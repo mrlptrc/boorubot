@@ -538,3 +538,6 @@ html.sl-loading .guide-tabs { visibility: hidden; }
 @media (max-width: 860px) {
   .cal-bottom { grid-template-columns: 1fr; }
 }
+
+.confirm-box { margin-bottom: 18px; border-color: #f2d77c; box-shadow: 0 4px 0 #f2d77c; background: #fffbea; }
+.confirm-box h2 { margin-top: 0; }

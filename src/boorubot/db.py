@@ -49,7 +49,8 @@ CREATE TABLE IF NOT EXISTS posts (
     status TEXT NOT NULL DEFAULT 'draft',
     scheduled_for TEXT,     -- legado (agendamento por data fixa); não é mais usado
     queue_pos REAL,         -- posição na fila (só posts aprovados)
-    published_at TEXT       -- quando saiu de verdade em pelo menos um site
+    published_at TEXT,      -- quando saiu de verdade em pelo menos um site
+    approved_in_test INTEGER NOT NULL DEFAULT 0  -- aprovada com o modo teste ligado: precisa confirmar
 );
 CREATE TABLE IF NOT EXISTS publications (
     id INTEGER PRIMARY KEY,
@@ -139,6 +140,13 @@ class DB:
             for col, kind in (("queue_pos", "REAL"), ("published_at", "TEXT")):
                 if col not in cols:  # banco criado por versão anterior
                     self.conn.execute(f"ALTER TABLE posts ADD COLUMN {col} {kind}")
+            if "approved_in_test" not in cols:
+                self.conn.execute("ALTER TABLE posts ADD COLUMN approved_in_test INTEGER NOT NULL DEFAULT 0")
+                # banco de antes da trava: com o modo teste ligado, o que está na fila foi aprovado
+                # no teste e também precisa de confirmação antes de ir ao ar
+                mode = self.conn.execute("SELECT value FROM settings WHERE key = 'test_mode'").fetchone()
+                if mode is None or mode[0] == "1":
+                    self.conn.execute("UPDATE posts SET approved_in_test = 1 WHERE status = 'approved'")
             # versões antigas consumiam o post no teste ("tested"); teste não muda mais o post
             self.conn.execute("UPDATE posts SET status = 'draft' WHERE status = 'tested'")
             self.conn.execute("DELETE FROM settings WHERE key = 'danbooru_env'")
@@ -212,13 +220,25 @@ class DB:
     # --- fila + limitador de ritmo -----------------------------------------------
 
     def queue(self) -> list[dict]:
+        """Fila. Em produção, arte aprovada no modo teste fica DE FORA até alguém confirmar:
+        desligar o modo teste nunca faz arte de teste ir ao ar sozinha."""
+        guard = "" if self.test_mode else " AND approved_in_test = 0"
         return [_decode(r) for r in self._all(
-            "SELECT * FROM posts WHERE status = 'approved' ORDER BY queue_pos, id")]
+            f"SELECT * FROM posts WHERE status = 'approved'{guard} ORDER BY queue_pos, id")]
 
     def approve(self, post_id: int) -> None:
-        """Entra no fim da fila."""
+        """Entra no fim da fila (marcada se for aprovada com o modo teste ligado)."""
         last = self._all("SELECT MAX(queue_pos) AS m FROM posts WHERE status = 'approved'")[0]["m"]
-        self.update_post(post_id, status="approved", queue_pos=(last or 0) + 1)
+        self.update_post(post_id, status="approved", queue_pos=(last or 0) + 1,
+                         approved_in_test=int(self.test_mode))
+
+    def needs_confirmation(self) -> list[dict]:
+        """Aprovadas no modo teste, esperando alguém confirmar que valem para produção."""
+        return [_decode(r) for r in self._all(
+            "SELECT * FROM posts WHERE status = 'approved' AND approved_in_test = 1 ORDER BY queue_pos, id")]
+
+    def confirm_for_production(self, post_id: int) -> None:
+        self.update_post(post_id, approved_in_test=0)
 
     def move_in_queue(self, post_id: int, where: str) -> None:
         agg = "MIN" if where == "first" else "MAX"
@@ -432,6 +452,7 @@ def _decode(row: dict) -> dict:
     row["sites"] = json.loads(row["sites"])
     row["site_tags"] = json.loads(row["site_tags"])
     row["original_character"] = bool(row["original_character"])
+    row["approved_in_test"] = bool(row.get("approved_in_test"))
     row["tag_list"] = row["tags"].split()
     return row
 

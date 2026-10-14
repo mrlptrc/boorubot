@@ -121,7 +121,7 @@ def week_favorites(db: DB, now: datetime) -> dict:
 
 @dataclass
 class Alert:
-    kind: str           # session | backup | test_mode
+    kind: str           # confirm | session | backup | test_mode
     site: str = ""
     label: str = ""
     others: int = 0     # quantos sites do próximo post continuam funcionando
@@ -130,6 +130,8 @@ class Alert:
 def alerts(db: DB, sites_in_use: list[str], next_post: dict | None) -> list[Alert]:
     """Do mais importante para o menos: sessão caída (trava publicação), backup falhando, modo teste."""
     found: list[Alert] = []
+    if not db.test_mode and db.needs_confirmation():
+        found.append(Alert("confirm", others=len(db.needs_confirmation())))
     sessions = db.sessions()
     for site in ALL_SITES:
         sess = sessions.get(site)
@@ -202,4 +204,5 @@ def build(db: DB, now: datetime | None = None) -> dict:
         "review": review,
         "failed_sites": failed_sites,
         "next_slot": db.projected_next(now),
+        "to_confirm": [] if db.test_mode else db.needs_confirmation(),
     }

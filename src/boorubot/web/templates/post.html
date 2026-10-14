@@ -56,6 +56,13 @@
       </div>
     </fieldset>
 
+    {% if post.status == 'approved' and post.approved_in_test %}
+    <p class="notice n-direct">
+      {% if test_mode %}<b>Aprovada no modo teste.</b> Quando o modo teste for desligado, ela <b>não vai ao ar</b>
+        sozinha: vai pedir confirmação.
+      {% else %}<b>Aprovada no modo teste:</b> não vai ao ar até você confirmar que vale de verdade.{% endif %}
+    </p>
+    {% endif %}
     {% if editable and 'danbooru' in post.sites %}
     <p class="notice n-{{ danbooru_mode }}">
       {% if danbooru_mode == 'direct' %}<b>Danbooru:</b> sua conta tem aprovação automática, então este post <b>vai ao ar na hora</b>, sem moderação. Confira o <b>rating</b> e as <b>tags</b>.
@@ -70,6 +77,8 @@
         <button name="action" value="approve" class="primary">Aprovar e agendar</button>
       {% elif post.status == 'approved' %}
         <button name="action" value="unapprove" class="ghost">Voltar para rascunho</button>
+        {% if post.approved_in_test and not test_mode %}<button name="action" value="confirm" class="primary"
+          data-confirm="Esta arte vai entrar na fila e sair DE VERDADE. Confirmar?">Confirmar para valer</button>{% endif %}
         {% if queue_pos and queue_pos > 1 %}<button name="action" value="first" class="ghost">Passar para o início da fila</button>{% endif %}
         {% if queue_pos and queue_pos < queue_len %}<button name="action" value="last" class="ghost">Mandar para o fim</button>{% endif %}
       {% endif %}

@@ -180,16 +180,28 @@ def create_app(db: DB | None = None, worker: Worker | None = None, start_worker:
                 return see_other(f"/posts/{post_id}?erro=" + quote("não dá para aprovar: " + ", ".join(errors)))
         if action == "approve":
             db.approve(post_id)
-        elif action == "publish_now":
-            db.update_post(post_id, status="publishing", queue_pos=None)
+        elif action == "publish_now":  # clique explícito em produção vale como confirmação
+            db.update_post(post_id, status="publishing", queue_pos=None, approved_in_test=0)
             worker.submit("publish", post_id, f"publicar #{post_id} (agora)")
         elif action == "test":  # não muda nada no post: só grava em test_runs
             worker.submit("test", post_id, f"testar #{post_id}")
         elif action == "unapprove":
-            db.update_post(post_id, status="draft", queue_pos=None)
+            db.update_post(post_id, status="draft", queue_pos=None, approved_in_test=0)
+        elif action == "confirm" and row["status"] == "approved":
+            db.confirm_for_production(post_id)
         elif action in ("first", "last") and row["status"] == "approved":
             db.move_in_queue(post_id, action)
         return see_other(f"/posts/{post_id}")
+
+    @app.post("/fila/teste")
+    def confirm_all(action: str = Form(...)):
+        """Artes aprovadas no modo teste: confirmar todas para produção ou voltar todas para rascunho."""
+        for post in db.needs_confirmation():
+            if action == "confirm":
+                db.confirm_for_production(post["id"])
+            elif action == "draft":
+                db.update_post(post["id"], status="draft", queue_pos=None, approved_in_test=0)
+        return see_other("/")
 
     @app.post("/posts/{post_id}/suggest")
     def suggest(post_id: int):

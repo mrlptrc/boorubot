@@ -85,11 +85,32 @@
   </div>
 </section>
 
+{% if d.to_confirm %}
+<section class="card confirm-box" aria-labelledby="confirmar">
+  <h2 id="confirmar">Confirme antes de postar</h2>
+  <p class="small">Estas artes foram aprovadas com o <b>modo teste</b> ligado. Por segurança elas <b>não vão ao ar</b>
+    até você confirmar que valem de verdade (arte sua ou dela, tags e rating conferidos).</p>
+  <div class="chips-row">
+    {% for p in d.to_confirm %}
+    <a class="art-chip" href="/posts/{{ p.id }}"><img src="/images/{{ p.image }}" alt="">{{ p.title or ('#' ~ p.id) }}</a>
+    {% endfor %}
+  </div>
+  <form method="post" action="/fila/teste" class="actions">
+    <button class="ghost" name="action" value="draft">Voltar todas para rascunho</button>
+    <button class="primary" name="action" value="confirm" data-confirm="Todas estas artes vão entrar na fila e sair DE VERDADE, 1 por dia. Confirmar?">Confirmar todas para valer</button>
+  </form>
+</section>
+{% endif %}
+
 {% set a = d.alert %}
 {% if a %}
 <div class="alert-strip" role="status">
   <img src="/static/pets/chick.svg" alt="">
-  {% if a.kind == 'session' %}
+  {% if a.kind == 'confirm' %}
+    <span><b>{{ a.others }} arte{{ 's' if a.others != 1 }}</b> aprovada{{ 's' if a.others != 1 }} no modo teste
+      esperando confirmação. Elas não vão ao ar sozinhas.</span>
+    <a href="#confirmar">Revisar</a>
+  {% elif a.kind == 'session' %}
     <span>O <b>{{ a.label }}</b> pediu login de novo.{% if a.others %} Até lá, os posts saem só nos outros {{ a.others }} site{{ 's' if a.others != 1 }}.{% endif %}</span>
     <a href="/sites#{{ a.site }}">Entrar agora</a>
   {% elif a.kind == 'backup' %}
