@@ -156,6 +156,32 @@
   </div>
 </form>
 
+<h2 id="ritmo">Ritmo por site</h2>
+<form method="post" action="/settings/ritmo" class="card settings rhythm-form">
+  <p class="muted small">O padrão é todos os sites no mesmo dia, 1 arte por dia. Dá para espaçar um site
+    ("dia sim, dia não"), atrasar ("1 dia depois" do dia da arte) ou desligar. Nunca sai mais de 1 por dia em cada site,
+    e PC desligado só atrasa: não sai tudo junto. Veja o resultado no <a href="/calendario">Calendário</a>.</p>
+  <table class="table">
+    <tr><th>Site</th><th>Ritmo</th><th>Quando</th></tr>
+    {% for s in ALL_SITES %}
+    <tr>
+      <td><b>{{ SITE_LABELS[s] }}</b></td>
+      <td><select name="rhythm_{{ s }}" aria-label="Ritmo do {{ SITE_LABELS[s] }}">
+        <option value="diario" {{ 'selected' if rhythms[s] == 'diario' }}>1 por dia</option>
+        <option value="dia_sim_dia_nao" {{ 'selected' if rhythms[s] == 'dia_sim_dia_nao' }}>dia sim, dia não</option>
+        <option value="desligado" {{ 'selected' if rhythms[s] == 'desligado' }}>desligado</option>
+      </select></td>
+      <td><select name="delay_{{ s }}" aria-label="Atraso do {{ SITE_LABELS[s] }}">
+        {% for n in range(0, 4) %}
+        <option value="{{ n }}" {{ 'selected' if delays[s] == n }}>{{ 'mesmo dia' if n == 0 else (n ~ (' dia depois' if n == 1 else ' dias depois')) }}</option>
+        {% endfor %}
+      </select></td>
+    </tr>
+    {% endfor %}
+  </table>
+  <div class="actions"><button class="primary">Salvar ritmo</button></div>
+</form>
+
 <h2 id="config">Configurações</h2>
 <form method="post" action="/settings" class="card settings">
   <label class="check">
