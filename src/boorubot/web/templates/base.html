@@ -18,6 +18,7 @@
 {% set path = request.url.path %}
 {% macro nav_links() %}
   <a href="/" class="{{ 'on' if path == '/' or path.startswith('/posts') }}"><img src="/static/pets/cat.svg" alt=""><span>Início</span></a>
+  <a href="/calendario" class="{{ 'on' if path == '/calendario' }}"><img src="/static/pets/bunny.svg" alt=""><span>Calendário</span></a>
   <a href="/metricas" class="{{ 'on' if path == '/metricas' }}"><img src="/static/pets/bear.svg" alt=""><span>Métricas</span></a>
   <a href="/sites" class="{{ 'on' if path == '/sites' }}"><img src="/static/pets/puppy.svg" alt=""><span>Sites</span></a>
   <a href="/historico" class="{{ 'on' if path == '/historico' }}"><img src="/static/pets/paw.svg" alt=""><span>Histórico</span></a>
