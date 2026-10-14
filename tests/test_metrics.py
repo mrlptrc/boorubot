@@ -129,7 +129,7 @@ def test_history_shows_metrics_and_refresh_button(db):
     page = c.get("/historico").text
     assert "<b>42</b> · ♥ 17" in page
     assert "<b>42</b> · ♥ 17" in c.get(f"/posts/{post_id}").text
-    c.post("/historico/metricas")
+    c.post("/metricas/atualizar")
     assert [j.kind for j in w.jobs.queue] == ["metrics"]
 
 
