@@ -58,6 +58,7 @@ class FormSite(Site):
             page.goto(self.upload_url)
             self._wait_captcha(page, 20)
             ok = self._has_upload_form(page)
+            dump_forms(page, out / "upload-forms.json")  # diagnóstico dos campos reais
             shot = screenshot(page, out / "session.png")
         msg = "sessão ativa" if ok else "sem sessão: faça o login de novo"
         return Result(self.name, ok=ok, dry_run=True, message=msg, artifacts=[shot])

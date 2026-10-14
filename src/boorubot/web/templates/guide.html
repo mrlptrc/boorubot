@@ -1,0 +1,151 @@
+{% extends "base.html" %}
+{% block title %}Guia · boorubot{% endblock %}
+{% block content %}
+{% macro status(site) %}
+  {% set sess = sessions.get(site) %}
+  {% if sess and sess.ok %}<span class="pill s-ok">conectado</span>
+  {% elif sess %}<span class="pill s-failed">desconectado</span>
+  {% else %}<span class="pill">não conectado</span>{% endif %}
+{% endmacro %}
+
+<article class="guide">
+  <h1>Como usar o boorubot</h1>
+  <p class="lead">Você sobe a arte, a IA sugere as tags, você revisa e aprova. O robô posta <b>1 arte por dia</b>
+  no horário escolhido, em todos os sites marcados, usando as <b>suas</b> contas.</p>
+
+  <nav class="toc card">
+    <b>Neste guia</b>
+    <ol>
+      <li><a href="#antes">Antes de começar</a></li>
+      <li><a href="#danbooru">Conectar o Danbooru</a> {{ status('danbooru') }}</li>
+      <li><a href="#gelbooru">Conectar Gelbooru, paheal e rule34.us</a> {{ status('gelbooru') }} {{ status('paheal') }} {{ status('rule34us') }}</li>
+      <li><a href="#rule34xxx">Conectar o rule34.xxx</a> {{ status('rule34xxx') }}</li>
+      <li><a href="#teste">Fazer um post de teste</a></li>
+      <li><a href="#valendo">Começar a postar de verdade</a></li>
+      <li><a href="#dia-a-dia">Dia a dia</a></li>
+      <li><a href="#regras">Regras dos sites (para não perder a conta)</a></li>
+      <li><a href="#seguranca">Segurança das suas contas</a></li>
+      <li><a href="#problemas">Algo deu errado?</a></li>
+    </ol>
+  </nav>
+
+  <section id="antes">
+    <h2>1. Antes de começar</h2>
+    <ul>
+      <li>Este painel roda <b>neste computador</b>. Para os posts saírem no horário, o PC precisa estar <b>ligado</b> e o painel <b>aberto</b>.</li>
+      <li>Tenha em mãos o <b>usuário e a senha</b> de cada site. A senha você digita no próprio site e ela <b>não fica salva aqui</b>.</li>
+      <li>Enquanto o <b>modo teste</b> estiver ligado (faixa amarela no topo), nada é postado. Pode testar à vontade.</li>
+    </ul>
+  </section>
+
+  <section id="danbooru">
+    <h2>2. Conectar o Danbooru {{ status('danbooru') }}</h2>
+    <p>O Danbooru conecta por uma <b>chave de API</b>, uma senha especial só para o robô que você pode cancelar quando quiser.</p>
+    <ol class="steps">
+      <li>Entre na sua conta em <a href="https://danbooru.donmai.us/login" target="_blank">danbooru.donmai.us</a>.</li>
+      <li>Abra <a href="https://danbooru.donmai.us/api_keys/new" target="_blank">danbooru.donmai.us/api_keys/new</a>
+        (ou: seu perfil → <i>API Key</i> → <i>New</i>).</li>
+      <li>Em <i>Name</i> escreva <code>boorubot</code>. Deixe <i>IP Addresses</i> e <i>Permissions</i> <b>em branco</b> e clique em <i>Create</i>.</li>
+      <li>Copie a chave que aparece na lista (um texto longo de letras e números).</li>
+      <li>Aqui no painel, vá em <a href="/sites#danbooru">Sites → Danbooru</a>, preencha seu <b>usuário</b>, cole a <b>chave</b>,
+        escolha o ambiente <b>Real</b> e clique em <b>Salvar e testar</b>.</li>
+      <li>Em alguns segundos deve aparecer <span class="pill s-ok">conectado</span> com o seu nível de conta.
+        Sendo <b>Contributor</b>, seus posts são aprovados direto.</li>
+    </ol>
+    <p class="tip">Para cancelar o acesso do robô: no Danbooru, abra <a href="https://danbooru.donmai.us/api_keys" target="_blank">API Keys</a> e apague a chave <code>boorubot</code>.</p>
+  </section>
+
+  <section id="gelbooru">
+    <h2>3. Conectar Gelbooru, paheal e rule34.us</h2>
+    <p>Esses sites conectam pelo navegador, do mesmo jeito que você entra normalmente.</p>
+    <ol class="steps">
+      <li>Vá em <a href="/sites">Sites</a> e clique em <b>Entrar</b> no site desejado.</li>
+      <li>Uma <b>janela do navegador abre</b> na página de login do site. Entre com seu usuário e senha.</li>
+      <li>Depois de logada, <b>feche essa janela</b>. O painel testa sozinho e mostra <span class="pill s-ok">conectado</span>.</li>
+      <li>Repita para cada site. Se aparecer <span class="pill s-failed">desconectado</span>, clique em <b>Entrar</b> de novo.</li>
+    </ol>
+    <p id="paheal" class="tip"><b>rule34.paheal:</b> o site não aceita artes só com personagem original (OC). Quando a arte for de OC,
+      marque a caixa <i>"Só personagem original"</i> no post e o robô pula o paheal automaticamente.</p>
+    <p id="rule34us" class="tip"><b>rule34.us:</b> se aparecer um "não sou um robô" na hora de entrar, resolva na própria janela.</p>
+  </section>
+
+  <section id="rule34xxx">
+    <h2>4. Conectar o rule34.xxx {{ status('rule34xxx') }}</h2>
+    <p>Igual aos anteriores, com dois detalhes:</p>
+    <ul>
+      <li>Ao abrir, pode aparecer uma tela de <b>"verificando se você é humano"</b>. Espere alguns segundos, ela passa sozinha.</li>
+      <li>O login tem <b>captcha</b>: resolva antes de clicar em <i>Log in</i>.</li>
+    </ul>
+    <p class="tip">Nesse site, a janela do navegador também abre <b>na hora de postar</b>, porque o site bloqueia o modo invisível. É normal: não feche, ela fecha sozinha.</p>
+  </section>
+
+  <section id="teste">
+    <h2>5. Fazer um post de teste</h2>
+    <ol class="steps">
+      <li>Confira se a faixa amarela de <b>modo teste</b> está aparecendo.</li>
+      <li>Na <a href="/">Fila</a>, arraste uma arte para <b>+ Nova arte</b>.</li>
+      <li>Clique em <b>✨ Sugerir com IA</b>. Na primeira vez demora alguns minutos (baixa o modelo), depois leva um segundo.</li>
+      <li>Revise as tags, o rating e o link original. Marque os sites e clique em <b>Publicar agora</b>.</li>
+      <li>Embaixo do post aparece cada site como <span class="pill s-dry_run">teste</span> (deu certo) ou
+        <span class="pill s-failed">falhou</span>, com o motivo.</li>
+    </ol>
+  </section>
+
+  <section id="valendo">
+    <h2>6. Começar a postar de verdade</h2>
+    <p>Quando todos os sites estiverem <span class="pill s-ok">conectado</span> e o teste tiver dado certo:</p>
+    <ol class="steps">
+      <li>Em <a href="/sites#danbooru">Sites → Danbooru</a>, confirme que o ambiente é <b>Real</b>.</li>
+      <li>Em <a href="/sites">Sites → Configurações</a>, <b>desmarque "Modo teste"</b>, escolha o <b>horário</b> do post diário e salve.</li>
+      <li>A faixa amarela some. A partir daí, os posts aprovados saem de verdade.</li>
+    </ol>
+  </section>
+
+  <section id="dia-a-dia">
+    <h2>7. Dia a dia</h2>
+    <ul>
+      <li><b>Aprovar e agendar</b>: o post entra no próximo dia livre, no horário configurado (1 por dia).</li>
+      <li><b>Publicar agora</b>: posta na hora, fora da agenda.</li>
+      <li><b>Voltar para rascunho</b>: tira o post da agenda.</li>
+      <li><b>Tentar de novo</b>: se um site falhou, reenvia <b>só para os sites que falharam</b>.</li>
+      <li><b>Tags padrão</b> (em Sites → Configurações): seu nome de artista, <code>commission</code> etc. já entram em todo post novo.</li>
+      <li><b>Histórico</b>: todos os envios, com o link do post em cada site.</li>
+    </ul>
+  </section>
+
+  <section id="regras">
+    <h2>8. Regras dos sites (para não perder a conta)</h2>
+    <ul>
+      <li><b>Uma conta por site.</b> Danbooru e paheal proíbem contas extras. Use só a sua.</li>
+      <li><b>Personagens sempre adultos</b> e nada de pessoas reais. Vale para todos os sites e é lei.</li>
+      <li><b>Danbooru</b>: estilo anime, boa qualidade, de 10 a 20 tags ou mais, e o crédito da artista (a tag com seu nome de artista). Nada de conteúdo pago ou bloqueado por paywall.</li>
+      <li><b>Gelbooru</b>: estilo japonês, sem marca d'água, boa qualidade.</li>
+      <li><b>rule34.paheal</b>: não aceita OC (veja acima) e não deixa criar tags novas sem falar com a moderação.</li>
+      <li><b>Ritmo</b>: 1 post por dia é tranquilo. Postar em rajada parece spam.</li>
+    </ul>
+  </section>
+
+  <section id="seguranca">
+    <h2>9. Segurança das suas contas</h2>
+    <ul>
+      <li>Sua <b>senha nunca é salva</b> no painel. Fica só a sessão ("lembrar de mim") no navegador do robô, neste PC.</li>
+      <li>A <b>chave do Danbooru</b> fica salva só neste PC e pode ser cancelada no Danbooru a qualquer momento.</li>
+      <li>O painel só abre <b>neste computador</b>. Ninguém de fora acessa.</li>
+    </ul>
+  </section>
+
+  <section id="problemas">
+    <h2>10. Algo deu errado?</h2>
+    <dl>
+      <dt>O post não saiu no horário.</dt>
+      <dd>O PC estava ligado com o painel aberto? O modo teste está desligado? Os sites estão "conectado"?</dd>
+      <dt>Apareceu "sem sessão no site".</dt>
+      <dd>O site te deslogou. Vá em <a href="/sites">Sites</a>, clique em <b>Entrar</b> naquele site e faça login de novo. Depois, use <b>Tentar de novo</b> no post.</dd>
+      <dt>Danbooru "desconectado".</dt>
+      <dd>Confira o usuário (exatamente como no site) e se a chave não foi apagada. Gere outra se precisar.</dd>
+      <dt>A sugestão de tags errou.</dt>
+      <dd>É só uma sugestão: apague as tags erradas e adicione as que faltam. Confira sempre o <b>rating</b>.</dd>
+    </dl>
+  </section>
+</article>
+{% endblock %}

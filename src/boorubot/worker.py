@@ -38,7 +38,7 @@ def publish_post(db: DB, post_id: int) -> str:
         if name in done:
             continue
         try:
-            result = build_site(name).publish(post, dry_run=dry_run)
+            result = build_site(name, db).publish(post, dry_run=dry_run)
             status = "dry_run" if result.dry_run else ("ok" if result.ok else "failed")
             db.add_publication(post_id, name, status, result.url, result.message)
         except SkipPost as exc:
@@ -101,7 +101,7 @@ class Worker:
         if job.kind == "publish":
             publish_post(self.db, int(job.target))
         elif job.kind in ("login", "session"):
-            site = build_site(str(job.target))
+            site = build_site(str(job.target), self.db)
             try:
                 result = site.login() if job.kind == "login" else site.session_check()
                 self.db.set_session(site.name, result.ok, result.message)

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import uuid
 from urllib.parse import quote
 from pathlib import Path
@@ -63,8 +64,31 @@ def create_app(db: DB | None = None, worker: Worker | None = None, start_worker:
     )
 
     def render(request: Request, name: str, **ctx):
-        ctx.update(test_mode=db.test_mode, jobs=worker.pending())
+        ctx.update(test_mode=db.test_mode, jobs=worker.pending(), danbooru_env=db.setting("danbooru_env"))
         return templates.TemplateResponse(request, name, ctx)
+
+    def default_sites() -> list[str]:
+        try:
+            return [s for s in ALL_SITES if s in json.loads(db.setting("default_sites"))]
+        except ValueError:
+            return list(ALL_SITES)
+
+    def setup_steps() -> list[dict]:
+        """Checklist de configuração mostrada na Fila até tudo estar pronto."""
+        sessions = db.sessions()
+        steps = [{
+            "label": f"Conectar {SITE_LABELS[s]}",
+            "done": bool(sessions.get(s, {}).get("ok")),
+            "href": f"/guia#{s}",
+        } for s in default_sites()]
+        tested = any(p["status"] in ("tested", "done", "partial") for p in db.list_posts())
+        steps.append({"label": "Fazer um post de teste (modo teste ligado)", "done": tested, "href": "/guia#teste"})
+        steps.append({"label": "Desligar o modo teste para começar a postar", "done": not db.test_mode,
+                      "href": "/guia#valendo"})
+        if "danbooru" in default_sites():
+            steps.append({"label": "Danbooru no ambiente real (não o de teste)",
+                          "done": db.setting("danbooru_env") == "live", "href": "/guia#danbooru"})
+        return steps
 
     def post_or_404(post_id: int) -> dict:
         row = db.get_post(post_id)
@@ -82,6 +106,7 @@ def create_app(db: DB | None = None, worker: Worker | None = None, start_worker:
             scheduled=db.list_posts(("approved", "publishing")),
             recent=[p for p in db.list_posts() if p["status"] in ("done", "partial", "failed", "tested")][:12],
             next_slot=db.next_free_slot(),
+            steps=setup_steps(),
         )
 
     @app.post("/posts")
@@ -91,7 +116,8 @@ def create_app(db: DB | None = None, worker: Worker | None = None, start_worker:
             raise HTTPException(400, f"formato não suportado: {ext or '?'} (use {', '.join(IMAGE_EXTS)})")
         filename = f"{uuid.uuid4().hex}{ext}"
         (IMAGES_DIR / filename).write_bytes(await image.read())
-        post_id = db.create_post(filename, title=Path(image.filename).stem, sites=list(ALL_SITES))
+        post_id = db.create_post(filename, title=Path(image.filename).stem, sites=default_sites(),
+                                 tags=" ".join(normalize_tags(db.setting("default_tags"))))
         return see_other(f"/posts/{post_id}")
 
     @app.get("/posts/{post_id}")
@@ -161,7 +187,32 @@ def create_app(db: DB | None = None, worker: Worker | None = None, start_worker:
 
     @app.get("/sites")
     def sites_page(request: Request):
-        return render(request, "sites.html", sessions=db.sessions(), daily_time=db.setting("daily_time"))
+        key = db.setting("danbooru_api_key")
+        return render(
+            request, "sites.html", sessions=db.sessions(), daily_time=db.setting("daily_time"),
+            danbooru_login=db.setting("danbooru_login"),
+            danbooru_key_hint=f"••••{key[-4:]}" if key else "",
+            default_tags=db.setting("default_tags"), default_sites=default_sites(),
+        )
+
+    @app.post("/settings/danbooru")
+    def save_danbooru(login: str = Form(""), api_key: str = Form(""), env: str = Form("test")):
+        db.set_setting("danbooru_login", login.strip())
+        if api_key.strip():  # vazio = mantém a chave salva
+            db.set_setting("danbooru_api_key", api_key.strip())
+        db.set_setting("danbooru_env", env if env in ("test", "live") else "test")
+        worker.submit("session", "danbooru", "testar sessão Danbooru")
+        return see_other("/sites#danbooru")
+
+    @app.post("/settings/danbooru/remove")
+    def remove_danbooru():
+        db.set_setting("danbooru_api_key", "")
+        db.set_session("danbooru", False, "chave removida do painel")
+        return see_other("/sites#danbooru")
+
+    @app.get("/guia")
+    def guide(request: Request):
+        return render(request, "guide.html", sessions=db.sessions())
 
     @app.post("/sites/{name}/{kind}")
     def site_action(name: str, kind: str):
@@ -174,8 +225,15 @@ def create_app(db: DB | None = None, worker: Worker | None = None, start_worker:
         return see_other("/sites")
 
     @app.post("/settings")
-    def save_settings(test_mode: bool = Form(False), daily_time: str = Form("18:00")):
+    def save_settings(
+        test_mode: bool = Form(False),
+        daily_time: str = Form("18:00"),
+        default_tags: str = Form(""),
+        default_sites: list[str] = Form([]),
+    ):
         db.set_setting("test_mode", "1" if test_mode else "0")
+        db.set_setting("default_tags", " ".join(normalize_tags(default_tags)))
+        db.set_setting("default_sites", json.dumps([s for s in ALL_SITES if s in default_sites]))
         hh, _, mm = daily_time.partition(":")
         if hh.isdigit() and mm.isdigit() and int(hh) < 24 and int(mm) < 60:
             db.set_setting("daily_time", f"{int(hh):02d}:{int(mm):02d}")

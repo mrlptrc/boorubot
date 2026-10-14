@@ -59,6 +59,11 @@ CREATE TABLE IF NOT EXISTS settings (
 DEFAULT_SETTINGS = {
     "test_mode": "1",       # 1 = nada é enviado de verdade (dry-run)
     "daily_time": "18:00",  # horário do post diário
+    "danbooru_env": "test",  # test = testbooru, live = danbooru de verdade
+    "danbooru_login": "",
+    "danbooru_api_key": "",
+    "default_tags": "",      # entram em todo post novo (ex.: nome de artista, commission)
+    "default_sites": json.dumps(["danbooru", "gelbooru", "paheal", "rule34us", "rule34xxx"]),
 }
 
 _lock = threading.Lock()

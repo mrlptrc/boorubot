@@ -20,6 +20,7 @@ from boorubot.models import Post
 from boorubot.sites.base import Result, Site
 
 USER_AGENT = "boorubot/0.1 (post-automation)"
+NO_KEY = "sem usuário/chave de API: preencha em Sites → Danbooru (ou DANBOORU_LOGIN/DANBOORU_API_KEY no .env)"
 RATING_CODES = {"general": "g", "sensitive": "s", "questionable": "q", "explicit": "e"}
 
 
@@ -78,11 +79,17 @@ class Danbooru(Site):
 
     def session_check(self) -> Result:
         if not (self.login and self.api_key):
-            return Result(self.name, ok=False, dry_run=True, message="faltam DANBOORU_LOGIN / DANBOORU_API_KEY no .env")
-        me = self.whoami()
-        ok = me.get("name") == self.login
+            return Result(self.name, ok=False, dry_run=True, message=NO_KEY)
+        try:
+            me = self.whoami()
+        except httpx.HTTPStatusError as exc:
+            if exc.response.status_code in (401, 403):
+                return Result(self.name, ok=False, dry_run=True, message="usuário ou chave de API inválidos")
+            raise
+        ok = me.get("name", "").lower() == self.login.lower()
         level = me.get("level_string", "?")
-        msg = f"API ok: {me.get('name')} ({level}) em {self.base_url}" if ok else "API key recusada"
+        where = "teste (testbooru)" if "testbooru" in self.base_url else "real"
+        msg = f"conectado como {me.get('name')} ({level}), ambiente {where}" if ok else "usuário ou chave de API inválidos"
         return Result(self.name, ok=ok, dry_run=True, message=msg)
 
     def publish(self, post: Post, dry_run: bool = True) -> Result:
@@ -94,7 +101,7 @@ class Danbooru(Site):
                 message=f"enviaria {post.image.name} para {self.base_url}\n  " + "\n  ".join(lines),
             )
         if not (self.login and self.api_key):
-            raise DanbooruError("faltam DANBOORU_LOGIN / DANBOORU_API_KEY no .env")
+            raise DanbooruError(NO_KEY)
 
         asset_id = self._upload_file(post)
         r = self.client.post("/posts.json", data=self.post_payload(post, asset_id))

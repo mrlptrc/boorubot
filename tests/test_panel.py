@@ -105,7 +105,7 @@ class FakeSite:
 def test_publish_records_each_site_and_retries_only_failures(db, monkeypatch):
     (app_mod.IMAGES_DIR / "a.png").write_bytes(PNG)
     outcomes = {"danbooru": "ok", "paheal": "skip", "gelbooru": "boom"}
-    monkeypatch.setattr(worker_mod, "build_site", lambda n: FakeSite(n, outcomes[n]))
+    monkeypatch.setattr(worker_mod, "build_site", lambda n, db=None: FakeSite(n, outcomes[n]))
     db.set_setting("test_mode", "0")
     post_id = db.create_post("a.png", tags="x", sites=["danbooru", "paheal", "gelbooru"])
 
@@ -127,7 +127,7 @@ def test_test_mode_never_sends(db, monkeypatch):
             seen.append(dry_run)
             return super().publish(post, dry_run)
 
-    monkeypatch.setattr(worker_mod, "build_site", lambda n: Spy(n, "ok"))
+    monkeypatch.setattr(worker_mod, "build_site", lambda n, db=None: Spy(n, "ok"))
     post_id = db.create_post("a.png", tags="x", sites=["danbooru", "gelbooru"])
     assert db.test_mode
     assert publish_post(db, post_id) == "tested"
@@ -136,6 +136,48 @@ def test_test_mode_never_sends(db, monkeypatch):
 
 def test_test_mode_still_reports_failures(db, monkeypatch):
     (app_mod.IMAGES_DIR / "a.png").write_bytes(PNG)
-    monkeypatch.setattr(worker_mod, "build_site", lambda n: FakeSite(n, "boom" if n == "gelbooru" else "ok"))
+    monkeypatch.setattr(worker_mod, "build_site", lambda n, db=None: FakeSite(n, "boom" if n == "gelbooru" else "ok"))
     post_id = db.create_post("a.png", tags="x", sites=["danbooru", "gelbooru"])
     assert publish_post(db, post_id) == "partial"
+
+
+def test_danbooru_credentials_saved_in_panel(client, db):
+    c, w = client
+    r = c.post("/settings/danbooru", data={"login": " artista ", "api_key": "abc123xyz", "env": "live"},
+               follow_redirects=False)
+    assert r.status_code == 303
+    assert db.setting("danbooru_login") == "artista" and db.setting("danbooru_env") == "live"
+    assert [j.kind for j in w.jobs.queue] == ["session"]  # já agenda o teste
+    # chave em branco mantém a salva
+    c.post("/settings/danbooru", data={"login": "artista", "api_key": "", "env": "live"})
+    assert db.setting("danbooru_api_key") == "abc123xyz"
+    page = c.get("/sites").text
+    assert "abc123xyz" not in page and "••••3xyz" in page
+
+    from boorubot.config import build_site
+    site = build_site("danbooru", db)
+    assert site.base_url == "https://danbooru.donmai.us" and site.login == "artista"
+
+
+def test_defaults_prefill_new_posts(client, db):
+    c, _ = client
+    c.post("/settings", data={"test_mode": "true", "daily_time": "09:30",
+                              "default_tags": "Nome Artista, commission", "default_sites": ["danbooru", "gelbooru"]})
+    post_id = upload(c)
+    row = db.get_post(post_id)
+    assert row["tags"] == "nome_artista commission"
+    assert row["sites"] == ["danbooru", "gelbooru"]
+    assert db.setting("daily_time") == "09:30"
+
+
+def test_guide_and_checklist(client, db):
+    c, _ = client
+    assert "api_keys/new" in c.get("/guia").text
+    home = c.get("/").text
+    assert "Configuração inicial" in home and "Conectar Danbooru" in home
+    for s in ("danbooru", "gelbooru", "paheal", "rule34us", "rule34xxx"):
+        db.set_session(s, True, "ok")
+    db.set_setting("test_mode", "0")
+    db.set_setting("danbooru_env", "live")
+    db.create_post("a.png", status="done")
+    assert "Configuração inicial" not in c.get("/").text

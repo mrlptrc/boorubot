@@ -13,6 +13,7 @@
       <a href="/" class="{{ 'on' if request.url.path == '/' or request.url.path.startswith('/posts') }}">Fila</a>
       <a href="/sites" class="{{ 'on' if request.url.path == '/sites' }}">Sites</a>
       <a href="/historico" class="{{ 'on' if request.url.path == '/historico' }}">Histórico</a>
+      <a href="/guia" class="{{ 'on' if request.url.path == '/guia' }}">Guia</a>
     </nav>
     <div id="jobs" class="jobs" data-count="{{ jobs|length }}">
       {% if jobs %}<span class="spin"></span> {{ jobs[0] }}{% if jobs|length > 1 %} (+{{ jobs|length - 1 }}){% endif %}{% endif %}
@@ -20,6 +21,8 @@
   </header>
   {% if test_mode %}
   <div class="banner">Modo teste ligado: os posts são preenchidos mas <b>não enviados</b>. Desligue em <a href="/sites">Sites</a>.</div>
+  {% elif danbooru_env == 'test' %}
+  <div class="banner">O Danbooru está no ambiente de <b>teste</b> (testbooru). Troque para Real em <a href="/sites#danbooru">Sites</a>.</div>
   {% endif %}
   <main>{% block content %}{% endblock %}</main>
   <script>

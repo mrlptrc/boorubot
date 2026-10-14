@@ -1,30 +1,58 @@
 {% extends "base.html" %}
 {% block title %}Sites · boorubot{% endblock %}
 {% block content %}
-<h2>Sites</h2>
-<p class="muted">"Entrar" abre o navegador neste PC: faça o login (e o captcha, se aparecer) e <b>feche a janela</b> quando terminar.
-A sessão fica salva e o robô reaproveita.</p>
+<h2>Contas conectadas</h2>
+<p class="muted">Primeira vez? Siga o <a href="/guia">guia de conexão</a>, que leva uns 10 minutos.</p>
 
 <div class="site-list">
-  {% for s in ALL_SITES %}
-  {% set sess = sessions.get(s) %}
-  <div class="card site">
-    <div>
-      <strong>{{ SITE_LABELS[s] }}</strong>
-      {% if sess %}
-        <span class="pill {{ 's-ok' if sess.ok else 's-failed' }}">{{ 'conectado' if sess.ok else 'desconectado' }}</span>
-        <div class="muted small">{{ sess.message }} · checado {{ sess.checked_at[8:10] }}/{{ sess.checked_at[5:7] }} {{ sess.checked_at[11:16] }}</div>
-      {% else %}
-        <span class="pill">não verificado</span>
-      {% endif %}
-      {% if s == 'danbooru' %}<div class="muted small">usa API key no arquivo .env</div>{% endif %}
-      {% if s == 'rule34xxx' %}<div class="muted small">abre o navegador visível (o Cloudflare bloqueia o modo invisível)</div>{% endif %}
+  {% set sess = sessions.get('danbooru') %}
+  <div class="card site site-danbooru" id="danbooru">
+    <div class="site-head">
+      <div>
+        <strong>Danbooru</strong>
+        {% if sess %}<span class="pill {{ 's-ok' if sess.ok else 's-failed' }}">{{ 'conectado' if sess.ok else 'desconectado' }}</span>
+        {% else %}<span class="pill">não conectado</span>{% endif %}
+        <div class="muted small">{% if sess %}{{ sess.message }} · checado {{ sess.checked_at[8:10] }}/{{ sess.checked_at[5:7] }} {{ sess.checked_at[11:16] }}{% else %}conecta por chave de API (sem abrir navegador){% endif %}</div>
+      </div>
+      <a class="small" href="/guia#danbooru">Como conectar?</a>
     </div>
-    <div class="actions">
-      {% if s != 'danbooru' %}
-      <form method="post" action="/sites/{{ s }}/login"><button class="primary">Entrar</button></form>
-      {% endif %}
-      <form method="post" action="/sites/{{ s }}/session"><button class="ghost">Testar</button></form>
+    <form method="post" action="/settings/danbooru" class="inline-form">
+      <label>Usuário do Danbooru <input name="login" value="{{ danbooru_login }}" autocomplete="off" placeholder="seu_nome_de_usuario"></label>
+      <label>Chave de API <input name="api_key" type="password" autocomplete="new-password"
+        placeholder="{{ 'salva (' ~ danbooru_key_hint ~ '). Deixe vazio para manter' if danbooru_key_hint else 'cole a chave aqui' }}"></label>
+      <label>Ambiente
+        <select name="env">
+          <option value="live" {{ 'selected' if danbooru_env == 'live' }}>Real (danbooru.donmai.us)</option>
+          <option value="test" {{ 'selected' if danbooru_env == 'test' }}>Teste (testbooru, para o técnico)</option>
+        </select>
+      </label>
+      <div class="actions">
+        <button class="primary">Salvar e testar</button>
+        <button class="ghost" formaction="/sites/danbooru/session">Testar</button>
+        {% if danbooru_key_hint %}<button class="danger" formaction="/settings/danbooru/remove" onclick="return confirm('Remover a chave do painel?')">Remover chave</button>{% endif %}
+      </div>
+    </form>
+  </div>
+
+  {% for s in ALL_SITES if s != 'danbooru' %}
+  {% set sess = sessions.get(s) %}
+  <div class="card site" id="{{ s }}">
+    <div class="site-head">
+      <div>
+        <strong>{{ SITE_LABELS[s] }}</strong>
+        {% if sess %}<span class="pill {{ 's-ok' if sess.ok else 's-failed' }}">{{ 'conectado' if sess.ok else 'desconectado' }}</span>
+        {% else %}<span class="pill">não conectado</span>{% endif %}
+        <div class="muted small">
+          {% if sess %}{{ sess.message }} · checado {{ sess.checked_at[8:10] }}/{{ sess.checked_at[5:7] }} {{ sess.checked_at[11:16] }}
+          {% else %}"Entrar" abre o site numa janela: faça login e feche a janela{% endif %}
+          {% if s == 'rule34xxx' %}<br>tem captcha no login, resolva na janela{% endif %}
+        </div>
+      </div>
+      <div class="actions">
+        <a class="small" href="/guia#{{ s }}">Como conectar?</a>
+        <form method="post" action="/sites/{{ s }}/login"><button class="primary">Entrar</button></form>
+        <form method="post" action="/sites/{{ s }}/session"><button class="ghost">Testar</button></form>
+      </div>
     </div>
   </div>
   {% endfor %}
@@ -37,6 +65,15 @@ A sessão fica salva e o robô reaproveita.</p>
     Modo teste <small>preenche os formulários e tira print, mas não envia nada</small>
   </label>
   <label>Horário do post diário <input type="time" name="daily_time" value="{{ daily_time }}"></label>
+  <label>Tags padrão <small>entram automaticamente em todo post novo (ex.: seu nome de artista, <code>commission</code>)</small>
+    <input name="default_tags" value="{{ default_tags }}" placeholder="nome_da_artista commission">
+  </label>
+  <div class="sites">
+    <span>Sites marcados em posts novos</span>
+    {% for s in ALL_SITES %}
+    <label class="chip"><input type="checkbox" name="default_sites" value="{{ s }}" {{ 'checked' if s in default_sites }}> {{ SITE_LABELS[s] }}</label>
+    {% endfor %}
+  </div>
   <div class="actions"><button class="primary">Salvar</button></div>
 </form>
 {% endblock %}

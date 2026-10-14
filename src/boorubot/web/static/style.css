@@ -83,3 +83,38 @@ button:disabled { opacity: .6; cursor: wait; }
 .site .actions { margin-top: 0; }
 .settings { display: flex; flex-direction: column; gap: 12px; max-width: 480px; }
 .settings input[type=time] { width: 140px; }
+
+.setup { margin-bottom: 16px; }
+.setup-head { display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
+.setup-head a { margin-left: auto; }
+.bar { height: 6px; background: var(--line); border-radius: 999px; margin: 10px 0; overflow: hidden; }
+.bar span { display: block; height: 100%; background: var(--accent); }
+.checklist { list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 6px 16px; font-size: 14px; }
+.checklist li { display: flex; align-items: center; gap: 8px; }
+.checklist a { color: var(--ink); }
+.checklist li.ok a { color: var(--muted); text-decoration: line-through; }
+.box { width: 18px; height: 18px; border: 1.5px solid var(--line); border-radius: 5px; display: inline-flex; align-items: center; justify-content: center; font-size: 12px; flex: none; }
+.checklist li.ok .box { background: var(--ok); border-color: var(--ok); color: #fff; }
+
+.site-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; width: 100%; }
+.site-head .actions { align-items: center; margin-top: 0; }
+.site-danbooru { flex-direction: column; align-items: stretch; }
+.inline-form { display: grid; grid-template-columns: 1fr 1.4fr 1fr; gap: 12px; align-items: end; margin-top: 12px; }
+.inline-form .actions { grid-column: 1 / -1; margin-top: 0; }
+@media (max-width: 760px) { .inline-form { grid-template-columns: 1fr; } }
+.site-danbooru .danger { margin-left: auto; }
+.settings { max-width: 640px; }
+
+.guide { max-width: 760px; }
+.guide h1 { font-size: 26px; margin: 8px 0; }
+.guide .lead { font-size: 16px; }
+.guide section { scroll-margin-top: 70px; padding-top: 4px; }
+.guide h2 { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.guide li { margin: 6px 0; }
+.toc ol { margin: 8px 0 0; padding-left: 20px; }
+.toc li { margin: 4px 0; }
+.steps li::marker { color: var(--accent); font-weight: 700; }
+.tip { background: var(--card); border-left: 3px solid var(--accent); padding: 10px 14px; border-radius: 0 8px 8px 0; font-size: 14px; }
+.guide dt { font-weight: 600; margin-top: 12px; }
+.guide dd { margin: 4px 0 0 0; color: var(--muted); }
+code { background: var(--line); padding: 1px 5px; border-radius: 4px; font-size: 0.92em; }

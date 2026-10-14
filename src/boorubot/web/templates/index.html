@@ -1,5 +1,22 @@
 {% extends "base.html" %}
 {% block content %}
+{% set done = steps|selectattr('done')|list|length %}
+{% if done < steps|length %}
+<section class="card setup">
+  <div class="setup-head">
+    <strong>Configuração inicial</strong>
+    <span class="muted small">{{ done }} de {{ steps|length }}</span>
+    <a class="small" href="/guia">abrir o guia →</a>
+  </div>
+  <div class="bar"><span style="width: {{ (100 * done / steps|length)|round|int }}%"></span></div>
+  <ul class="checklist">
+    {% for st in steps %}
+    <li class="{{ 'ok' if st.done }}"><span class="box">{{ '✓' if st.done else '' }}</span> <a href="{{ st.href }}">{{ st.label }}</a></li>
+    {% endfor %}
+  </ul>
+</section>
+{% endif %}
+
 <section class="card upload">
   <form method="post" action="/posts" enctype="multipart/form-data" id="upload-form">
     <label class="drop" id="drop">
