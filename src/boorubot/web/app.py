@@ -332,10 +332,16 @@ def create_app(db: DB | None = None, worker: Worker | None = None, start_worker:
         return render(request, "history.html", pubs=db.publications(limit=200), metrics=db.latest_metrics(),
                       metrics_last_run=db.setting("metrics_last_run"))
 
-    @app.post("/historico/metricas")
+    @app.get("/metricas")
+    def metrics_page(request: Request, periodo: str = "30"):
+        from boorubot import insights
+
+        return render(request, "metrics.html", m=insights.build(db, periodo))
+
+    @app.post("/metricas/atualizar")
     def refresh_metrics():
         worker.submit("metrics", "danbooru", "atualizar métricas")
-        return see_other("/historico")
+        return see_other("/metricas")
 
     @app.get("/status.json")
     def status():
