@@ -14,7 +14,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from boorubot import startup
-from boorubot.config import ALL_SITES, build_site
+from boorubot.config import ALL_SITES, SITE_LABELS, build_site
 from boorubot.sites.forms import FORM_SITES
 from boorubot.db import DB, IMAGES_DIR
 from boorubot.models import IMAGE_EXTS, RATINGS
@@ -23,13 +23,6 @@ from boorubot.worker import Worker
 
 HERE = Path(__file__).parent
 
-SITE_LABELS = {
-    "danbooru": "Danbooru",
-    "gelbooru": "Gelbooru",
-    "paheal": "rule34.paheal",
-    "rule34us": "rule34.us",
-    "rule34xxx": "rule34.xxx",
-}
 BROWSER_MODE_LABELS = {
     "headless": "invisível (sem janela)",
     "hidden": "janela escondida (aparece só se pedir captcha)",
@@ -118,16 +111,9 @@ def create_app(db: DB | None = None, worker: Worker | None = None, start_worker:
 
     @app.get("/")
     def index(request: Request):
-        return render(
-            request, "index.html",
-            drafts=db.list_posts(("draft",)),
-            scheduled=db.list_posts(("publishing",)) + db.queue(),
-            projected=db.projected_times(),
-            positions={p["id"]: i + 1 for i, p in enumerate(db.queue())},
-            recent=[p for p in db.list_posts() if p["status"] in ("done", "partial", "failed")][:12],
-            next_slot=db.projected_next(),
-            steps=setup_steps(),
-        )
+        from boorubot import dashboard
+
+        return render(request, "index.html", d=dashboard.build(db), steps=setup_steps())
 
     @app.post("/posts")
     async def create_post(image: UploadFile = File(...)):
