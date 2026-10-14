@@ -333,7 +333,6 @@ ninja-keys {
   --ninja-key-border-radius: 6px; --ninja-separate-border: 2px dashed var(--line); --ninja-footer-background: var(--card-soft);
   --ninja-placeholder-color: #c79bb3; --ninja-icon-size: 28px; --ninja-actions-height: 380px; --ninja-top: 14%; --ninja-z-index: 30;
 }
-ninja-keys .nk-pet, ninja-keys .nk-thumb { width: 28px; height: 28px; border-radius: 8px; object-fit: cover; margin-right: 8px; vertical-align: middle; }
 html.no-search .search-btn, html.no-search [data-open-search] { display: none; }
 
 /* --- guia em abas --------------------------------------------------------- */

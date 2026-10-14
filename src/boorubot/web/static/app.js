@@ -118,7 +118,10 @@
     ["valendo", "Começar a postar de verdade"], ["dia-a-dia", "Dia a dia"], ["regras", "Regras dos sites"],
     ["seguranca", "Segurança das suas contas"], ["problemas", "Algo deu errado?"],
   ];
-  const icon = (pet) => `<img class="nk-pet" src="${PET(pet)}" alt="">`;
+  // os resultados da busca ficam dentro do shadow DOM do ninja-keys: o CSS da página não chega lá,
+  // então o tamanho vai inline (senão a miniatura da arte aparece no tamanho original)
+  const ICON_STYLE = "width:28px;height:28px;object-fit:cover;border-radius:8px;margin-right:8px;flex:none";
+  const icon = (pet) => `<img class="nk-pet" src="${PET(pet)}" alt="" style="${ICON_STYLE}">`;
   const go = (url) => () => { location.href = url; };
   function post(url) {
     return () => {
@@ -163,7 +166,7 @@
         id: "arte-" + p.id,
         title: `${p.title} · ${p.status_label}`,
         section: "Artes",
-        icon: `<img class="nk-thumb" src="/images/${encodeURIComponent(p.image)}" alt="">`,
+        icon: `<img class="nk-thumb" src="/images/${encodeURIComponent(p.image)}" alt="" style="${ICON_STYLE}">`,
         keywords: `${p.tags} ${p.status} #${p.id}`,
         handler: go(`/posts/${p.id}`),
       }));
