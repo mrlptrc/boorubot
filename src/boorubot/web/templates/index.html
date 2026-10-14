@@ -3,6 +3,7 @@
 {% set done = steps|selectattr('done')|list|length %}
 {% if done < steps|length %}
 <section class="card setup">
+  <img class="setup-pet" src="/static/pets/bunny.svg" alt="">
   <div class="setup-head">
     <strong>Configuração inicial</strong>
     <span class="muted small">{{ done }} de {{ steps|length }}</span>
@@ -21,8 +22,9 @@
   <form method="post" action="/posts" enctype="multipart/form-data" id="upload-form">
     <label class="drop" id="drop">
       <input type="file" name="image" accept=".png,.jpg,.jpeg,.gif,.webp" required onchange="this.form.submit()">
-      <strong>+ Nova arte</strong>
-      <span>clique ou arraste a imagem aqui</span>
+      <img src="/static/pets/puppy.svg" alt="">
+      <div><strong>+ Nova arte</strong>
+      <span>clique ou arraste a imagem aqui</span></div>
     </label>
   </form>
   <p class="muted">Um post aprovado agora sairia em: <b>{{ next_slot.strftime('%d/%m %H:%M') }}</b>
@@ -44,7 +46,7 @@
     </a>
     {% endfor %}
   </div>
-  {% else %}<p class="muted">{{ empty }}</p>{% endif %}
+  {% else %}<div class="empty"><img src="/static/pets/cat-sleep.svg" alt=""><p>{{ empty }}</p></div>{% endif %}
 {% endmacro %}
 
 <h2>Rascunhos <small>revise as tags e aprove</small></h2>
