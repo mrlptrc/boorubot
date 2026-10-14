@@ -14,7 +14,11 @@ from playwright.sync_api import Page
 
 from boorubot.models import Post
 from boorubot.sites.base import Result, Site, SkipPost
-from boorubot.sites.browser import captcha_present, dump_forms, open_page, run_dir, screenshot
+from boorubot.sites.browser import (
+    BROWSER_MODES, captcha_present, dump_forms, open_page, reveal_window, run_dir, screenshot,
+)
+
+CAPTCHA_MSG = "o site pediu captcha: entre de novo em Sites → Entrar (e resolva o captcha lá)"
 
 
 class FormSiteError(RuntimeError):
@@ -29,21 +33,33 @@ class FormSite(Site):
     rating_values: dict[str, list[str]] = {}
     # URL depois do envio que indica post criado
     success_url = re.compile(r"$^")
-    # rule34.xxx: o Cloudflare barra navegador invisível
+    # rule34.xxx: o Cloudflare barra navegador invisível (headless vira "hidden")
     needs_headed = False
+    # modo do navegador no ENVIO REAL; pode ser trocado por site no painel (settings browser_mode_<site>)
+    send_mode = "headless"
     login_timeout_ms = 10 * 60 * 1000
     captcha_timeout_s = 5 * 60
 
-    def __init__(self, username: str = "", password: str = ""):
+    def __init__(self, username: str = "", password: str = "", send_mode: str | None = None):
         self.username = username
         self.password = password
+        self.send_mode_override = send_mode if send_mode in BROWSER_MODES else None
+
+    def browser_mode(self, purpose: str) -> str:
+        """purpose: login | send (envio real) | dry_run | session | discover."""
+        if purpose == "login":
+            return "visible"  # login e captcha são sempre feitos por uma pessoa, na tela
+        mode = (self.send_mode_override or self.send_mode) if purpose == "send" else "headless"
+        if self.needs_headed and mode == "headless":
+            mode = "hidden"
+        return mode
 
     # --- login -----------------------------------------------------------------
 
     def login(self) -> Result:
         """Abre o navegador visível no login (usuário/senha do .env já preenchidos).
         A pessoa entra, resolve captcha se tiver e FECHA a janela; a sessão fica em .profiles/<site>."""
-        with open_page(self.name, headless=False) as page:
+        with open_page(self.name, self.browser_mode("login")) as page:
             page.goto(self.login_url)
             if self.username and self.password and page.locator("input[name=pass]").count():
                 page.fill("input[name=user]", self.username)
@@ -54,7 +70,7 @@ class FormSite(Site):
     def session_check(self) -> Result:
         """A sessão salva ainda vale? Abre a página de upload e procura o formulário."""
         out = run_dir(self.name)
-        with open_page(self.name, headless=not self.needs_headed) as page:
+        with open_page(self.name, self.browser_mode("session")) as page:
             page.goto(self.upload_url)
             self._wait_captcha(page, 20)
             ok = self._has_upload_form(page)
@@ -76,7 +92,7 @@ class FormSite(Site):
     def check(self, headless: bool = True) -> Result:
         """Sem credenciais: a página de login abre? tem formulário? tem captcha?"""
         out = run_dir(self.name)
-        with open_page(f"{self.name}-check", headless=headless) as page:
+        with open_page(f"{self.name}-check", "headless" if headless else "visible") as page:
             resp = page.goto(self.login_url, wait_until="domcontentloaded")
             status = resp.status if resp else None
             # challenge do Cloudflare às vezes passa sozinho num navegador real
@@ -99,7 +115,7 @@ class FormSite(Site):
     def discover(self) -> Result:
         """Logado: salva a estrutura do formulário de upload para conferir as heurísticas."""
         out = run_dir(self.name)
-        with open_page(self.name, headless=not self.needs_headed) as page:
+        with open_page(self.name, self.browser_mode("discover")) as page:
             page.goto(self.upload_url)
             self._wait_captcha(page, 20)
             forms = dump_forms(page, out / "upload-forms.json")
@@ -113,12 +129,20 @@ class FormSite(Site):
     def publish(self, post: Post, dry_run: bool = True) -> Result:
         self.check_rules(post)
         out = run_dir(self.name)
-        # envio real roda com navegador visível para a pessoa poder resolver captcha
-        with open_page(self.name, headless=dry_run and not self.needs_headed) as page:
+        mode = self.browser_mode("dry_run" if dry_run else "send")
+        with open_page(self.name, mode) as page:
             page.goto(self.upload_url)
-            if not self._wait_captcha(page, 20 if dry_run else self.captcha_timeout_s):
-                shot = screenshot(page, out / "captcha.png")
-                raise FormSiteError(f"captcha não resolvido na página de upload. print: {shot}")
+            # challenge do Cloudflare às vezes passa sozinho em alguns segundos
+            if not self._wait_captcha(page, 20):
+                if dry_run or mode == "headless":
+                    # sem janela não há como uma pessoa resolver; nunca tentar contornar
+                    shot = screenshot(page, out / "captcha.png")
+                    raise FormSiteError(f"{CAPTCHA_MSG}. print: {shot}")
+                if mode == "hidden":
+                    reveal_window(page)
+                if not self._wait_captcha(page, self.captcha_timeout_s):
+                    shot = screenshot(page, out / "captcha.png")
+                    raise FormSiteError(f"captcha não resolvido a tempo na página de upload. print: {shot}")
             if not self._has_upload_form(page):
                 shot = screenshot(page, out / "no-form.png")
                 raise FormSiteError(f"sem sessão no site: faça o login (painel: Sites → Entrar). print: {shot}")
@@ -209,6 +233,7 @@ class Rule34xxx(Gelbooru):
     """Mesmo engine do Gelbooru 0.2, mas com captcha próprio + Cloudflare na frente."""
     name = "rule34xxx"
     needs_headed = True
+    send_mode = "hidden"
     home_url = "https://rule34.xxx/"
     login_url = "https://rule34.xxx/index.php?page=account&s=login&code=00"
     upload_url = "https://rule34.xxx/index.php?page=post&s=add"

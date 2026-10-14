@@ -44,7 +44,9 @@ def build_site(name: str, db=None, test: bool = False):
         )
     if name in FORM_SITES:
         prefix = name.upper().replace(".", "_")
-        return FORM_SITES[name](username=env(f"{prefix}_USER"), password=env(f"{prefix}_PASS"))
+        send_mode = db.setting(f"browser_mode_{name}") if db is not None else None
+        return FORM_SITES[name](username=env(f"{prefix}_USER"), password=env(f"{prefix}_PASS"),
+                                send_mode=send_mode or None)
     raise SystemExit(f"site desconhecido: {name}")
 
 

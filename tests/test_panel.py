@@ -400,3 +400,13 @@ def test_sites_page_toggles_startup(client, monkeypatch, tmp_path):
     assert "ligado</span>" in c.get("/sites").text
     c.post("/settings/startup", data={"action": "remove"})
     assert not (folder / startup.SCRIPT_NAME).exists()
+
+
+def test_browser_mode_setting_from_sites_page(client, db):
+    c, _ = client
+    page = c.get("/sites").text
+    assert "invisível (sem janela)" in page and "janela escondida" in page
+    c.post("/settings/browser/gelbooru", data={"mode": "visible"})
+    assert db.setting("browser_mode_gelbooru") == "visible"
+    assert c.post("/settings/browser/danbooru", data={"mode": "visible"}).status_code == 404
+    assert c.post("/settings/browser/gelbooru", data={"mode": "xyz"}).status_code == 404

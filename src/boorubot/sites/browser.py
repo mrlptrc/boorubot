@@ -18,6 +18,15 @@ ROOT = Path(__file__).resolve().parents[3]
 PROFILES_DIR = ROOT / ".profiles"
 RUNS_DIR = ROOT / "runs"
 
+# Como o navegador roda:
+#   headless = sem janela nenhuma (o normal no envio real)
+#   hidden   = navegador real com a janela FORA da tela (sites que barram headless, ex. rule34.xxx);
+#              se aparecer captcha, reveal_window() traz a janela para a pessoa resolver
+#   visible  = janela na tela (login, que é sempre feito por uma pessoa)
+# Fora da tela em vez de minimizado: janela minimizada pode parar de renderizar e travar o Playwright.
+BROWSER_MODES = ("headless", "hidden", "visible")
+OFFSCREEN_ARGS = ["--window-position=-32000,-32000"]
+
 CAPTCHA_PATTERNS = re.compile(r"captcha|just a moment|attention required", re.I)
 CAPTCHA_FRAMES = ("recaptcha", "hcaptcha", "turnstile", "challenges.cloudflare.com")
 
@@ -46,16 +55,20 @@ def run_dir(site: str) -> Path:
     return path
 
 
+def launch_options(mode: str) -> dict:
+    if mode not in BROWSER_MODES:
+        raise ValueError(f"modo de navegador desconhecido: {mode}")
+    options = {"headless": mode == "headless", "viewport": {"width": 1280, "height": 900}, "locale": "en-US"}
+    if mode == "hidden":
+        options["args"] = list(OFFSCREEN_ARGS)
+    return options
+
+
 @contextmanager
-def open_page(site: str, headless: bool = True):
+def open_page(site: str, mode: str = "headless"):
     PROFILES_DIR.mkdir(exist_ok=True)
     with sync_playwright() as p:
-        ctx = p.chromium.launch_persistent_context(
-            str(PROFILES_DIR / site),
-            headless=headless,
-            viewport={"width": 1280, "height": 900},
-            locale="en-US",
-        )
+        ctx = p.chromium.launch_persistent_context(str(PROFILES_DIR / site), **launch_options(mode))
         try:
             page = ctx.pages[0] if ctx.pages else ctx.new_page()
             yield page
@@ -64,6 +77,17 @@ def open_page(site: str, headless: bool = True):
                 ctx.close()
             except Exception:
                 pass  # a pessoa já fechou a janela (fluxo de login)
+
+
+def reveal_window(page: Page) -> None:
+    """Traz a janela escondida (fora da tela) para a frente, para a pessoa resolver um captcha."""
+    cdp = page.context.new_cdp_session(page)
+    window_id = cdp.send("Browser.getWindowForTarget")["windowId"]
+    # windowState e posição não podem ir na mesma chamada quando a janela não está "normal"
+    cdp.send("Browser.setWindowBounds", {"windowId": window_id, "bounds": {"windowState": "normal"}})
+    cdp.send("Browser.setWindowBounds", {"windowId": window_id,
+                                         "bounds": {"left": 80, "top": 60, "width": 1300, "height": 950}})
+    page.bring_to_front()
 
 
 def captcha_present(page: Page) -> bool:

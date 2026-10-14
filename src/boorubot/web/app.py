@@ -14,7 +14,8 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from boorubot import startup
-from boorubot.config import ALL_SITES
+from boorubot.config import ALL_SITES, build_site
+from boorubot.sites.forms import FORM_SITES
 from boorubot.db import DB, IMAGES_DIR
 from boorubot.models import IMAGE_EXTS, RATINGS
 from boorubot.sites.danbooru import CONTRIBUTOR_LEVEL
@@ -28,6 +29,11 @@ SITE_LABELS = {
     "paheal": "rule34.paheal",
     "rule34us": "rule34.us",
     "rule34xxx": "rule34.xxx",
+}
+BROWSER_MODE_LABELS = {
+    "headless": "invisível (sem janela)",
+    "hidden": "janela escondida (aparece só se pedir captcha)",
+    "visible": "janela visível",
 }
 RATINGS_PT = {"general": "geral (SFW)", "sensitive": "sensível", "questionable": "questionável (nudez)",
               "explicit": "explícito"}
@@ -64,7 +70,7 @@ def create_app(db: DB | None = None, worker: Worker | None = None, start_worker:
     templates = Jinja2Templates(directory=HERE / "templates")
     templates.env.globals.update(
         SITE_LABELS=SITE_LABELS, STATUS_LABELS=STATUS_LABELS, RATINGS=RATINGS, RATINGS_PT=RATINGS_PT,
-        ALL_SITES=ALL_SITES,
+        ALL_SITES=ALL_SITES, BROWSER_MODE_LABELS=BROWSER_MODE_LABELS,
     )
 
     def danbooru_mode() -> str:
@@ -226,7 +232,16 @@ def create_app(db: DB | None = None, worker: Worker | None = None, start_worker:
             default_tags=db.setting("default_tags"), default_sites=default_sites(),
             force_pending=db.setting("danbooru_force_pending") == "1",
             startup=startup.status(), startup_error=erro,
+            send_modes={s: build_site(s, db).browser_mode("send") for s in FORM_SITES},
+            default_modes={s: build_site(s).browser_mode("send") for s in FORM_SITES},
         )
+
+    @app.post("/settings/browser/{name}")
+    def save_browser_mode(name: str, mode: str = Form(...)):
+        if name not in FORM_SITES or mode not in BROWSER_MODE_LABELS:
+            raise HTTPException(404)
+        db.set_setting(f"browser_mode_{name}", mode)
+        return see_other(f"/sites#{name}")
 
     @app.post("/settings/startup")
     def toggle_startup(action: str = Form(...)):

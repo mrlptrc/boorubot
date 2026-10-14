@@ -86,6 +86,22 @@
         <form method="post" action="/sites/{{ s }}/session"><button class="ghost">Testar</button></form>
       </div>
     </div>
+    <details class="test-account">
+      <summary>Avançado <small class="muted">como o navegador aparece no envio real: {{ BROWSER_MODE_LABELS[send_modes[s]] }}</small></summary>
+      <form method="post" action="/settings/browser/{{ s }}" class="inline-form">
+        <label>Navegador no envio real
+          <select name="mode">
+            {% for m in ('headless', 'hidden', 'visible') %}
+              {% if not (s == 'rule34xxx' and m == 'headless') %}
+              <option value="{{ m }}" {{ 'selected' if send_modes[s] == m }}>{{ BROWSER_MODE_LABELS[m] }}{{ ' (padrão)' if default_modes[s] == m }}</option>
+              {% endif %}
+            {% endfor %}
+          </select>
+        </label>
+        <div class="actions"><button class="ghost">Salvar</button></div>
+      </form>
+      <p class="muted small">Só troque se o envio desse site começar a falhar sem janela. O login é sempre numa janela visível.</p>
+    </details>
   </div>
   {% endfor %}
 </div>
