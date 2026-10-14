@@ -25,6 +25,21 @@ GELBOORU_FORM = """
 </form>
 """
 
+# Formulário REAL do Gelbooru (capturado logado em 14/10/2026): rating g/s/q/e
+GELBOORU_REAL_FORM = """
+<form method="post" enctype="multipart/form-data" action="index.php?page=post&s=add">
+  <input type="file" name="upload">
+  <input type="text" name="source">
+  <input type="text" name="title">
+  <textarea name="tags"></textarea>
+  <input type="radio" name="rating" value="e">
+  <input type="radio" name="rating" value="q">
+  <input type="radio" name="rating" value="s">
+  <input type="radio" name="rating" value="g">
+  <input type="submit" name="submit" value="Upload">
+</form>
+"""
+
 # Formato do Shimmie2 (paheal), sem campo de rating
 SHIMMIE_FORM = """
 <form method="post" enctype="multipart/form-data" action="/upload">
@@ -64,11 +79,24 @@ def test_gelbooru_like_form(browser):
     assert page.locator("form#search input[name=tags]").input_value() == ""
 
 
-def test_rating_without_matching_option_fails_loudly(browser, tmp_path):
+@pytest.mark.parametrize("rating, value", [
+    ("general", "g"), ("sensitive", "s"), ("questionable", "q"), ("explicit", "e"),
+])
+def test_gelbooru_real_form_ratings(browser, rating, value):
     post = Post.load(EXAMPLE)
-    post.rating = "sensitive"
+    post.rating = rating
+    page = fill(browser, GELBOORU_REAL_FORM, Gelbooru(), post)
+    checked = page.locator("input[name=rating]:checked").evaluate_all("rs => rs.map(r => r.value)")
+    assert checked == [value]
+
+
+def test_rating_without_matching_option_fails_loudly(browser):
+    post = Post.load(EXAMPLE)
+    post.rating = "general"
+    only_eq = GELBOORU_REAL_FORM.replace('<input type="radio" name="rating" value="s">', "").replace(
+        '<input type="radio" name="rating" value="g">', "")
     with pytest.raises(FormSiteError, match="sem opção"):
-        fill(browser, GELBOORU_FORM, Gelbooru(), post)  # form só tem e/q/s
+        fill(browser, only_eq, Gelbooru(), post)  # sem g: não chuta outro rating
 
 
 def test_shimmie_form(browser):

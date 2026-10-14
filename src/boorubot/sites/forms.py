@@ -220,9 +220,10 @@ class Gelbooru(FormSite):
     home_url = "https://gelbooru.com/"
     login_url = "https://gelbooru.com/index.php?page=account&s=login&code=00"
     upload_url = "https://gelbooru.com/index.php?page=post&s=add"
+    # formulário real (conferido logado): g / s / q / e. Aqui "s" é SENSÍVEL, não "safe".
     rating_values = {
-        "general": ["general", "g", "safe", "s"],
-        "sensitive": ["sensitive"],
+        "general": ["general", "g"],
+        "sensitive": ["sensitive", "s"],
         "questionable": ["questionable", "q"],
         "explicit": ["explicit", "e"],
     }
