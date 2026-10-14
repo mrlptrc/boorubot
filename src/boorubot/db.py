@@ -308,6 +308,13 @@ class DB:
         return self._all("SELECT * FROM metric_snapshots WHERE captured_at >= ? ORDER BY captured_at, id",
                          (since.isoformat(timespec="seconds"),))
 
+    def all_metric_snapshots(self) -> list[dict]:
+        return self._all("SELECT * FROM metric_snapshots ORDER BY captured_at, id")
+
+    def publications_with_posts(self) -> list[dict]:
+        return self._all("SELECT p.*, posts.title, posts.image FROM publications p "
+                         "JOIN posts ON posts.id = p.post_id ORDER BY p.id")
+
     def has_metrics(self) -> bool:
         return bool(self._all("SELECT 1 FROM metric_snapshots LIMIT 1"))
 
