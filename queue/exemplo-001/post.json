@@ -1,0 +1,15 @@
+{
+  "title": "Teste de automação",
+  "tags": ["test_image", "gradient", "no_humans", "simple_background"],
+  "rating": "general",
+  "source": "",
+  "commentary": {
+    "title": "Teste",
+    "description": "Post de teste do boorubot no testbooru."
+  },
+  "original_character": false,
+  "sites": ["danbooru"],
+  "site_tags": {
+    "danbooru": ["commentary"]
+  }
+}

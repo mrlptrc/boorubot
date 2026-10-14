@@ -1,0 +1,124 @@
+"""Danbooru via API oficial.
+
+Fluxo (conferido no código do Danbooru, uploads_controller/posts_controller):
+  1. POST /uploads.json        upload[files][0]=<arquivo>
+  2. GET  /uploads/{id}.json   até status == completed  -> upload_media_assets[0].id
+  3. POST /posts.json          upload_media_asset_id + post[tag_string|rating|source|artist_commentary]
+
+O Cloudflare bloqueia User-Agent de navegador sem JS; com um UA próprio a API responde normal.
+Teste antes em https://testbooru.donmai.us (pedido da própria documentação).
+"""
+
+from __future__ import annotations
+
+import mimetypes
+import time
+
+import httpx
+
+from boorubot.models import Post
+from boorubot.sites.base import Result, Site
+
+USER_AGENT = "boorubot/0.1 (post-automation)"
+RATING_CODES = {"general": "g", "sensitive": "s", "questionable": "q", "explicit": "e"}
+
+
+class DanbooruError(RuntimeError):
+    pass
+
+
+class Danbooru(Site):
+    name = "danbooru"
+
+    def __init__(
+        self,
+        base_url: str,
+        login: str = "",
+        api_key: str = "",
+        transport: httpx.BaseTransport | None = None,
+        poll_interval: float = 2.0,
+        poll_timeout: float = 120.0,
+    ):
+        self.base_url = base_url.rstrip("/")
+        self.login = login
+        self.api_key = api_key
+        self.poll_interval = poll_interval
+        self.poll_timeout = poll_timeout
+        self.client = httpx.Client(
+            base_url=self.base_url,
+            auth=(login, api_key) if login and api_key else None,
+            headers={"User-Agent": USER_AGENT},
+            timeout=60,
+            transport=transport,
+        )
+
+    def tags_for(self, post: Post) -> list[str]:
+        tags = post.tags_for(self.name)
+        if post.original_character and "original" not in tags:
+            tags.append("original")
+        return tags
+
+    def post_payload(self, post: Post, upload_media_asset_id: int) -> dict[str, str]:
+        payload = {
+            "upload_media_asset_id": str(upload_media_asset_id),
+            "post[tag_string]": " ".join(self.tags_for(post)),
+            "post[rating]": RATING_CODES[post.rating],
+            "post[source]": post.source,
+        }
+        if post.commentary_title or post.commentary_description:
+            payload["post[artist_commentary][original_title]"] = post.commentary_title
+            payload["post[artist_commentary][original_description]"] = post.commentary_description
+        return payload
+
+    def whoami(self) -> dict:
+        """Confere as credenciais. Sem login, o Danbooru devolve o usuário anônimo."""
+        r = self.client.get("/profile.json")
+        r.raise_for_status()
+        return r.json()
+
+    def publish(self, post: Post, dry_run: bool = True) -> Result:
+        if dry_run:
+            payload = self.post_payload(post, upload_media_asset_id=0)
+            lines = [f"{k} = {v}" for k, v in payload.items() if k != "upload_media_asset_id"]
+            return Result(
+                self.name, ok=True, dry_run=True,
+                message=f"enviaria {post.image.name} para {self.base_url}\n  " + "\n  ".join(lines),
+            )
+        if not (self.login and self.api_key):
+            raise DanbooruError("faltam DANBOORU_LOGIN / DANBOORU_API_KEY no .env")
+
+        asset_id = self._upload_file(post)
+        r = self.client.post("/posts.json", data=self.post_payload(post, asset_id))
+        if r.status_code >= 400:
+            raise DanbooruError(f"criar post falhou ({r.status_code}): {r.text[:300]}")
+        post_id = r.json()["id"]
+        return Result(self.name, ok=True, dry_run=False, message=f"post #{post_id} criado",
+                      url=f"{self.base_url}/posts/{post_id}")
+
+    def _upload_file(self, post: Post) -> int:
+        mime = mimetypes.guess_type(post.image.name)[0] or "application/octet-stream"
+        with post.image.open("rb") as fh:
+            r = self.client.post("/uploads.json", files={"upload[files][0]": (post.image.name, fh, mime)})
+        if r.status_code >= 400:
+            raise DanbooruError(f"upload falhou ({r.status_code}): {r.text[:300]}")
+        upload = r.json()
+
+        deadline = time.monotonic() + self.poll_timeout
+        while upload.get("status") not in ("completed", "error"):
+            if time.monotonic() > deadline:
+                raise DanbooruError(f"upload #{upload['id']} não terminou em {self.poll_timeout}s")
+            time.sleep(self.poll_interval)
+            r = self.client.get(f"/uploads/{upload['id']}.json", params={"include": "upload_media_assets"})
+            r.raise_for_status()
+            upload = r.json()
+
+        if upload["status"] == "error":
+            raise DanbooruError(f"upload #{upload['id']} deu erro: {upload.get('error')}")
+        if "upload_media_assets" not in upload:
+            r = self.client.get(f"/uploads/{upload['id']}.json", params={"include": "upload_media_assets"})
+            r.raise_for_status()
+            upload = r.json()
+        assets = upload.get("upload_media_assets") or []
+        if not assets:
+            raise DanbooruError(f"upload #{upload['id']} sem media asset")
+        return assets[0]["id"]

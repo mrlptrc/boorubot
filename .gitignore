@@ -1,0 +1,8 @@
+.env
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+# sessões de navegador logadas (cookies!) e saídas de execução
+.profiles/
+runs/

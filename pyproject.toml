@@ -1,0 +1,25 @@
+[project]
+name = "boorubot"
+version = "0.1.0"
+description = "Add your description here"
+authors = [
+    { name = "mrlptrc", email = "murilopatricio@gmail.com" }
+]
+requires-python = ">=3.13"
+dependencies = [
+    "httpx>=0.28.1",
+    "playwright==1.55.0",
+    "python-dotenv>=1.2.4",
+]
+
+[project.scripts]
+boorubot = "boorubot:main"
+
+[build-system]
+requires = ["uv_build>=0.13.0,<0.14.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+]
