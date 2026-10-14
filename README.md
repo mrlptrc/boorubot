@@ -40,13 +40,35 @@ O que fica no PC (tudo fora do git):
 
 ## Painel (uso do dia a dia)
 
-- **Fila**: arraste a arte → **✨ Sugerir com IA** (tags + rating no padrão Danbooru, WD Tagger local)
-  → revise → marque os sites → **Aprovar e agendar**. Reordenar: início/fim da fila.
+- **Início (painel do dia)**: o que sai hoje, folga da fila (quantos dias seguidos têm post), próximo post,
+  favoritos na semana, um alerta por vez (sessão caída > backup falhando > modo teste), próximos 7 dias e
+  "Para revisar" (upload + rascunhos + falhas). Arraste a arte → **✨ Sugerir com IA** (tags + rating no padrão
+  Danbooru, WD Tagger local) → revise → marque os sites → **Aprovar e agendar**. Reordenar: início/fim da fila.
 - **🧪 Testar este post**: simula em cada site (Danbooru envia ao testbooru só se houver conta de teste).
-- **Sites**: contas, início automático, backup, horário do post, tags e sites padrão, e em "Avançado"
-  o modo do navegador por site (invisível / janela escondida / visível).
-- **Histórico**: só envios reais, com score e favoritos do Danbooru (atualizados 1x por dia ou no botão).
-- **Guia**: passo a passo para a cliente.
+- **Calendário**: semana × site com a arte prevista em cada dia, "pulado (OC)" no paheal, "esperando login"
+  quando a sessão do site caiu, e o que está aprovado mas ainda sem dia.
+- **Métricas**: favoritos ganhos, score médio nas primeiras 24 h, posts publicados, favoritos por semana,
+  artes mais amadas e tabela por site (7 dias · 30 dias · tudo). Botão "Atualizar métricas".
+- **Sites**: contas, início automático, backup, **ritmo por site**, horário do post, tags e sites padrão, e em
+  "Avançado" o modo do navegador por site (invisível / janela escondida / visível).
+- **Histórico**: só envios reais, com score e favoritos do Danbooru.
+- **Guia**: passo a passo para a cliente. **Ctrl+K** busca artes, páginas e ações.
+
+### Ritmo por site (Sites → Ritmo por site)
+
+A fila principal define o "dia 0" de cada arte (1 por dia, intervalo mínimo de 12 h, atraso não acumula).
+Cada site percorre a mesma fila no seu ritmo:
+
+| Ritmo | Quando | Efeito |
+|---|---|---|
+| 1 por dia (padrão) | mesmo dia (padrão) | sai junto com o dia 0, exatamente como antes |
+| 1 por dia | N dias depois | sai N dias depois do dia 0 da arte (ex.: Gelbooru 1 dia depois do Danbooru) |
+| dia sim, dia não | qualquer | no máximo 1 envio a cada 2 dias nesse site; a fila dele anda mais devagar |
+| desligado | — | o site não recebe nada |
+
+Sites fora do padrão ganham linhas em `site_schedule` (agendado → publicado/falhou/pulado), enviadas pelo
+agendador de cada site: 1 por dia por site, 1 envio por vez no total, e nunca reenvia para um site que já recebeu.
+Envio atrasado de um site não conta como "post do dia" da fila principal.
 
 A sugestão de tags baixa ~380 MB na primeira vez (modelo `SmilingWolf/wd-vit-tagger-v3`).
 
