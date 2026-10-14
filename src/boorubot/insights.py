@@ -66,7 +66,8 @@ def build(db: DB, period: str = "30", now: datetime | None = None) -> dict:
     in_period = [p for p in pubs if datetime.fromisoformat(p["created_at"]) >= start]
 
     series = favorites_by_day([s for s in snaps_all if datetime.fromisoformat(s["captured_at"]) >= start],
-                              now.date(), days)
+                              now.date(), days,
+                              published_at={p["id"]: datetime.fromisoformat(p["created_at"]) for p in pubs})
     first_scores = [sc for p in in_period if p["status"] == "ok"
                     for sc in [first_day_score(p, snaps_by_pub.get(p["id"], []))] if sc is not None]
 
