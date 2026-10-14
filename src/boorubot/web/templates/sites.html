@@ -113,10 +113,12 @@
       <strong>Início automático</strong> <span class="pill">só no Windows</span>
     {% elif startup.installed %}
       <strong>Início automático</strong> <span class="pill s-ok">ligado</span>
-      <div class="muted small">O painel abre escondido quando o Windows inicia, sem janela na tela. Os posts saem mesmo se você esquecer de abrir.</div>
+      <div class="muted small">O painel abre escondido quando o Windows inicia, sem janela na tela. Os posts saem mesmo se você esquecer de abrir.
+        <br>O PC também <b>não pode estar dormindo</b> no horário do post: <a href="/guia#pc-acordado">veja como ajustar</a>.</div>
     {% else %}
       <strong>Início automático</strong> <span class="pill s-failed">desligado</span>
-      <div class="muted small">Se o painel não estiver aberto no horário, o post do dia não sai. Recomendado: ligar.</div>
+      <div class="muted small">Se o painel não estiver aberto no horário, o post do dia não sai. Recomendado: ligar.
+        <br>O PC também <b>não pode estar dormindo</b> no horário do post: <a href="/guia#pc-acordado">veja como ajustar</a>.</div>
     {% endif %}
     {% if startup_error %}<div class="alert small">{{ startup_error }}</div>{% endif %}
   </div>

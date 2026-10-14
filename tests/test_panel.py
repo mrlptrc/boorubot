@@ -410,3 +410,10 @@ def test_browser_mode_setting_from_sites_page(client, db):
     assert db.setting("browser_mode_gelbooru") == "visible"
     assert c.post("/settings/browser/danbooru", data={"mode": "visible"}).status_code == 404
     assert c.post("/settings/browser/gelbooru", data={"mode": "xyz"}).status_code == 404
+
+
+def test_guide_explains_sleep_and_vps(client):
+    c, _ = client
+    guide = c.get("/guia").text
+    assert 'id="pc-acordado"' in guide and "suspensão" in guide and "VPS" in guide
+    assert "/guia#pc-acordado" in c.get("/sites").text

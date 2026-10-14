@@ -26,7 +26,8 @@
     </label>
   </form>
   <p class="muted">Um post aprovado agora sairia em: <b>{{ next_slot.strftime('%d/%m %H:%M') }}</b>
-    <small>· 1 post por dia; se o PC ficar desligado, a fila só atrasa (não sai tudo junto)</small></p>
+    <small>· 1 post por dia; o PC precisa estar <a href="/guia#pc-acordado">ligado e acordado</a> no horário
+      (se não estiver, a fila só atrasa, não sai tudo junto)</small></p>
 </section>
 
 {% macro grid(posts, empty) %}

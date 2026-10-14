@@ -16,7 +16,7 @@
   <nav class="toc card">
     <b>Neste guia</b>
     <ol>
-      <li><a href="#antes">Antes de começar</a></li>
+      <li><a href="#antes">Antes de começar</a> · <a href="#pc-acordado"><b>o PC precisa estar acordado</b></a></li>
       <li><a href="#danbooru">Conectar o Danbooru</a> {{ status('danbooru') }}</li>
       <li><a href="#gelbooru">Conectar Gelbooru, paheal e rule34.us</a> {{ status('gelbooru') }} {{ status('paheal') }} {{ status('rule34us') }}</li>
       <li><a href="#rule34xxx">Conectar o rule34.xxx</a> {{ status('rule34xxx') }}</li>
@@ -32,10 +32,43 @@
   <section id="antes">
     <h2>1. Antes de começar</h2>
     <ul>
-      <li>Este painel roda <b>neste computador</b>. Para os posts saírem no horário, o PC precisa estar <b>ligado</b> e o painel <b>aberto</b>.</li>
+      <li>Este painel roda <b>neste computador</b>. Para os posts saírem no horário, o PC precisa estar <b>ligado, acordado</b>
+        e com o painel aberto. Ligue o <a href="/sites#inicio">início automático</a> e veja abaixo como evitar que o PC durma.</li>
       <li>Tenha em mãos o <b>usuário e a senha</b> de cada site. A senha você digita no próprio site e ela <b>não fica salva aqui</b>.</li>
       <li>Enquanto o <b>modo teste</b> estiver ligado (faixa amarela no topo), nada é publicado e a fila fica <b>pausada</b>.
         Pode testar à vontade com "🧪 Testar este post", porque os testes não mexem na sua fila.</li>
+    </ul>
+  </section>
+
+  <section id="pc-acordado">
+    <h2>O PC precisa estar acordado no horário do post</h2>
+    <p>O robô roda <b>dentro do seu computador</b>. Quando o PC <b>entra em suspensão</b> (a tela apaga e ele "dorme"),
+      o robô dorme junto. A maioria dos PCs, e principalmente os notebooks, dorme sozinha depois de 15 a 30 minutos sem uso.</p>
+    <p>Se o PC estiver dormindo no horário do post, <b>o post atrasa</b> e só sai quando você mexer no computador.
+      Nada se perde e não sai tudo de uma vez: quando o PC acorda, sai 1 post e a fila continua no ritmo de 1 por dia.</p>
+
+    <h3>Soluções, da mais simples para a mais completa</h3>
+    <ol class="steps">
+      <li><b>Escolher um horário em que você costuma estar no PC</b> (em <a href="/sites">Sites → Configurações</a>).
+        Não precisa mudar nada no Windows.</li>
+      <li><b>Não deixar o PC dormir quando estiver na tomada.</b> No Windows 11: <i>Configurações → Sistema → Energia</i>
+        (ou <i>Energia e bateria</i>) → <i>Tela, suspensão e hibernação</i> → em <i>"Conectado à energia, colocar meu dispositivo
+        em suspensão após"</i>, escolha <b>Nunca</b>. A <b>tela pode continuar apagando</b>: o que importa é o PC não dormir.</li>
+      <li><b>Notebook com a tampa fechada:</b> por padrão, fechar a tampa faz o notebook dormir. Para mudar:
+        <i>Painel de Controle → Opções de Energia → Escolher a função do fechamento da tampa</i> → em <i>"Conectado"</i>,
+        escolha <b>Nada a fazer</b>. Deixe na tomada e num lugar ventilado.</li>
+      <li><b>Evoluir para um servidor na nuvem (VPS).</b> O robô passa a rodar num computador alugado que fica ligado 24 horas,
+        sem depender do seu PC. É o caminho para quem quer "aprovar e esquecer" de verdade.</li>
+    </ol>
+
+    <h3>Sobre o servidor na nuvem (próxima fase)</h3>
+    <ul>
+      <li><b>Vantagem:</b> os posts saem no horário mesmo com seu PC desligado, em viagem ou sem internet.</li>
+      <li><b>Custo:</b> em torno de R$ 30 a 60 por mês, dependendo do provedor.</li>
+      <li><b>O que muda para você:</b> o painel passa a abrir por um endereço na internet, com senha. Os logins e captchas
+        dos sites continuam sendo feitos por você, por uma janela de navegador remoto dentro do próprio painel.</li>
+      <li><b>Quando vale:</b> se os atrasos começarem a incomodar, ou se o PC fica desligado com frequência.
+        Fale com o técnico: a migração aproveita tudo o que já está configurado aqui.</li>
     </ul>
   </section>
 
@@ -159,7 +192,8 @@
     <h2>10. Algo deu errado?</h2>
     <dl>
       <dt>O post não saiu no horário.</dt>
-      <dd>O PC estava ligado com o painel aberto? O modo teste está desligado? Os sites estão "conectado"?</dd>
+      <dd>O PC estava ligado <b>e acordado</b> (veja <a href="#pc-acordado">o PC precisa estar acordado</a>)?
+        O modo teste está desligado? Os sites estão "conectado"? Se o PC estava dormindo, o post sai sozinho quando ele acordar.</dd>
       <dt>Apareceu "sem sessão no site".</dt>
       <dd>O site te deslogou. Vá em <a href="/sites">Sites</a>, clique em <b>Entrar</b> naquele site e faça login de novo. Depois, use <b>Tentar de novo</b> no post.</dd>
       <dt>Danbooru "desconectado".</dt>
