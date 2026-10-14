@@ -16,19 +16,27 @@ def env(name: str, default: str = "") -> str:
 DANBOORU_URLS = {"test": "https://testbooru.donmai.us", "live": "https://danbooru.donmai.us"}
 
 
-def build_site(name: str, db=None):
-    """Monta o site. Com `db` (painel), as credenciais do painel têm prioridade sobre o .env."""
+def build_site(name: str, db=None, test: bool = False):
+    """Monta o site. Com `db` (painel), produção e teste usam contas SEPARADAS:
+    produção -> Danbooru real + conta real; test=True -> testbooru + conta de teste."""
     from boorubot.sites.danbooru import Danbooru
     from boorubot.sites.forms import FORM_SITES
 
     if name == "danbooru":
-        if db is not None and db.setting("danbooru_api_key"):
+        if db is not None and test:
             return Danbooru(
-                base_url=DANBOORU_URLS.get(db.setting("danbooru_env"), DANBOORU_URLS["test"]),
+                base_url=DANBOORU_URLS["test"],
+                login=db.setting("danbooru_test_login"),
+                api_key=db.setting("danbooru_test_api_key"),
+            )
+        if db is not None:
+            return Danbooru(
+                base_url=DANBOORU_URLS["live"],
                 login=db.setting("danbooru_login"),
                 api_key=db.setting("danbooru_api_key"),
                 force_pending=db.setting("danbooru_force_pending") == "1",
             )
+        # CLI do técnico: .env (testbooru por padrão)
         return Danbooru(
             base_url=env("DANBOORU_URL", DANBOORU_URLS["test"]),
             login=env("DANBOORU_LOGIN"),

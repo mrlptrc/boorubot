@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block title %}{{ post.title or ('#' ~ post.id) }} · boorubot{% endblock %}
 {% block content %}
-{% set editable = post.status in ('draft', 'approved', 'tested', 'failed', 'partial') %}
+{% set editable = post.status in ('draft', 'approved', 'failed', 'partial') %}
 <p><a href="/">&larr; Fila</a></p>
 {% if error %}<div class="alert">{{ error }}</div>{% endif %}
 
@@ -10,9 +10,10 @@
     <img src="/images/{{ post.image }}" alt="">
     <figcaption>
       <span class="pill s-{{ post.status }}">{{ STATUS_LABELS[post.status] }}</span>
-      {% if post.scheduled_for and post.status == 'approved' %}
-        agendado para <b>{{ post.scheduled_for[8:10] }}/{{ post.scheduled_for[5:7] }} às {{ post.scheduled_for[11:16] }}</b>
+      {% if queue_pos %}
+        <b>{{ queue_pos }}º de {{ queue_len }}</b> na fila · previsão: <b>{{ projected.strftime('%d/%m às %H:%M') }}</b>
       {% endif %}
+      {% if post.published_at %}<span class="muted small">publicado em {{ post.published_at[8:10] }}/{{ post.published_at[5:7] }} {{ post.published_at[11:16] }}</span>{% endif %}
     </figcaption>
   </figure>
 
@@ -65,24 +66,47 @@
     {% endif %}
     <div class="actions">
       {% if editable %}<button name="action" value="save" class="ghost">Salvar</button>{% endif %}
-      {% if post.status in ('draft', 'tested') %}
+      {% if post.status == 'draft' %}
         <button name="action" value="approve" class="primary">Aprovar e agendar</button>
       {% elif post.status == 'approved' %}
         <button name="action" value="unapprove" class="ghost">Voltar para rascunho</button>
+        {% if queue_pos and queue_pos > 1 %}<button name="action" value="first" class="ghost">Passar para o início da fila</button>{% endif %}
+        {% if queue_pos and queue_pos < queue_len %}<button name="action" value="last" class="ghost">Mandar para o fim</button>{% endif %}
       {% endif %}
       {% if editable %}
+        <button name="action" value="test" class="{{ 'primary' if test_mode and post.status != 'draft' else 'ghost' }}"
+          title="Simula em cada site marcado. Não muda nada no post, na fila nem no histórico.">🧪 Testar este post</button>
+        {% if not test_mode %}
         <button name="action" value="publish_now" class="{{ 'primary' if post.status != 'draft' else 'ghost' }}"
-          onclick="return confirm('{{ 'Modo teste: vai só preencher, sem enviar.' if test_mode else 'Publicar AGORA nos sites marcados?' }}')">
+          onclick="return confirm('{{ 'Já saiu um post hoje. Publicar agora faz 2 no mesmo dia (pode parecer spam). Continuar?' if published_today and post.status not in ('failed', 'partial') else 'Publicar DE VERDADE agora nos sites marcados? Isso conta como o post de hoje.' }}')">
           {{ 'Tentar de novo' if post.status in ('failed', 'partial') else 'Publicar agora' }}
         </button>
+        {% endif %}
       {% endif %}
       <button name="action" value="delete" class="danger" formnovalidate onclick="return confirm('Apagar este post da fila?')">Apagar</button>
     </div>
   </form>
 </div>
 
+{% if tests %}
+<details class="tests" {{ 'open' if test_mode or not pubs }}>
+  <summary><h2>Testes <small>simulações; não contam como publicação</small></h2></summary>
+  <table class="table">
+    <tr><th>Quando</th><th>Site</th><th>Resultado</th><th>Detalhe</th></tr>
+    {% for p in tests %}
+    <tr>
+      <td>{{ p.created_at[8:10] }}/{{ p.created_at[5:7] }} {{ p.created_at[11:16] }}</td>
+      <td>{{ SITE_LABELS[p.site] }}</td>
+      <td><span class="pill s-{{ p.status }}">{{ STATUS_LABELS[p.status] }}</span></td>
+      <td class="msg">{% if p.url %}<a href="{{ p.url }}" target="_blank">{{ p.url }}</a>{% else %}{{ p.message }}{% endif %}</td>
+    </tr>
+    {% endfor %}
+  </table>
+</details>
+{% endif %}
+
 {% if pubs %}
-<h2>Publicações</h2>
+<h2>Publicações <small>envios reais</small></h2>
 <table class="table">
   <tr><th>Quando</th><th>Site</th><th>Status</th><th>Detalhe</th></tr>
   {% for p in pubs %}

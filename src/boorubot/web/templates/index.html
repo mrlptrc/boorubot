@@ -25,7 +25,8 @@
       <span>clique ou arraste a imagem aqui</span>
     </label>
   </form>
-  <p class="muted">Próximo horário livre: <b>{{ next_slot.strftime('%d/%m %H:%M') }}</b></p>
+  <p class="muted">Um post aprovado agora sairia em: <b>{{ next_slot.strftime('%d/%m %H:%M') }}</b>
+    <small>· 1 post por dia; se o PC ficar desligado, a fila só atrasa (não sai tudo junto)</small></p>
 </section>
 
 {% macro grid(posts, empty) %}
@@ -36,7 +37,7 @@
       <img src="/images/{{ p.image }}" alt="">
       <div class="meta">
         <span class="pill s-{{ p.status }}">{{ STATUS_LABELS[p.status] }}</span>
-        {% if p.scheduled_for and p.status == 'approved' %}<span class="when">{{ p.scheduled_for[8:10] }}/{{ p.scheduled_for[5:7] }} {{ p.scheduled_for[11:16] }}</span>{% endif %}
+        {% if p.id in projected %}<span class="when">{{ positions[p.id] }}º · prev. {{ projected[p.id].strftime('%d/%m %H:%M') }}</span>{% endif %}
         <div class="t">{{ p.title or ('#' ~ p.id) }}</div>
       </div>
     </a>
@@ -48,7 +49,7 @@
 <h2>Rascunhos <small>revise as tags e aprove</small></h2>
 {{ grid(drafts, "Nenhum rascunho. Suba uma arte acima.") }}
 
-<h2>Agendados <small>1 por dia</small></h2>
+<h2>Na fila <small>sai 1 por dia, na ordem; as datas são previsões</small></h2>
 {{ grid(scheduled, "Nada agendado.") }}
 
 <h2>Recentes</h2>

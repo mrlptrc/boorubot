@@ -18,19 +18,22 @@ log = logging.getLogger("boorubot.worker")
 
 @dataclass
 class Job:
-    kind: str  # publish | login | session
+    kind: str  # publish (produção) | test | login | session | session_test
     target: int | str
     label: str = ""
     started: float = field(default=0.0)
 
 
 def publish_post(db: DB, post_id: int) -> str:
-    """Publica nos sites pendentes do post. Retorna o status final do post."""
+    """PRODUÇÃO: publica de verdade nos sites pendentes do post. Retorna o status final.
+    Recusa rodar com o modo teste ligado: produção e teste nunca se misturam."""
     row = db.get_post(post_id)
     if not row:
         return "missing"
-    dry_run = db.test_mode
-    db.update_post(post_id, status="publishing")
+    if db.test_mode:
+        log.warning("post %s: produção bloqueada com o modo teste ligado", post_id)
+        return "blocked"
+    db.update_post(post_id, status="publishing", queue_pos=None)
     post = to_post(row)
     done = db.published_sites(post_id)
     results = []
@@ -38,8 +41,8 @@ def publish_post(db: DB, post_id: int) -> str:
         if name in done:
             continue
         try:
-            result = build_site(name, db).publish(post, dry_run=dry_run)
-            status = "dry_run" if result.dry_run else ("ok" if result.ok else "failed")
+            result = build_site(name, db).publish(post, dry_run=False)
+            status = "ok" if result.ok else "failed"
             db.add_publication(post_id, name, status, result.url, result.message)
         except SkipPost as exc:
             status = "skipped"
@@ -50,14 +53,43 @@ def publish_post(db: DB, post_id: int) -> str:
             db.add_publication(post_id, name, status, message=f"{type(exc).__name__}: {exc}")
         results.append(status)
 
+    if "ok" in results:
+        db.mark_published(post_id)  # conta para o ritmo só se saiu de verdade em algum site
     if results and all(s == "failed" for s in results):
         final = "failed"
     elif "failed" in results:
         final = "partial"
     else:
-        final = "tested" if dry_run else "done"
+        final = "done"
     db.update_post(post_id, status=final)
     return final
+
+
+def run_post_test(db: DB, post_id: int) -> list[str]:
+    """TESTE: simula o post em cada site marcado. Grava só em test_runs; NÃO muda status,
+    posição na fila, published_at nem o ritmo. Danbooru só envia de verdade se houver conta
+    de teste (testbooru); os sites de formulário apenas preenchem, sem enviar."""
+    row = db.get_post(post_id)
+    if not row:
+        return []
+    post = to_post(row)
+    has_test_account = bool(db.setting("danbooru_test_api_key"))
+    results = []
+    for name in row["sites"]:
+        upload = name == "danbooru" and has_test_account
+        try:
+            result = build_site(name, db, test=True).publish(post, dry_run=not upload)
+            status = ("test_upload" if upload else "dry_run") if result.ok else "failed"
+            db.add_test_run(post_id, name, status, result.url, result.message)
+        except SkipPost as exc:
+            status = "skipped"
+            db.add_test_run(post_id, name, status, message=str(exc))
+        except Exception as exc:
+            status = "failed"
+            log.exception("falha testando post %s em %s", post_id, name)
+            db.add_test_run(post_id, name, status, message=f"{type(exc).__name__}: {exc}")
+        results.append(status)
+    return results
 
 
 class Worker:
@@ -100,6 +132,14 @@ class Worker:
     def _handle(self, job: Job) -> None:
         if job.kind == "publish":
             publish_post(self.db, int(job.target))
+        elif job.kind == "test":
+            run_post_test(self.db, int(job.target))
+        elif job.kind == "session_test":  # conta de teste do Danbooru (testbooru)
+            try:
+                result = build_site("danbooru", self.db, test=True).session_check()
+                self.db.set_session("danbooru_test", result.ok, result.message)
+            except Exception as exc:
+                self.db.set_session("danbooru_test", False, f"{type(exc).__name__}: {exc}")
         elif job.kind in ("login", "session"):
             site = build_site(str(job.target), self.db)
             try:
@@ -112,10 +152,24 @@ class Worker:
             except Exception as exc:
                 self.db.set_session(site.name, False, f"{type(exc).__name__}: {exc}")
 
+    def tick(self) -> None:
+        """Um passo do agendador: no máximo 1 publicação por vez, liberada pelo pacer.
+        Em modo teste a fila fica pausada (testes não contam no ritmo e esvaziariam a fila)."""
+        if self.db.test_mode:
+            return
+        busy = any(j.kind == "publish" for j in list(self.jobs.queue))
+        busy = busy or (self.current is not None and self.current.kind == "publish")
+        if busy:
+            return
+        row = self.db.next_due()
+        if row:
+            self.db.update_post(row["id"], status="publishing", queue_pos=None)
+            self.submit("publish", row["id"], f"publicar #{row['id']} (agendado)")
+
     def _run_scheduler(self) -> None:
         while not self._stop.is_set():
-            queued = {j.target for j in list(self.jobs.queue) if j.kind == "publish"}
-            for row in self.db.due_posts():
-                if row["id"] not in queued:
-                    self.submit("publish", row["id"], f"publicar #{row['id']} (agendado)")
+            try:
+                self.tick()
+            except Exception:
+                log.exception("agendador falhou")
             self._stop.wait(self.scheduler_interval)

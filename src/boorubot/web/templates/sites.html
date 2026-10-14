@@ -9,7 +9,7 @@
   <div class="card site site-danbooru" id="danbooru">
     <div class="site-head">
       <div>
-        <strong>Danbooru</strong>
+        <strong>Danbooru</strong> <small class="muted">conta real</small>
         {% if sess %}<span class="pill {{ 's-ok' if sess.ok else 's-failed' }}">{{ 'conectado' if sess.ok else 'desconectado' }}</span>
         {% else %}<span class="pill">não conectado</span>{% endif %}
         <div class="muted small">{% if sess %}{{ sess.message }} · checado {{ sess.checked_at[8:10] }}/{{ sess.checked_at[5:7] }} {{ sess.checked_at[11:16] }}{% else %}conecta por chave de API (sem abrir navegador){% endif %}</div>
@@ -20,12 +20,6 @@
       <label>Usuário do Danbooru <input name="login" value="{{ danbooru_login }}" autocomplete="off" placeholder="seu_nome_de_usuario"></label>
       <label>Chave de API <input name="api_key" type="password" autocomplete="new-password"
         placeholder="{{ 'salva (' ~ danbooru_key_hint ~ '). Deixe vazio para manter' if danbooru_key_hint else 'cole a chave aqui' }}"></label>
-      <label>Ambiente
-        <select name="env">
-          <option value="live" {{ 'selected' if danbooru_env == 'live' }}>Real (danbooru.donmai.us)</option>
-          <option value="test" {{ 'selected' if danbooru_env == 'test' }}>Teste (testbooru, para o técnico)</option>
-        </select>
-      </label>
       <div class="level-box">
         {% if danbooru_mode == 'unknown' %}
           <p class="muted small">Ao conectar, o painel lê o <b>nível da sua conta</b> e mostra como os posts vão entrar no Danbooru.</p>
@@ -50,6 +44,26 @@
         {% if danbooru_key_hint %}<button class="danger" formaction="/settings/danbooru/remove" onclick="return confirm('Remover a chave do painel?')">Remover chave</button>{% endif %}
       </div>
     </form>
+
+    {% set tsess = sessions.get('danbooru_test') %}
+    <details class="test-account" id="danbooru-test" {{ 'open' if danbooru_test_key_hint }}>
+      <summary>Conta de teste (testbooru) <small class="muted">opcional, para o técnico</small>
+        {% if tsess %}<span class="pill {{ 's-ok' if tsess.ok else 's-failed' }}">{{ 'conectada' if tsess.ok else 'desconectada' }}</span>{% endif %}
+      </summary>
+      <p class="muted small">Usada <b>só</b> pelo botão "Testar este post": com ela, o teste envia de verdade para o
+        <a href="https://testbooru.donmai.us" target="_blank">testbooru</a> (site de testes do Danbooru, separado do real).
+        Sem ela, o teste do Danbooru só simula. <b>Nunca</b> é usada na publicação real.
+        {% if tsess %}<br>{{ tsess.message }}{% endif %}</p>
+      <form method="post" action="/settings/danbooru-test" class="inline-form">
+        <label>Usuário no testbooru <input name="login" value="{{ danbooru_test_login }}" autocomplete="off"></label>
+        <label>Chave de API do testbooru <input name="api_key" type="password" autocomplete="new-password"
+          placeholder="{{ 'salva (' ~ danbooru_test_key_hint ~ '). Deixe vazio para manter' if danbooru_test_key_hint else 'cole a chave aqui' }}"></label>
+        <div class="actions">
+          <button class="ghost">Salvar e testar</button>
+          {% if danbooru_test_key_hint %}<button class="danger" name="remove" value="true">Remover</button>{% endif %}
+        </div>
+      </form>
+    </details>
   </div>
 
   {% for s in ALL_SITES if s != 'danbooru' %}

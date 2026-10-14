@@ -20,9 +20,7 @@
     </div>
   </header>
   {% if test_mode %}
-  <div class="banner">Modo teste ligado: os posts são preenchidos mas <b>não enviados</b>. Desligue em <a href="/sites">Sites</a>.</div>
-  {% elif danbooru_env == 'test' %}
-  <div class="banner">O Danbooru está no ambiente de <b>teste</b> (testbooru). Troque para Real em <a href="/sites#danbooru">Sites</a>.</div>
+  <div class="banner">Modo teste ligado: a fila está <b>pausada</b> e nada é publicado. Use "Testar este post" à vontade. Desligue em <a href="/sites">Sites</a>.</div>
   {% endif %}
   <main>{% block content %}{% endblock %}</main>
   <script>

@@ -15,8 +15,17 @@ DATA_DIR = ROOT / "data"
 IMAGES_DIR = DATA_DIR / "images"
 DB_PATH = DATA_DIR / "boorubot.db"
 
-# draft -> approved (agendado) -> publishing -> done | partial | failed | tested (modo teste)
-POST_STATUSES = ("draft", "approved", "publishing", "done", "partial", "failed", "tested")
+# draft -> approved (na fila) -> publishing -> done | partial | failed
+#
+# TESTE E PRODUÇÃO NUNCA SE MISTURAM: testar um post grava só em `test_runs` e não muda
+# status, fila, published_at nem o ritmo. `publications` guarda apenas envios reais.
+#
+# Agendamento = fila + limitador de ritmo. Post aprovado não tem data: tem posição na fila.
+# O "pacer" (next_due) libera o primeiro da fila quando: já passou do horário diário, ainda
+# não saiu post hoje e o último saiu há >= MIN_GAP. Atraso (PC desligado) nunca acumula:
+# ao voltar sai 1 post e o resto segue 1 por dia. As datas na tela são só previsões.
+MIN_GAP = timedelta(hours=12)
+POST_STATUSES = ("draft", "approved", "publishing", "done", "partial", "failed")
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS posts (
@@ -33,7 +42,9 @@ CREATE TABLE IF NOT EXISTS posts (
     sites TEXT NOT NULL DEFAULT '[]',
     site_tags TEXT NOT NULL DEFAULT '{}',
     status TEXT NOT NULL DEFAULT 'draft',
-    scheduled_for TEXT
+    scheduled_for TEXT,     -- legado (agendamento por data fixa); não é mais usado
+    queue_pos REAL,         -- posição na fila (só posts aprovados)
+    published_at TEXT       -- quando saiu de verdade em pelo menos um site
 );
 CREATE TABLE IF NOT EXISTS publications (
     id INTEGER PRIMARY KEY,
@@ -41,6 +52,15 @@ CREATE TABLE IF NOT EXISTS publications (
     site TEXT NOT NULL,
     created_at TEXT NOT NULL,
     status TEXT NOT NULL,          -- ok | dry_run | skipped | failed
+    url TEXT NOT NULL DEFAULT '',
+    message TEXT NOT NULL DEFAULT ''
+);
+CREATE TABLE IF NOT EXISTS test_runs (
+    id INTEGER PRIMARY KEY,
+    post_id INTEGER NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
+    site TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    status TEXT NOT NULL,          -- dry_run (simulado) | test_upload (enviado ao testbooru) | skipped | failed
     url TEXT NOT NULL DEFAULT '',
     message TEXT NOT NULL DEFAULT ''
 );
@@ -59,12 +79,14 @@ CREATE TABLE IF NOT EXISTS settings (
 DEFAULT_SETTINGS = {
     "test_mode": "1",       # 1 = nada é enviado de verdade (dry-run)
     "daily_time": "18:00",  # horário do post diário
-    "danbooru_env": "test",  # test = testbooru, live = danbooru de verdade
-    "danbooru_login": "",
+    "danbooru_login": "",           # conta REAL (produção, danbooru.donmai.us)
     "danbooru_api_key": "",
+    "danbooru_test_login": "",      # conta de TESTE (testbooru), opcional, só para testes
+    "danbooru_test_api_key": "",
     "danbooru_level": "",          # preenchido pelo teste de conexão (nível real da conta)
     "danbooru_level_string": "",
     "danbooru_force_pending": "0",  # 1 = mesmo Contributor, manda para a fila de moderação
+    "last_published_at": "",  # último post real: base do limitador de ritmo
     "default_tags": "",      # entram em todo post novo (ex.: nome de artista, commission)
     "default_sites": json.dumps(["danbooru", "gelbooru", "paheal", "rule34us", "rule34xxx"]),
 }
@@ -84,6 +106,13 @@ class DB:
         self.conn.execute("PRAGMA foreign_keys = ON")
         with _lock, self.conn:
             self.conn.executescript(SCHEMA)
+            cols = {r[1] for r in self.conn.execute("PRAGMA table_info(posts)")}
+            for col, kind in (("queue_pos", "REAL"), ("published_at", "TEXT")):
+                if col not in cols:  # banco criado por versão anterior
+                    self.conn.execute(f"ALTER TABLE posts ADD COLUMN {col} {kind}")
+            # versões antigas consumiam o post no teste ("tested"); teste não muda mais o post
+            self.conn.execute("UPDATE posts SET status = 'draft' WHERE status = 'tested'")
+            self.conn.execute("DELETE FROM settings WHERE key = 'danbooru_env'")
             for key, value in DEFAULT_SETTINGS.items():
                 self.conn.execute("INSERT OR IGNORE INTO settings VALUES (?, ?)", (key, value))
 
@@ -137,35 +166,90 @@ class DB:
         if statuses:
             marks = ",".join("?" * len(statuses))
             rows = self._all(f"SELECT * FROM posts WHERE status IN ({marks}) "
-                             "ORDER BY COALESCE(scheduled_for, created_at)", statuses)
+                             "ORDER BY queue_pos IS NULL, queue_pos, created_at DESC", statuses)
         else:
             rows = self._all("SELECT * FROM posts ORDER BY created_at DESC")
         return [_decode(r) for r in rows]
 
-    def approve(self, post_id: int, when: datetime | None = None) -> datetime:
-        """Agenda no próximo horário diário livre (1 post por dia)."""
-        when = when or self.next_free_slot()
-        self.update_post(post_id, status="approved", scheduled_for=when.isoformat(timespec="minutes"))
-        return when
+    # --- fila + limitador de ritmo -----------------------------------------------
 
-    def next_free_slot(self, ref: datetime | None = None) -> datetime:
-        ref = ref or datetime.now()
-        hour, minute = (int(x) for x in self.setting("daily_time").split(":"))
-        taken = {r["scheduled_for"][:10] for r in self._all(
-            "SELECT scheduled_for FROM posts WHERE status IN ('approved', 'publishing') AND scheduled_for IS NOT NULL")}
-        taken |= {r["day"] for r in self._all(
-            "SELECT DISTINCT substr(created_at, 1, 10) AS day FROM publications WHERE status = 'ok'")}
-        slot = ref.replace(hour=hour, minute=minute, second=0, microsecond=0)
-        if slot <= ref:
-            slot += timedelta(days=1)
-        while slot.date().isoformat() in taken:
-            slot += timedelta(days=1)
-        return slot
-
-    def due_posts(self, ref: datetime | None = None) -> list[dict]:
-        ref = (ref or datetime.now()).isoformat(timespec="minutes")
+    def queue(self) -> list[dict]:
         return [_decode(r) for r in self._all(
-            "SELECT * FROM posts WHERE status = 'approved' AND scheduled_for <= ? ORDER BY scheduled_for", (ref,))]
+            "SELECT * FROM posts WHERE status = 'approved' ORDER BY queue_pos, id")]
+
+    def approve(self, post_id: int) -> None:
+        """Entra no fim da fila."""
+        last = self._all("SELECT MAX(queue_pos) AS m FROM posts WHERE status = 'approved'")[0]["m"]
+        self.update_post(post_id, status="approved", queue_pos=(last or 0) + 1)
+
+    def move_in_queue(self, post_id: int, where: str) -> None:
+        agg = "MIN" if where == "first" else "MAX"
+        edge = self._all(f"SELECT {agg}(queue_pos) AS v FROM posts WHERE status = 'approved'")[0]["v"] or 0
+        self.update_post(post_id, queue_pos=edge - 1 if where == "first" else edge + 1)
+
+    def last_published(self) -> datetime | None:
+        value = self.setting("last_published_at")
+        return datetime.fromisoformat(value) if value else None
+
+    def mark_published(self, post_id: int, when: datetime | None = None) -> None:
+        when = when or datetime.now()
+        row = self.get_post(post_id)
+        if row and not row["published_at"]:
+            self.update_post(post_id, published_at=when.isoformat(timespec="seconds"))
+        last = self.last_published()
+        if last is None or when > last:
+            self.set_setting("last_published_at", when.isoformat(timespec="seconds"))
+
+    def _daily_slot(self, day: datetime) -> datetime:
+        hour, minute = (int(x) for x in self.setting("daily_time").split(":"))
+        return day.replace(hour=hour, minute=minute, second=0, microsecond=0)
+
+    def _earliest_after(self, ref: datetime, last: datetime | None) -> datetime:
+        """Menor instante >= ref em que o pacer libera um post:
+        depois do horário do dia, nenhum post nesse dia e >= MIN_GAP desde o último."""
+        day = ref.date()
+        while True:
+            slot = self._daily_slot(datetime.combine(day, ref.time()))
+            if last and last.date() >= day:
+                day += timedelta(days=1)
+                continue
+            start = max(ref, slot)
+            if last:
+                start = max(start, last + MIN_GAP)
+            if start.date() != day:  # o intervalo mínimo empurrou para outro dia
+                day = start.date()
+                ref = max(ref, start)
+                continue
+            return start
+
+    def slot_open(self, ref: datetime | None = None) -> bool:
+        ref = ref or datetime.now()
+        return self._earliest_after(ref, self.last_published()) <= ref
+
+    def next_due(self, ref: datetime | None = None) -> dict | None:
+        """O pacer: devolve no máximo UM post, e só se o ritmo permitir agora."""
+        queue = self.queue()
+        return queue[0] if queue and self.slot_open(ref) else None
+
+    def projected_times(self, ref: datetime | None = None) -> dict[int, datetime]:
+        """Previsão de quando cada post da fila sai, mantendo o ritmo de 1 por dia."""
+        ref = ref or datetime.now()
+        last, out = self.last_published(), {}
+        cursor = ref
+        for row in self.queue():
+            when = self._earliest_after(cursor, last)
+            out[row["id"]] = when
+            last, cursor = when, when
+        return out
+
+    def projected_next(self, ref: datetime | None = None) -> datetime:
+        """Quando sairia um post aprovado agora (entrando no fim da fila)."""
+        ref = ref or datetime.now()
+        times = self.projected_times(ref)
+        if not times:
+            return self._earliest_after(ref, self.last_published())
+        last = max(times.values())
+        return self._earliest_after(last, last)
 
     # --- publicações -------------------------------------------------------------
 
@@ -183,6 +267,17 @@ class DB:
         """Sites onde o post já saiu (ou foi pulado por regra) — não reenvia."""
         return {r["site"] for r in self._all(
             "SELECT site FROM publications WHERE post_id = ? AND status IN ('ok', 'skipped')", (post_id,))}
+
+    # --- testes (separados da produção) -------------------------------------------
+
+    def add_test_run(self, post_id: int, site: str, status: str, url: str = "", message: str = "") -> None:
+        self._exec("INSERT INTO test_runs (post_id, site, created_at, status, url, message) "
+                   "VALUES (?, ?, ?, ?, ?, ?)", (post_id, site, now(), status, url, message))
+
+    def test_runs(self, post_id: int | None = None) -> list[dict]:
+        if post_id is not None:
+            return self._all("SELECT * FROM test_runs WHERE post_id = ? ORDER BY id DESC", (post_id,))
+        return self._all("SELECT * FROM test_runs ORDER BY id DESC")
 
     # --- sessões -----------------------------------------------------------------
 

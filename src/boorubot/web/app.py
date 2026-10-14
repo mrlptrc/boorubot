@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import uuid
+from datetime import datetime
 from urllib.parse import quote
 from pathlib import Path
 
@@ -30,9 +31,10 @@ SITE_LABELS = {
 RATINGS_PT = {"general": "geral (SFW)", "sensitive": "sensível", "questionable": "questionável (nudez)",
               "explicit": "explícito"}
 STATUS_LABELS = {
-    "draft": "rascunho", "approved": "agendado", "publishing": "publicando",
-    "done": "publicado", "partial": "parcial", "failed": "falhou", "tested": "testado (não enviado)",
-    "ok": "publicado", "dry_run": "teste", "skipped": "pulado",
+    "draft": "rascunho", "approved": "na fila", "publishing": "publicando",
+    "done": "publicado", "partial": "parcial", "failed": "falhou",
+    "ok": "publicado", "skipped": "pulado",
+    "dry_run": "simulado", "test_upload": "enviado ao testbooru",
 }
 
 
@@ -75,7 +77,7 @@ def create_app(db: DB | None = None, worker: Worker | None = None, start_worker:
         return "moderated"
 
     def render(request: Request, name: str, **ctx):
-        ctx.update(test_mode=db.test_mode, jobs=worker.pending(), danbooru_env=db.setting("danbooru_env"),
+        ctx.update(test_mode=db.test_mode, jobs=worker.pending(),
                    danbooru_mode=danbooru_mode(), danbooru_level=db.setting("danbooru_level_string"))
         return templates.TemplateResponse(request, name, ctx)
 
@@ -93,13 +95,10 @@ def create_app(db: DB | None = None, worker: Worker | None = None, start_worker:
             "done": bool(sessions.get(s, {}).get("ok")),
             "href": f"/guia#{s}",
         } for s in default_sites()]
-        tested = any(p["status"] in ("tested", "done", "partial") for p in db.list_posts())
-        steps.append({"label": "Fazer um post de teste (modo teste ligado)", "done": tested, "href": "/guia#teste"})
+        steps.append({"label": "Testar um post (botão \"Testar este post\")", "done": bool(db.test_runs()),
+                      "href": "/guia#teste"})
         steps.append({"label": "Desligar o modo teste para começar a postar", "done": not db.test_mode,
                       "href": "/guia#valendo"})
-        if "danbooru" in default_sites():
-            steps.append({"label": "Danbooru no ambiente real (não o de teste)",
-                          "done": db.setting("danbooru_env") == "live", "href": "/guia#danbooru"})
         return steps
 
     def post_or_404(post_id: int) -> dict:
@@ -115,9 +114,11 @@ def create_app(db: DB | None = None, worker: Worker | None = None, start_worker:
         return render(
             request, "index.html",
             drafts=db.list_posts(("draft",)),
-            scheduled=db.list_posts(("approved", "publishing")),
-            recent=[p for p in db.list_posts() if p["status"] in ("done", "partial", "failed", "tested")][:12],
-            next_slot=db.next_free_slot(),
+            scheduled=db.list_posts(("publishing",)) + db.queue(),
+            projected=db.projected_times(),
+            positions={p["id"]: i + 1 for i, p in enumerate(db.queue())},
+            recent=[p for p in db.list_posts() if p["status"] in ("done", "partial", "failed")][:12],
+            next_slot=db.projected_next(),
             steps=setup_steps(),
         )
 
@@ -134,7 +135,15 @@ def create_app(db: DB | None = None, worker: Worker | None = None, start_worker:
 
     @app.get("/posts/{post_id}")
     def edit_post(request: Request, post_id: int, erro: str = ""):
-        return render(request, "post.html", post=post_or_404(post_id), pubs=db.publications(post_id), error=erro)
+        row = post_or_404(post_id)
+        queue_ids = [p["id"] for p in db.queue()]
+        return render(
+            request, "post.html", post=row, pubs=db.publications(post_id), tests=db.test_runs(post_id), error=erro,
+            has_test_account=bool(db.setting("danbooru_test_api_key")),
+            projected=db.projected_times().get(post_id),
+            queue_pos=queue_ids.index(post_id) + 1 if post_id in queue_ids else None, queue_len=len(queue_ids),
+            published_today=bool(db.last_published() and db.last_published().date() == datetime.now().date()),
+        )
 
     @app.post("/posts/{post_id}")
     def save_post(
@@ -155,7 +164,7 @@ def create_app(db: DB | None = None, worker: Worker | None = None, start_worker:
             (IMAGES_DIR / row["image"]).unlink(missing_ok=True)
             return see_other("/")
 
-        if row["status"] in ("draft", "approved", "tested", "failed", "partial"):
+        if row["status"] in ("draft", "approved", "failed", "partial"):
             clean_tags = " ".join(normalize_tags(tags))
             db.update_post(
                 post_id, title=title.strip(), tags=clean_tags,
@@ -164,7 +173,10 @@ def create_app(db: DB | None = None, worker: Worker | None = None, start_worker:
                 original_character=original_character, sites=[s for s in ALL_SITES if s in sites],
             )
 
-        if action in ("approve", "publish_now"):
+        if action == "publish_now" and db.test_mode:
+            return see_other(f"/posts/{post_id}?erro=" + quote(
+                "modo teste ligado: nada é publicado. Use \"Testar este post\" ou desligue o modo teste em Sites."))
+        if action in ("approve", "publish_now", "test"):
             errors = []
             if not db.get_post(post_id)["tags"]:
                 errors.append("sem tags")
@@ -175,10 +187,14 @@ def create_app(db: DB | None = None, worker: Worker | None = None, start_worker:
         if action == "approve":
             db.approve(post_id)
         elif action == "publish_now":
-            db.update_post(post_id, status="approved")
+            db.update_post(post_id, status="publishing", queue_pos=None)
             worker.submit("publish", post_id, f"publicar #{post_id} (agora)")
+        elif action == "test":  # não muda nada no post: só grava em test_runs
+            worker.submit("test", post_id, f"testar #{post_id}")
         elif action == "unapprove":
-            db.update_post(post_id, status="draft", scheduled_for=None)
+            db.update_post(post_id, status="draft", queue_pos=None)
+        elif action in ("first", "last") and row["status"] == "approved":
+            db.move_in_queue(post_id, action)
         return see_other(f"/posts/{post_id}")
 
     @app.post("/posts/{post_id}/suggest")
@@ -199,29 +215,42 @@ def create_app(db: DB | None = None, worker: Worker | None = None, start_worker:
 
     @app.get("/sites")
     def sites_page(request: Request):
-        key = db.setting("danbooru_api_key")
+        key, test_key = db.setting("danbooru_api_key"), db.setting("danbooru_test_api_key")
         return render(
             request, "sites.html", sessions=db.sessions(), daily_time=db.setting("daily_time"),
             danbooru_login=db.setting("danbooru_login"),
             danbooru_key_hint=f"••••{key[-4:]}" if key else "",
+            danbooru_test_login=db.setting("danbooru_test_login"),
+            danbooru_test_key_hint=f"••••{test_key[-4:]}" if test_key else "",
             default_tags=db.setting("default_tags"), default_sites=default_sites(),
             force_pending=db.setting("danbooru_force_pending") == "1",
         )
 
     @app.post("/settings/danbooru")
-    def save_danbooru(
-        login: str = Form(""), api_key: str = Form(""), env: str = Form("test"), force_pending: bool = Form(False),
-    ):
-        # conta/ambiente podem ter mudado: esquece o nível até o próximo teste
+    def save_danbooru(login: str = Form(""), api_key: str = Form(""), force_pending: bool = Form(False)):
+        """Conta REAL (produção). A conta de teste fica em /settings/danbooru-test."""
+        # a conta pode ter mudado: esquece o nível até o próximo teste
         db.set_setting("danbooru_level", "")
         db.set_setting("danbooru_level_string", "")
         db.set_setting("danbooru_force_pending", "1" if force_pending else "0")
         db.set_setting("danbooru_login", login.strip())
         if api_key.strip():  # vazio = mantém a chave salva
             db.set_setting("danbooru_api_key", api_key.strip())
-        db.set_setting("danbooru_env", env if env in ("test", "live") else "test")
         worker.submit("session", "danbooru", "testar sessão Danbooru")
         return see_other("/sites#danbooru")
+
+    @app.post("/settings/danbooru-test")
+    def save_danbooru_test(login: str = Form(""), api_key: str = Form(""), remove: bool = Form(False)):
+        """Conta de TESTE (testbooru): usada só pelo botão "Testar este post"."""
+        if remove:
+            db.set_setting("danbooru_test_api_key", "")
+            db.set_session("danbooru_test", False, "conta de teste removida")
+            return see_other("/sites#danbooru-test")
+        db.set_setting("danbooru_test_login", login.strip())
+        if api_key.strip():
+            db.set_setting("danbooru_test_api_key", api_key.strip())
+        worker.submit("session_test", "danbooru", "testar conta de teste (testbooru)")
+        return see_other("/sites#danbooru-test")
 
     @app.post("/settings/danbooru/remove")
     def remove_danbooru():
@@ -237,10 +266,13 @@ def create_app(db: DB | None = None, worker: Worker | None = None, start_worker:
 
     @app.post("/sites/{name}/{kind}")
     def site_action(name: str, kind: str):
+        if name == "danbooru-test" and kind == "session":
+            worker.submit("session_test", "danbooru", "testar conta de teste (testbooru)")
+            return see_other("/sites#danbooru-test")
         if name not in ALL_SITES or kind not in ("login", "session"):
             raise HTTPException(404)
         if kind == "login" and name == "danbooru":
-            raise HTTPException(400, "Danbooru usa API key no .env, não precisa de login no navegador")
+            raise HTTPException(400, "Danbooru conecta por chave de API, não precisa de login no navegador")
         label = f"{'login' if kind == 'login' else 'testar sessão'} {SITE_LABELS[name]}"
         worker.submit(kind, name, label)
         return see_other("/sites")

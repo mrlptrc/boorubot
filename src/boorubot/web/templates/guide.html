@@ -34,7 +34,8 @@
     <ul>
       <li>Este painel roda <b>neste computador</b>. Para os posts saírem no horário, o PC precisa estar <b>ligado</b> e o painel <b>aberto</b>.</li>
       <li>Tenha em mãos o <b>usuário e a senha</b> de cada site. A senha você digita no próprio site e ela <b>não fica salva aqui</b>.</li>
-      <li>Enquanto o <b>modo teste</b> estiver ligado (faixa amarela no topo), nada é postado. Pode testar à vontade.</li>
+      <li>Enquanto o <b>modo teste</b> estiver ligado (faixa amarela no topo), nada é publicado e a fila fica <b>pausada</b>.
+        Pode testar à vontade com "🧪 Testar este post", porque os testes não mexem na sua fila.</li>
     </ul>
   </section>
 
@@ -47,8 +48,8 @@
         (ou: seu perfil → <i>API Key</i> → <i>New</i>).</li>
       <li>Em <i>Name</i> escreva <code>boorubot</code>. Deixe <i>IP Addresses</i> e <i>Permissions</i> <b>em branco</b> e clique em <i>Create</i>.</li>
       <li>Copie a chave que aparece na lista (um texto longo de letras e números).</li>
-      <li>Aqui no painel, vá em <a href="/sites#danbooru">Sites → Danbooru</a>, preencha seu <b>usuário</b>, cole a <b>chave</b>,
-        escolha o ambiente <b>Real</b> e clique em <b>Salvar e testar</b>.</li>
+      <li>Aqui no painel, vá em <a href="/sites#danbooru">Sites → Danbooru</a>, preencha seu <b>usuário</b>, cole a <b>chave</b>
+        e clique em <b>Salvar e testar</b>.</li>
       <li>Em alguns segundos deve aparecer <span class="pill s-ok">conectado</span> com o <b>nível da sua conta</b>,
         lido direto do Danbooru.</li>
     </ol>
@@ -94,33 +95,39 @@
   </section>
 
   <section id="teste">
-    <h2>5. Fazer um post de teste</h2>
+    <h2>5. Testar um post</h2>
+    <p><b>Teste e publicação real nunca se misturam.</b> Testar um post não muda nada nele: ele continua na mesma posição
+      da fila, não conta como post do dia e não aparece no Histórico.</p>
     <ol class="steps">
-      <li>Confira se a faixa amarela de <b>modo teste</b> está aparecendo.</li>
       <li>Na <a href="/">Fila</a>, arraste uma arte para <b>+ Nova arte</b>.</li>
       <li>Clique em <b>✨ Sugerir com IA</b>. Na primeira vez demora alguns minutos (baixa o modelo), depois leva um segundo.</li>
-      <li>Revise as tags, o rating e o link original. Marque os sites e clique em <b>Publicar agora</b>.</li>
-      <li>Embaixo do post aparece cada site como <span class="pill s-dry_run">teste</span> (deu certo) ou
-        <span class="pill s-failed">falhou</span>, com o motivo.</li>
+      <li>Revise as tags, o rating e o link original, marque os sites e clique em <b>🧪 Testar este post</b>.</li>
+      <li>Embaixo do post, na seção <b>Testes</b>, cada site aparece como <span class="pill s-dry_run">simulado</span> (deu certo)
+        ou <span class="pill s-failed">falhou</span>, com o motivo.</li>
     </ol>
+    <p class="tip">Nos testes, os sites só <b>preenchem</b> o formulário, sem enviar. O Danbooru só envia de verdade se o técnico
+      cadastrar uma conta de teste no <b>testbooru</b>, o site de testes deles, separado do Danbooru real.</p>
   </section>
 
   <section id="valendo">
     <h2>6. Começar a postar de verdade</h2>
     <p>Quando todos os sites estiverem <span class="pill s-ok">conectado</span> e o teste tiver dado certo:</p>
     <ol class="steps">
-      <li>Em <a href="/sites#danbooru">Sites → Danbooru</a>, confirme que o ambiente é <b>Real</b>.</li>
       <li>Em <a href="/sites">Sites → Configurações</a>, <b>desmarque "Modo teste"</b>, escolha o <b>horário</b> do post diário e salve.</li>
-      <li>A faixa amarela some. A partir daí, os posts aprovados saem de verdade.</li>
+      <li>A faixa amarela some e a fila volta a andar: os posts aprovados saem de verdade, 1 por dia, sempre pelas suas contas reais.</li>
     </ol>
   </section>
 
   <section id="dia-a-dia">
     <h2>7. Dia a dia</h2>
     <ul>
-      <li><b>Aprovar e agendar</b>: o post entra no próximo dia livre, no horário configurado (1 por dia).</li>
-      <li><b>Publicar agora</b>: posta na hora, fora da agenda.</li>
-      <li><b>Voltar para rascunho</b>: tira o post da agenda.</li>
+      <li><b>Aprovar e agendar</b>: o post entra no <b>fim da fila</b>. Sai 1 por dia, na ordem, no horário configurado.
+        As datas mostradas são <b>previsões</b>.</li>
+      <li><b>PC desligado?</b> A fila só atrasa: quando o painel voltar, sai <b>1</b> post e o resto continua 1 por dia.
+        Nunca sai tudo junto.</li>
+      <li><b>Passar para o início / Mandar para o fim</b>: muda a ordem da fila.</li>
+      <li><b>Publicar agora</b>: posta na hora e <b>conta como o post do dia</b> (o próximo da fila vai para amanhã).</li>
+      <li><b>Voltar para rascunho</b>: tira o post da fila.</li>
       <li><b>Tentar de novo</b>: se um site falhou, reenvia <b>só para os sites que falharam</b>.</li>
       <li><b>Tags padrão</b> (em Sites → Configurações): seu nome de artista, <code>commission</code> etc. já entram em todo post novo.</li>
       <li><b>Histórico</b>: todos os envios, com o link do post em cada site.</li>
