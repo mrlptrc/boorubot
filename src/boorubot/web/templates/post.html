@@ -78,12 +78,12 @@
           title="Simula em cada site marcado. Não muda nada no post, na fila nem no histórico.">🧪 Testar este post</button>
         {% if not test_mode %}
         <button name="action" value="publish_now" class="{{ 'primary' if post.status != 'draft' else 'ghost' }}"
-          onclick="return confirm('{{ 'Já saiu um post hoje. Publicar agora faz 2 no mesmo dia (pode parecer spam). Continuar?' if published_today and post.status not in ('failed', 'partial') else 'Publicar DE VERDADE agora nos sites marcados? Isso conta como o post de hoje.' }}')">
+          data-confirm="{{ 'Já saiu um post hoje. Publicar agora faz 2 no mesmo dia (pode parecer spam). Continuar?' if published_today and post.status not in ('failed', 'partial') else 'Publicar DE VERDADE agora nos sites marcados? Isso conta como o post de hoje.' }}">
           {{ 'Tentar de novo' if post.status in ('failed', 'partial') else 'Publicar agora' }}
         </button>
         {% endif %}
       {% endif %}
-      <button name="action" value="delete" class="danger" formnovalidate onclick="return confirm('Apagar este post da fila?')">Apagar</button>
+      <button name="action" value="delete" class="danger" formnovalidate data-confirm="Apagar este post da fila?">Apagar</button>
     </div>
   </form>
 </div>

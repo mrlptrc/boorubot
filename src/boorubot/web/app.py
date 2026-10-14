@@ -14,7 +14,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from boorubot import startup
-from boorubot.config import ALL_SITES, build_site
+from boorubot.config import ALL_SITES, SITE_LABELS, build_site
 from boorubot.sites.forms import FORM_SITES
 from boorubot.db import DB, IMAGES_DIR
 from boorubot.models import IMAGE_EXTS, RATINGS
@@ -23,13 +23,6 @@ from boorubot.worker import Worker
 
 HERE = Path(__file__).parent
 
-SITE_LABELS = {
-    "danbooru": "Danbooru",
-    "gelbooru": "Gelbooru",
-    "paheal": "rule34.paheal",
-    "rule34us": "rule34.us",
-    "rule34xxx": "rule34.xxx",
-}
 BROWSER_MODE_LABELS = {
     "headless": "invisível (sem janela)",
     "hidden": "janela escondida (aparece só se pedir captcha)",
@@ -118,16 +111,9 @@ def create_app(db: DB | None = None, worker: Worker | None = None, start_worker:
 
     @app.get("/")
     def index(request: Request):
-        return render(
-            request, "index.html",
-            drafts=db.list_posts(("draft",)),
-            scheduled=db.list_posts(("publishing",)) + db.queue(),
-            projected=db.projected_times(),
-            positions={p["id"]: i + 1 for i, p in enumerate(db.queue())},
-            recent=[p for p in db.list_posts() if p["status"] in ("done", "partial", "failed")][:12],
-            next_slot=db.projected_next(),
-            steps=setup_steps(),
-        )
+        from boorubot import dashboard
+
+        return render(request, "index.html", d=dashboard.build(db), steps=setup_steps())
 
     @app.post("/posts")
     async def create_post(image: UploadFile = File(...)):
@@ -233,6 +219,7 @@ def create_app(db: DB | None = None, worker: Worker | None = None, start_worker:
             default_tags=db.setting("default_tags"), default_sites=default_sites(),
             force_pending=db.setting("danbooru_force_pending") == "1",
             startup=startup.status(), error=erro,
+            rhythms={s: db.site_rhythm(s) for s in ALL_SITES}, delays={s: db.site_delay(s) for s in ALL_SITES},
             backup_dir=db.setting("backup_dir"), last_backup_at=db.setting("last_backup_at"),
             last_backup_ok=db.setting("last_backup_ok"), last_backup_msg=db.setting("last_backup_msg"),
             send_modes={s: build_site(s, db).browser_mode("send") for s in FORM_SITES},
@@ -346,13 +333,46 @@ def create_app(db: DB | None = None, worker: Worker | None = None, start_worker:
         return render(request, "history.html", pubs=db.publications(limit=200), metrics=db.latest_metrics(),
                       metrics_last_run=db.setting("metrics_last_run"))
 
-    @app.post("/historico/metricas")
+    @app.get("/calendario")
+    def calendar_page(request: Request):
+        from boorubot import calendar_view
+
+        return render(request, "calendar.html", c=calendar_view.build(db))
+
+    @app.post("/settings/ritmo")
+    async def save_rhythm(request: Request):
+        """Ritmo e atraso por site. Só muda o que vem a seguir: o que já saiu fica como está."""
+        from boorubot.db import MAX_DELAY_DAYS, RHYTHMS
+
+        form = await request.form()
+        for site in ALL_SITES:
+            rhythm = str(form.get(f"rhythm_{site}", "diario"))
+            delay = str(form.get(f"delay_{site}", "0"))
+            db.set_setting(f"rhythm_{site}", rhythm if rhythm in RHYTHMS else "diario")
+            db.set_setting(f"delay_{site}", delay if delay.isdigit() and int(delay) <= MAX_DELAY_DAYS else "0")
+        return see_other("/sites#ritmo")
+
+    @app.get("/metricas")
+    def metrics_page(request: Request, periodo: str = "30"):
+        from boorubot import insights
+
+        return render(request, "metrics.html", m=insights.build(db, periodo))
+
+    @app.post("/metricas/atualizar")
     def refresh_metrics():
         worker.submit("metrics", "danbooru", "atualizar métricas")
-        return see_other("/historico")
+        return see_other("/metricas")
 
     @app.get("/status.json")
     def status():
         return {"jobs": worker.pending()}
+
+    @app.get("/busca.json")
+    def search_index():
+        """Artes para a busca Ctrl+K (o filtro roda no navegador)."""
+        return {"posts": [{
+            "id": p["id"], "title": p["title"] or f"#{p['id']}", "image": p["image"], "tags": p["tags"],
+            "status": p["status"], "status_label": STATUS_LABELS.get(p["status"], p["status"]),
+        } for p in db.list_posts()]}
 
     return app

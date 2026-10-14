@@ -417,3 +417,19 @@ def test_guide_explains_sleep_and_vps(client):
     guide = c.get("/guia").text
     assert 'id="pc-acordado"' in guide and "suspensão" in guide and "VPS" in guide
     assert "/guia#pc-acordado" in c.get("/sites").text
+
+
+def test_search_index_lists_posts_for_ctrl_k(client, db):
+    c, _ = client
+    post_id = upload(c)
+    c.post(f"/posts/{post_id}", data={"action": "save", "title": "sereia", "tags": "1girl mermaid", "sites": ["danbooru"]})
+    found = {p["id"]: p for p in c.get("/busca.json").json()["posts"]}
+    assert found[post_id]["title"] == "sereia" and "mermaid" in found[post_id]["tags"]
+    assert found[post_id]["status_label"] == "rascunho"
+
+
+def test_dangerous_buttons_ask_for_confirmation(client, db):
+    c, _ = client
+    post_id = upload(c)
+    page = c.get(f"/posts/{post_id}").text
+    assert 'data-confirm="Apagar este post da fila?"' in page and "return confirm(" not in page

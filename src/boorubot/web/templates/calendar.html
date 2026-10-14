@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% block title %}Calendário · boorubot{% endblock %}
+{% block content %}
+<header class="hello">
+  <div>
+    <h1>Calendário</h1>
+    <p class="muted">Cada site tem o próprio ritmo. As datas são previsões; para mudar a ordem, use
+      "passar para o início / fim da fila" na arte.</p>
+  </div>
+  <a class="small" href="/sites#ritmo">ajustar ritmo por site →</a>
+</header>
+
+<div class="cal-wrap card">
+  <div class="cal" role="table" aria-label="Próximos 7 dias por site">
+    <div class="cal-row" role="row">
+      <span class="cal-head" role="columnheader"></span>
+      {% for d in c.dates %}<span class="cal-day{{ ' today' if d.today }}" role="columnheader">{{ d.label }}</span>{% endfor %}
+    </div>
+    {% for r in c.rows %}
+    <div class="cal-row" role="row">
+      <span class="cal-site" role="rowheader">{{ r.label }}
+        <small class="{{ 'warn' if r.session_down and not r.off }}">{{ 'pedir login' if r.session_down and not r.off else r.rhythm }}</small></span>
+      {% for cell in r.cells %}
+        {% set p = cell.post %}
+        {% if cell.kind in ('post', 'published', 'waiting') %}
+        <a class="cal-cell {{ cell.kind }}{{ ' today' if c.dates[loop.index0].today }}" role="cell" href="/posts/{{ p.id }}"
+           title="{{ p.title or ('#' ~ p.id) }}{{ ' · já saiu' if cell.kind == 'published' }}{{ ' · esperando login' if cell.kind == 'waiting' }}">
+          <img src="/images/{{ p.image }}" alt="">
+          <span>{{ 'esperando' if cell.kind == 'waiting' else (p.title or ('#' ~ p.id))|truncate(14, True, '…') }}</span>
+        </a>
+        {% elif cell.kind == 'skipped' %}
+        <span class="cal-cell skipped" role="cell">pulado (OC)</span>
+        {% elif cell.kind == 'off' %}
+        <span class="cal-cell off" role="cell">desligado</span>
+        {% elif cell.kind == 'rest' %}
+        <span class="cal-cell rest" role="cell"><span class="sr-only">folga</span></span>
+        {% else %}
+        <span class="cal-cell empty" role="cell">vazio</span>
+        {% endif %}
+      {% endfor %}
+    </div>
+    {% endfor %}
+  </div>
+</div>
+
+<div class="cal-bottom">
+  <section class="card" aria-labelledby="sem-dia">
+    <h2 id="sem-dia">Na fila, sem dia ainda</h2>
+    {% if c.beyond %}
+    <div class="chips-row">
+      {% for p in c.beyond %}
+      <a class="art-chip" href="/posts/{{ p.id }}"><img src="/images/{{ p.image }}" alt="">{{ p.title or ('#' ~ p.id) }}</a>
+      {% endfor %}
+    </div>
+    {% else %}
+    <p class="muted">Tudo o que está aprovado já tem dia nesta semana.</p>
+    {% endif %}
+  </section>
+  {% if c.empty_days %}
+  <section class="card cal-tip">
+    <img src="/static/pets/bunny.svg" alt="">
+    <p>{{ c.empty_days|join(', ') }} {{ 'está vazio' if c.empty_days|length == 1 else 'estão vazios' }}.
+      {% if c.suggestion and c.suggestion_is_draft %}Aprove <a href="/posts/{{ c.suggestion.id }}"><b>{{ c.suggestion.title or ('#' ~ c.suggestion.id) }}</b></a>
+      ou suba uma arte nova.{% else %}Aprove mais artes para preencher a semana.{% endif %}</p>
+  </section>
+  {% endif %}
+</div>
+{% endblock %}

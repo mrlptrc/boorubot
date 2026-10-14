@@ -51,3 +51,7 @@ def build_site(name: str, db=None, test: bool = False):
 
 
 ALL_SITES = ("danbooru", "gelbooru", "paheal", "rule34us", "rule34xxx")
+SITE_LABELS = {
+    "danbooru": "Danbooru", "gelbooru": "Gelbooru", "paheal": "rule34.paheal",
+    "rule34us": "rule34.us", "rule34xxx": "rule34.xxx",
+}
