@@ -96,7 +96,13 @@ DEFAULT_SETTINGS = {
     "danbooru_level_string": "",
     "danbooru_force_pending": "0",  # 1 = mesmo Contributor, manda para a fila de moderação
     "last_published_at": "",  # último post real: base do limitador de ritmo
-    "metrics_last_run": "",   # última coleta de métricas (1x por dia)
+    "metrics_last_run": "",   # última coleta de métricas bem-sucedida
+    "metrics_last_attempt": "",  # data da última tentativa: evita repetir a cada 30 s se a API cair
+    "backup_dir": "",         # pasta de backup (vazio = backup desligado)
+    "backup_last_attempt": "",
+    "last_backup_at": "",
+    "last_backup_ok": "",
+    "last_backup_msg": "",
     "default_tags": "",      # entram em todo post novo (ex.: nome de artista, commission)
     "default_sites": json.dumps(["danbooru", "gelbooru", "paheal", "rule34us", "rule34xxx"]),
 }
@@ -125,6 +131,15 @@ class DB:
             self.conn.execute("DELETE FROM settings WHERE key = 'danbooru_env'")
             for key, value in DEFAULT_SETTINGS.items():
                 self.conn.execute("INSERT OR IGNORE INTO settings VALUES (?, ?)", (key, value))
+
+    def backup_to(self, target: Path) -> None:
+        """Cópia consistente do banco (API de backup do SQLite), segura com o painel rodando."""
+        out = sqlite3.connect(target)
+        try:
+            with _lock:
+                self.conn.backup(out)
+        finally:
+            out.close()
 
     def _exec(self, sql: str, params=()) -> sqlite3.Cursor:
         with _lock, self.conn:

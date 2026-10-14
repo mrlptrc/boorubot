@@ -232,10 +232,28 @@ def create_app(db: DB | None = None, worker: Worker | None = None, start_worker:
             danbooru_test_key_hint=f"••••{test_key[-4:]}" if test_key else "",
             default_tags=db.setting("default_tags"), default_sites=default_sites(),
             force_pending=db.setting("danbooru_force_pending") == "1",
-            startup=startup.status(), startup_error=erro,
+            startup=startup.status(), error=erro,
+            backup_dir=db.setting("backup_dir"), last_backup_at=db.setting("last_backup_at"),
+            last_backup_ok=db.setting("last_backup_ok"), last_backup_msg=db.setting("last_backup_msg"),
             send_modes={s: build_site(s, db).browser_mode("send") for s in FORM_SITES},
             default_modes={s: build_site(s).browser_mode("send") for s in FORM_SITES},
         )
+
+    @app.post("/settings/backup")
+    def save_backup(backup_dir: str = Form(""), action: str = Form("save")):
+        from boorubot.backup import BackupError, validate_dest
+
+        if action == "off" or not backup_dir.strip():
+            db.set_setting("backup_dir", "")
+            return see_other("/sites#backup")
+        try:
+            dest = validate_dest(backup_dir)
+        except BackupError as exc:
+            return see_other("/sites?erro=" + quote(str(exc)) + "#backup")
+        db.set_setting("backup_dir", str(dest))
+        if action == "now":
+            worker.submit("backup", "backup", "backup agora")
+        return see_other("/sites#backup")
 
     @app.post("/settings/browser/{name}")
     def save_browser_mode(name: str, mode: str = Form(...)):

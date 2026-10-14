@@ -19,7 +19,7 @@ log = logging.getLogger("boorubot.worker")
 
 @dataclass
 class Job:
-    kind: str  # publish (produção) | test | login | session | session_test | metrics
+    kind: str  # publish (produção) | test | login | session | session_test | metrics | backup
     target: int | str
     label: str = ""
     started: float = field(default=0.0)
@@ -139,6 +139,12 @@ class Worker:
             from boorubot.metrics import collect_danbooru_metrics
 
             log.info("métricas: %s snapshots gravados", collect_danbooru_metrics(self.db))
+        elif job.kind == "backup":
+            from boorubot.backup import backup_now
+
+            result = backup_now(self.db)
+            if result:
+                log.info("backup em %s: %s imagens novas", result.dest, result.images_copied)
         elif job.kind == "session_test":  # conta de teste do Danbooru (testbooru)
             try:
                 result = build_site("danbooru", self.db, test=True).session_check()
@@ -166,11 +172,17 @@ class Worker:
             self.current is not None and self.current.kind == kind)
 
     def _tick_daily(self) -> None:
-        """Manutenção 1x por dia (só leitura de produção; roda também com o modo teste ligado)."""
+        """Manutenção 1x por dia (não publica nada; roda também com o modo teste ligado).
+        Marca a TENTATIVA do dia: se a API cair ou a pasta sumir, não repete a cada 30 s."""
         today = datetime.now().date().isoformat()
-        if (not self.db.setting("metrics_last_run").startswith(today)
-                and self.db.publications_for_metrics("danbooru") and not self._queued("metrics")):
+        if (self.db.setting("metrics_last_attempt") != today and not self._queued("metrics")
+                and self.db.publications_for_metrics("danbooru")):
+            self.db.set_setting("metrics_last_attempt", today)
             self.submit("metrics", "danbooru", "atualizar métricas (diário)")
+        if (self.db.setting("backup_dir") and self.db.setting("backup_last_attempt") != today
+                and not self._queued("backup")):
+            self.db.set_setting("backup_last_attempt", today)
+            self.submit("backup", "backup", "backup diário")
 
     def _tick_publish(self) -> None:
         """No máximo 1 publicação por vez, liberada pelo pacer.

@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% block title %}Sites · boorubot{% endblock %}
 {% block content %}
+{% if error %}<div class="alert">{{ error }}</div>{% endif %}
 <h2>Contas conectadas</h2>
 <p class="muted">Primeira vez? Siga o <a href="/guia">guia de conexão</a>, que leva uns 10 minutos.</p>
 
@@ -120,7 +121,6 @@
       <div class="muted small">Se o painel não estiver aberto no horário, o post do dia não sai. Recomendado: ligar.
         <br>O PC também <b>não pode estar dormindo</b> no horário do post: <a href="/guia#pc-acordado">veja como ajustar</a>.</div>
     {% endif %}
-    {% if startup_error %}<div class="alert small">{{ startup_error }}</div>{% endif %}
   </div>
   {% if startup.supported %}
   <form method="post" action="/settings/startup" class="actions">
@@ -132,6 +132,29 @@
   </form>
   {% endif %}
 </div>
+
+<h2 id="backup">Backup diário</h2>
+<form method="post" action="/settings/backup" class="card settings">
+  <p class="muted small">Uma vez por dia, o painel copia o banco (fila, histórico, configurações) e as imagens para esta pasta.
+    Use uma pasta do <b>OneDrive</b> ou do Google Drive para ter cópia fora do PC. Os logins dos sites <b>não</b> vão para o backup
+    (por segurança); se precisar, é só entrar de novo em cada site.</p>
+  <label>Pasta de backup
+    <input name="backup_dir" value="{{ backup_dir }}" placeholder="C:\Users\voce\OneDrive\boorubot-backup">
+  </label>
+  <p class="small">
+    {% if not backup_dir %}<span class="pill">desligado</span>
+    {% elif last_backup_at %}
+      <span class="pill {{ 's-ok' if last_backup_ok == '1' else 's-failed' }}">{{ 'ok' if last_backup_ok == '1' else 'falhou' }}</span>
+      último backup: {{ last_backup_at[8:10] }}/{{ last_backup_at[5:7] }} {{ last_backup_at[11:16] }} · {{ last_backup_msg }}
+    {% elif last_backup_ok == '0' %}<span class="pill s-failed">falhou</span> {{ last_backup_msg }}
+    {% else %}<span class="pill">ainda não rodou</span>{% endif %}
+  </p>
+  <div class="actions">
+    <button class="primary" name="action" value="save">Salvar</button>
+    <button class="ghost" name="action" value="now">Salvar e fazer backup agora</button>
+    {% if backup_dir %}<button class="danger" name="action" value="off">Desligar</button>{% endif %}
+  </div>
+</form>
 
 <h2>Configurações</h2>
 <form method="post" action="/settings" class="card settings">
