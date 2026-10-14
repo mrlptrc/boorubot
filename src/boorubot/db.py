@@ -25,6 +25,11 @@ DB_PATH = DATA_DIR / "boorubot.db"
 # não saiu post hoje e o último saiu há >= MIN_GAP. Atraso (PC desligado) nunca acumula:
 # ao voltar sai 1 post e o resto segue 1 por dia. As datas na tela são só previsões.
 MIN_GAP = timedelta(hours=12)
+
+# Ritmo por site. A fila principal (acima) define o "dia 0" de cada arte; cada site percorre
+# a mesma fila no seu ritmo. Padrão = diário com atraso 0 = todos os sites no dia 0, como sempre.
+RHYTHMS = ("diario", "dia_sim_dia_nao", "desligado")
+MAX_DELAY_DAYS = 7
 POST_STATUSES = ("draft", "approved", "publishing", "done", "partial", "failed")
 
 SCHEMA = """
@@ -72,6 +77,14 @@ CREATE TABLE IF NOT EXISTS metric_snapshots (
     up_score INTEGER,
     down_score INTEGER,
     fav_count INTEGER
+);
+CREATE TABLE IF NOT EXISTS site_schedule (
+    post_id INTEGER NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
+    site TEXT NOT NULL,
+    due_at TEXT NOT NULL,          -- a partir de quando o site pode receber; o pacer do site decide o dia
+    status TEXT NOT NULL DEFAULT 'agendado',  -- agendado | publicado | falhou | pulado
+    updated_at TEXT NOT NULL,
+    PRIMARY KEY (post_id, site)
 );
 CREATE TABLE IF NOT EXISTS site_sessions (
     site TEXT PRIMARY KEY,
@@ -218,9 +231,19 @@ class DB:
 
     def mark_published(self, post_id: int, when: datetime | None = None) -> None:
         when = when or datetime.now()
+        self.mark_post_published_at(post_id, when)
+        self.mark_released(when)
+
+    def mark_post_published_at(self, post_id: int, when: datetime | None = None) -> None:
+        """Primeira vez que a arte saiu em algum site. Não mexe no ritmo da fila principal."""
+        when = when or datetime.now()
         row = self.get_post(post_id)
         if row and not row["published_at"]:
             self.update_post(post_id, published_at=when.isoformat(timespec="seconds"))
+
+    def mark_released(self, when: datetime | None = None) -> None:
+        """O "dia 0" de uma arte aconteceu: conta para o ritmo da fila principal."""
+        when = when or datetime.now()
         last = self.last_published()
         if last is None or when > last:
             self.set_setting("last_published_at", when.isoformat(timespec="seconds"))
@@ -229,13 +252,21 @@ class DB:
         hour, minute = (int(x) for x in self.setting("daily_time").split(":"))
         return day.replace(hour=hour, minute=minute, second=0, microsecond=0)
 
-    def _earliest_after(self, ref: datetime, last: datetime | None) -> datetime:
+    def daily_slot(self, day: datetime) -> datetime:
+        """O horário do post diário no dia de `day`."""
+        return self._daily_slot(day)
+
+    def earliest_after(self, ref: datetime, last: datetime | None, day_gap: int = 1) -> datetime:
+        return self._earliest_after(ref, last, day_gap)
+
+    def _earliest_after(self, ref: datetime, last: datetime | None, day_gap: int = 1) -> datetime:
         """Menor instante >= ref em que o pacer libera um post:
-        depois do horário do dia, nenhum post nesse dia e >= MIN_GAP desde o último."""
+        depois do horário do dia, nenhum post nesse dia e >= MIN_GAP desde o último.
+        day_gap=2 é o "dia sim, dia não": o próximo só sai 2 dias depois do último."""
         day = ref.date()
         while True:
             slot = self._daily_slot(datetime.combine(day, ref.time()))
-            if last and last.date() >= day:
+            if last and last.date() + timedelta(days=day_gap - 1) >= day:
                 day += timedelta(days=1)
                 continue
             start = max(ref, slot)
@@ -275,6 +306,59 @@ class DB:
             return self._earliest_after(ref, self.last_published())
         last = max(times.values())
         return self._earliest_after(last, last)
+
+    # --- ritmo por site ----------------------------------------------------------
+
+    def site_rhythm(self, site: str) -> str:
+        value = self.setting(f"rhythm_{site}")
+        return value if value in RHYTHMS else "diario"
+
+    def site_delay(self, site: str) -> int:
+        value = self.setting(f"delay_{site}")
+        return min(int(value), MAX_DELAY_DAYS) if value.isdigit() else 0
+
+    def site_follows_queue(self, site: str) -> bool:
+        """Diário e sem atraso: o site recebe a arte no dia 0, junto com a fila principal."""
+        return self.site_rhythm(site) == "diario" and self.site_delay(site) == 0
+
+    def site_day_gap(self, site: str) -> int:
+        return 2 if self.site_rhythm(site) == "dia_sim_dia_nao" else 1
+
+    def site_last_published(self, site: str) -> datetime | None:
+        value = self._all("SELECT MAX(created_at) AS m FROM publications WHERE site = ? AND status = 'ok'",
+                          (site,))[0]["m"]
+        return datetime.fromisoformat(value) if value else None
+
+    def site_slot_open(self, site: str, ref: datetime | None = None) -> bool:
+        ref = ref or datetime.now()
+        last = self.site_last_published(site)
+        return self._earliest_after(ref, last, self.site_day_gap(site)) <= ref
+
+    def schedule_site(self, post_id: int, site: str, due_at: datetime, status: str = "agendado") -> None:
+        self._exec("INSERT OR REPLACE INTO site_schedule (post_id, site, due_at, status, updated_at) "
+                   "VALUES (?, ?, ?, ?, ?)", (post_id, site, due_at.isoformat(timespec="seconds"), status, now()))
+
+    def set_schedule_status(self, post_id: int, site: str, status: str) -> None:
+        self._exec("UPDATE site_schedule SET status = ?, updated_at = ? WHERE post_id = ? AND site = ?",
+                   (status, now(), post_id, site))
+
+    def site_schedule(self, post_id: int | None = None, site: str | None = None,
+                      status: str | None = None) -> list[dict]:
+        sql, params = "SELECT * FROM site_schedule WHERE 1 = 1", []
+        for col, value in (("post_id", post_id), ("site", site), ("status", status)):
+            if value is not None:
+                sql += f" AND {col} = ?"
+                params.append(value)
+        return self._all(sql + " ORDER BY due_at, post_id", tuple(params))
+
+    def next_site_due(self, site: str, ref: datetime | None = None) -> dict | None:
+        """Pacer do site: no máximo UM envio atrasado por vez, e só se o ritmo do site permitir."""
+        ref = ref or datetime.now()
+        if self.site_rhythm(site) == "desligado":
+            return None
+        due = [r for r in self.site_schedule(site=site, status="agendado")
+               if datetime.fromisoformat(r["due_at"]) <= ref]
+        return due[0] if due and self.site_slot_open(site, ref) else None
 
     # --- publicações -------------------------------------------------------------
 
