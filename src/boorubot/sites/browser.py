@@ -59,6 +59,11 @@ def launch_options(mode: str) -> dict:
     if mode not in BROWSER_MODES:
         raise ValueError(f"modo de navegador desconhecido: {mode}")
     options = {"headless": mode == "headless", "viewport": {"width": 1280, "height": 900}, "locale": "en-US"}
+    if mode == "headless":
+        # headless com o Chromium completo ("novo headless"). O padrão do Playwright é outro executável
+        # (chromium-headless-shell), que NÃO lê os cookies gravados pela janela de login: o site parecia
+        # deslogado no teste de sessão e no envio, mesmo com o login feito.
+        options["channel"] = "chromium"
     if mode == "hidden":
         options["args"] = list(OFFSCREEN_ARGS)
     return options

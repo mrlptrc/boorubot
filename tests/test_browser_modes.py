@@ -125,3 +125,40 @@ def test_captcha_in_dry_run_never_reveals(fake_browser):
     with pytest.raises(FormSiteError, match="pediu captcha"):
         Rule34xxx().publish(Post.load(EXAMPLE), dry_run=True)
     assert fake_browser["revealed"] == 0
+
+
+def test_headless_uses_the_full_chromium():
+    """O headless-shell não lê os cookies que o Chromium completo (janela do login) grava."""
+    assert launch_options("headless").get("channel") == "chromium"
+
+
+def test_login_cookies_visible_to_headless_sends(tmp_path, monkeypatch):
+    """Regressão: logar no Gelbooru pela janela e o teste de sessão (invisível) não ver o login."""
+    import threading
+    from http.server import BaseHTTPRequestHandler, HTTPServer
+
+    from boorubot.sites import browser
+
+    class SetsCookie(BaseHTTPRequestHandler):
+        def do_GET(self):
+            self.send_response(200)
+            self.send_header("Set-Cookie", "user_id=42; Max-Age=31536000; Path=/")
+            self.send_header("Content-Type", "text/html")
+            self.end_headers()
+            self.wfile.write(b"<p>logado</p>")
+
+        def log_message(self, *a):
+            pass
+
+    server = HTTPServer(("127.0.0.1", 0), SetsCookie)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    monkeypatch.setattr(browser, "PROFILES_DIR", tmp_path)
+    url = f"http://127.0.0.1:{server.server_port}/"
+    try:
+        with browser.open_page("site", "hidden") as page:        # mesmo navegador da janela de login
+            page.goto(url)
+        with browser.open_page("site", "headless") as page:      # como o teste de sessão e o envio
+            names = [c["name"] for c in page.context.cookies(url)]
+    finally:
+        server.shutdown()
+    assert names == ["user_id"]
