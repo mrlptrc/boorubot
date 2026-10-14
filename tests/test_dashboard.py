@@ -89,16 +89,39 @@ def test_single_snapshot_means_no_gain_yet():
     assert sum(g for _, g in favorites_by_day([snap(1, at(14, 10), 50)], TODAY)) == 0
 
 
-def test_week_favorites_from_db(db):
+def published_pub(db, when):
     post_id = db.create_post("a.png")
     db.add_publication(post_id, "danbooru", "ok", "https://danbooru.donmai.us/posts/1")
     pub = db.publications(post_id)[0]["id"]
+    db._exec("UPDATE publications SET created_at = ? WHERE id = ?", (when.isoformat(timespec="seconds"), pub))
+    return pub
+
+
+def test_week_favorites_old_post_counts_from_oldest_snapshot(db):
+    pub = published_pub(db, at(1, 18))                              # antes da janela
     db.add_metric_snapshot(pub, at(1, 10).isoformat(), 5, 5, 0, 2)    # fora da janela
     db.add_metric_snapshot(pub, at(10, 10).isoformat(), 6, 6, 0, 4)
     db.add_metric_snapshot(pub, at(14, 10).isoformat(), 9, 9, 0, 11)
     fav = dashboard.week_favorites(db, at(14, 12))
     assert fav["has_data"] and fav["total"] == 7
     assert len(fav["bars"]) == 7 and fav["bars"][-1]["pct"] == 100
+
+
+def test_week_favorites_new_post_counts_from_zero(db):
+    """Post às 18h, 1ª coleta só no dia seguinte já com 12: esses 12 contam."""
+    pub = published_pub(db, at(12, 18))
+    db.add_metric_snapshot(pub, at(13, 10).isoformat(), 14, 14, 0, 12)
+    db.add_metric_snapshot(pub, at(14, 10).isoformat(), 20, 20, 0, 15)
+    fav = dashboard.week_favorites(db, at(14, 12))
+    assert fav["total"] == 15
+    by_day = {b["day"]: b["gain"] for b in fav["bars"]}
+    assert by_day[date(2026, 10, 13)] == 12 and by_day[date(2026, 10, 14)] == 3
+
+
+def test_new_post_baseline_is_zero_in_pure_function():
+    snaps = [snap(1, at(13, 10), 12)]
+    assert sum(g for _, g in favorites_by_day(snaps, TODAY, published_at={1: at(12, 18)})) == 12
+    assert sum(g for _, g in favorites_by_day(snaps, TODAY, published_at={1: at(1, 18)})) == 0
 
 
 def test_no_metrics_yet(db):
