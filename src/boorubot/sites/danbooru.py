@@ -76,6 +76,15 @@ class Danbooru(Site):
         r.raise_for_status()
         return r.json()
 
+    def session_check(self) -> Result:
+        if not (self.login and self.api_key):
+            return Result(self.name, ok=False, dry_run=True, message="faltam DANBOORU_LOGIN / DANBOORU_API_KEY no .env")
+        me = self.whoami()
+        ok = me.get("name") == self.login
+        level = me.get("level_string", "?")
+        msg = f"API ok: {me.get('name')} ({level}) em {self.base_url}" if ok else "API key recusada"
+        return Result(self.name, ok=ok, dry_run=True, message=msg)
+
     def publish(self, post: Post, dry_run: bool = True) -> Result:
         if dry_run:
             payload = self.post_payload(post, upload_media_asset_id=0)

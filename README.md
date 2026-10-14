@@ -9,6 +9,22 @@ Publica artes da fila em Danbooru, Gelbooru, rule34.paheal, rule34.us e rule34.x
 | Gelbooru, paheal, rule34.us | Formulário web via Playwright | `boorubot login <site>` uma vez |
 | rule34.xxx | Formulário web via Playwright | idem, mas com captcha no login e Cloudflare (só passa com navegador visível) |
 
+## Painel (uso do dia a dia)
+
+```bash
+uv run boorubot panel        # abre http://127.0.0.1:8765 no navegador
+```
+
+- **Fila**: arraste a arte → **✨ Sugerir com IA** (tags + rating no padrão Danbooru, WD Tagger local)
+  → revise → marque os sites → **Aprovar e agendar** (1 post por dia no horário configurado).
+- **Sites**: **Entrar** abre o navegador neste PC para login/captcha (feche a janela ao terminar);
+  **Testar** confere se a sessão ainda vale.
+- **Histórico**: cada envio por site, com link do post ou o erro.
+- **Modo teste** (ligado por padrão, em Sites): preenche tudo e tira print, mas **não envia**.
+
+O painel roda neste PC (o robô precisa de navegador real). Dados em `data/` (banco + imagens, fora do git).
+A sugestão de tags baixa ~380 MB na primeira vez (modelo `SmilingWolf/wd-vit-tagger-v3`).
+
 ## Setup
 
 ```bash
@@ -42,7 +58,7 @@ Cada post é uma pasta em `queue/` com **uma** imagem + `post.json` (veja `queue
 ```bash
 uv run boorubot check                        # reconhecimento sem credenciais
 uv run boorubot check rule34xxx --headed     # rule34.xxx só passa do Cloudflare com navegador visível
-uv run boorubot login gelbooru               # abre o navegador; login (e captcha) manual, sessão salva em .profiles/
+uv run boorubot login gelbooru               # abre o navegador; faça login (e captcha) e feche a janela
 uv run boorubot discover gelbooru            # logado: salva os campos reais do form de upload em runs/
 uv run boorubot post queue/exemplo-001                   # dry-run em todos os sites do post.json
 uv run boorubot post queue/exemplo-001 --site danbooru --send   # envio real

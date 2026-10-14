@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}Histórico · boorubot{% endblock %}
+{% block content %}
+<h2>Histórico</h2>
+{% if pubs %}
+<table class="table">
+  <tr><th></th><th>Quando</th><th>Arte</th><th>Site</th><th>Status</th><th>Detalhe</th></tr>
+  {% for p in pubs %}
+  <tr>
+    <td><a href="/posts/{{ p.post_id }}"><img class="mini" src="/images/{{ p.image }}" alt=""></a></td>
+    <td>{{ p.created_at[8:10] }}/{{ p.created_at[5:7] }} {{ p.created_at[11:16] }}</td>
+    <td><a href="/posts/{{ p.post_id }}">{{ p.title or ('#' ~ p.post_id) }}</a></td>
+    <td>{{ SITE_LABELS[p.site] }}</td>
+    <td><span class="pill s-{{ p.status }}">{{ STATUS_LABELS[p.status] }}</span></td>
+    <td class="msg">{% if p.url %}<a href="{{ p.url }}" target="_blank">{{ p.url }}</a>{% else %}{{ p.message }}{% endif %}</td>
+  </tr>
+  {% endfor %}
+</table>
+{% else %}<p class="muted">Nada publicado ainda.</p>{% endif %}
+{% endblock %}

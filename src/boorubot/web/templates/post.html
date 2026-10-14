@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+{% block title %}{{ post.title or ('#' ~ post.id) }} · boorubot{% endblock %}
+{% block content %}
+{% set editable = post.status in ('draft', 'approved', 'tested', 'failed', 'partial') %}
+<p><a href="/">&larr; Fila</a></p>
+{% if error %}<div class="alert">{{ error }}</div>{% endif %}
+
+<div class="post-layout">
+  <figure class="preview card">
+    <img src="/images/{{ post.image }}" alt="">
+    <figcaption>
+      <span class="pill s-{{ post.status }}">{{ STATUS_LABELS[post.status] }}</span>
+      {% if post.scheduled_for and post.status == 'approved' %}
+        agendado para <b>{{ post.scheduled_for[8:10] }}/{{ post.scheduled_for[5:7] }} às {{ post.scheduled_for[11:16] }}</b>
+      {% endif %}
+    </figcaption>
+  </figure>
+
+  <form method="post" class="card fields" id="post-form">
+    <fieldset {{ 'disabled' if not editable }}>
+      <label>Título <input name="title" value="{{ post.title }}"></label>
+
+      <div class="tags-head">
+        <span>Tags <small>separadas por espaço, padrão Danbooru (long_hair, 1girl...)</small></span>
+        <button type="button" class="ghost" id="suggest">✨ Sugerir com IA</button>
+      </div>
+      <textarea name="tags" id="tags" rows="6" placeholder="1girl long_hair commission ...">{{ post.tags }}</textarea>
+      <p class="muted small" id="suggest-info"></p>
+
+      <div class="row">
+        <label>Rating
+          <select name="rating" id="rating">
+            {% for r in RATINGS %}<option value="{{ r }}" {{ 'selected' if post.rating == r }}>{{ RATINGS_PT[r] }}</option>{% endfor %}
+          </select>
+        </label>
+        <label>Link original (source) <input name="source" value="{{ post.source }}" placeholder="https://x.com/..."></label>
+      </div>
+
+      <label class="check">
+        <input type="checkbox" name="original_character" value="true" {{ 'checked' if post.original_character }}>
+        Só personagem original (OC) <small>Danbooru ganha a tag <code>original</code>; o paheal não aceita e será pulado</small>
+      </label>
+
+      <details {{ 'open' if post.commentary_title or post.commentary_description }}>
+        <summary>Comentário da artista (Danbooru)</summary>
+        <label>Título <input name="commentary_title" value="{{ post.commentary_title }}"></label>
+        <label>Texto <textarea name="commentary_description" rows="3">{{ post.commentary_description }}</textarea></label>
+      </details>
+
+      <div class="sites">
+        <span>Publicar em</span>
+        {% for s in ALL_SITES %}
+        <label class="chip"><input type="checkbox" name="sites" value="{{ s }}" {{ 'checked' if s in post.sites }}> {{ SITE_LABELS[s] }}</label>
+        {% endfor %}
+      </div>
+    </fieldset>
+
+    <div class="actions">
+      {% if editable %}<button name="action" value="save" class="ghost">Salvar</button>{% endif %}
+      {% if post.status in ('draft', 'tested') %}
+        <button name="action" value="approve" class="primary">Aprovar e agendar</button>
+      {% elif post.status == 'approved' %}
+        <button name="action" value="unapprove" class="ghost">Voltar para rascunho</button>
+      {% endif %}
+      {% if editable %}
+        <button name="action" value="publish_now" class="{{ 'primary' if post.status != 'draft' else 'ghost' }}"
+          onclick="return confirm('{{ 'Modo teste: vai só preencher, sem enviar.' if test_mode else 'Publicar AGORA nos sites marcados?' }}')">
+          {{ 'Tentar de novo' if post.status in ('failed', 'partial') else 'Publicar agora' }}
+        </button>
+      {% endif %}
+      <button name="action" value="delete" class="danger" formnovalidate onclick="return confirm('Apagar este post da fila?')">Apagar</button>
+    </div>
+  </form>
+</div>
+
+{% if pubs %}
+<h2>Publicações</h2>
+<table class="table">
+  <tr><th>Quando</th><th>Site</th><th>Status</th><th>Detalhe</th></tr>
+  {% for p in pubs %}
+  <tr>
+    <td>{{ p.created_at[8:10] }}/{{ p.created_at[5:7] }} {{ p.created_at[11:16] }}</td>
+    <td>{{ SITE_LABELS[p.site] }}</td>
+    <td><span class="pill s-{{ p.status }}">{{ STATUS_LABELS[p.status] }}</span></td>
+    <td class="msg">{% if p.url %}<a href="{{ p.url }}" target="_blank">{{ p.url }}</a>{% else %}{{ p.message }}{% endif %}</td>
+  </tr>
+  {% endfor %}
+</table>
+{% endif %}
+
+<script>
+  document.getElementById("suggest").addEventListener("click", async (ev) => {
+    const btn = ev.currentTarget, info = document.getElementById("suggest-info");
+    btn.disabled = true; btn.textContent = "Analisando...";
+    info.textContent = "Na primeira vez o modelo é baixado (~380 MB), pode demorar alguns minutos.";
+    try {
+      const r = await fetch("/posts/{{ post.id }}/suggest", { method: "POST" });
+      if (!r.ok) throw new Error(await r.text());
+      const s = await r.json();
+      const box = document.getElementById("tags");
+      const current = box.value.split(/\s+/).filter(Boolean);
+      const added = s.tags.filter(t => !current.includes(t));
+      box.value = current.concat(added).join(" ");
+      document.getElementById("rating").value = s.rating;
+      const pct = Object.entries(s.rating_scores).map(([k, v]) => `${k} ${Math.round(v * 100)}%`).join(" · ");
+      info.textContent = `+${added.length} tags sugeridas` + (s.characters.length ? ` (personagens: ${s.characters.join(", ")})` : "") +
+        `. Rating sugerido: ${s.rating} (${pct}). Revise antes de aprovar.`;
+    } catch (e) {
+      info.textContent = "Falhou: " + e.message;
+    } finally {
+      btn.disabled = false; btn.textContent = "✨ Sugerir com IA";
+    }
+  });
+</script>
+{% endblock %}

@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}Sites · boorubot{% endblock %}
+{% block content %}
+<h2>Sites</h2>
+<p class="muted">"Entrar" abre o navegador neste PC: faça o login (e o captcha, se aparecer) e <b>feche a janela</b> quando terminar.
+A sessão fica salva e o robô reaproveita.</p>
+
+<div class="site-list">
+  {% for s in ALL_SITES %}
+  {% set sess = sessions.get(s) %}
+  <div class="card site">
+    <div>
+      <strong>{{ SITE_LABELS[s] }}</strong>
+      {% if sess %}
+        <span class="pill {{ 's-ok' if sess.ok else 's-failed' }}">{{ 'conectado' if sess.ok else 'desconectado' }}</span>
+        <div class="muted small">{{ sess.message }} · checado {{ sess.checked_at[8:10] }}/{{ sess.checked_at[5:7] }} {{ sess.checked_at[11:16] }}</div>
+      {% else %}
+        <span class="pill">não verificado</span>
+      {% endif %}
+      {% if s == 'danbooru' %}<div class="muted small">usa API key no arquivo .env</div>{% endif %}
+      {% if s == 'rule34xxx' %}<div class="muted small">abre o navegador visível (o Cloudflare bloqueia o modo invisível)</div>{% endif %}
+    </div>
+    <div class="actions">
+      {% if s != 'danbooru' %}
+      <form method="post" action="/sites/{{ s }}/login"><button class="primary">Entrar</button></form>
+      {% endif %}
+      <form method="post" action="/sites/{{ s }}/session"><button class="ghost">Testar</button></form>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+<h2>Configurações</h2>
+<form method="post" action="/settings" class="card settings">
+  <label class="check">
+    <input type="checkbox" name="test_mode" value="true" {{ 'checked' if test_mode }}>
+    Modo teste <small>preenche os formulários e tira print, mas não envia nada</small>
+  </label>
+  <label>Horário do post diário <input type="time" name="daily_time" value="{{ daily_time }}"></label>
+  <div class="actions"><button class="primary">Salvar</button></div>
+</form>
+{% endblock %}

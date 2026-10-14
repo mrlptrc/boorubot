@@ -6,3 +6,5 @@ __pycache__/
 # sessões de navegador logadas (cookies!) e saídas de execução
 .profiles/
 runs/
+# banco local e imagens enviadas pelo painel
+data/

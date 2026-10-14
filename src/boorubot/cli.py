@@ -4,6 +4,7 @@
   boorubot login <site>                    login manual no navegador (salva a sessão)
   boorubot discover <site>                 salva os campos do formulário de upload (logado)
   boorubot post <pasta> [--site X] [--send]  dry-run por padrão; --send publica de verdade
+  boorubot panel                           painel web local (http://127.0.0.1:8765)
 """
 
 from __future__ import annotations
@@ -48,6 +49,7 @@ def cmd_check(args) -> int:
 
 
 def cmd_login(args) -> int:
+    print(f"[{args.site}] faça o login no navegador (resolva o captcha se tiver) e FECHE a janela ao terminar")
     show(build_site(args.site).login())
     return 0
 
@@ -78,6 +80,24 @@ def cmd_post(args) -> int:
     return 1 if failures else 0
 
 
+def cmd_panel(args) -> int:
+    import logging
+    import threading
+    import webbrowser
+
+    import uvicorn
+
+    from boorubot.web.app import create_app
+
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
+    url = f"http://{args.host}:{args.port}"
+    print(f"painel em {url}  (Ctrl+C para parar)")
+    if not args.no_browser:
+        threading.Timer(1.5, webbrowser.open, (url,)).start()
+    uvicorn.run(create_app(), host=args.host, port=args.port, log_level="warning")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     for stream in (sys.stdout, sys.stderr):
         stream.reconfigure(encoding="utf-8")
@@ -102,6 +122,12 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--site", action="append", choices=ALL_SITES)
     p.add_argument("--send", action="store_true", help="envia de verdade")
     p.set_defaults(func=cmd_post)
+
+    p = sub.add_parser("panel", help="painel web local")
+    p.add_argument("--host", default="127.0.0.1", help="use 0.0.0.0 para abrir para a rede local")
+    p.add_argument("--port", type=int, default=8765)
+    p.add_argument("--no-browser", action="store_true")
+    p.set_defaults(func=cmd_panel)
 
     args = parser.parse_args(argv)
     return args.func(args)

@@ -29,6 +29,10 @@ class FormSite(Site):
     rating_values: dict[str, list[str]] = {}
     # URL depois do envio que indica post criado
     success_url = re.compile(r"$^")
+    # rule34.xxx: o Cloudflare barra navegador invisível
+    needs_headed = False
+    login_timeout_ms = 10 * 60 * 1000
+    captcha_timeout_s = 5 * 60
 
     def __init__(self, username: str = "", password: str = ""):
         self.username = username
@@ -37,20 +41,34 @@ class FormSite(Site):
     # --- login -----------------------------------------------------------------
 
     def login(self) -> Result:
-        """Abre o navegador visível; preenche usuário/senha do .env e espera a pessoa
-        resolver captcha e confirmar. A sessão fica salva em .profiles/<site>."""
-        out = run_dir(self.name)
+        """Abre o navegador visível no login (usuário/senha do .env já preenchidos).
+        A pessoa entra, resolve captcha se tiver e FECHA a janela; a sessão fica em .profiles/<site>."""
         with open_page(self.name, headless=False) as page:
             page.goto(self.login_url)
             if self.username and self.password and page.locator("input[name=pass]").count():
                 page.fill("input[name=user]", self.username)
                 page.fill("input[name=pass]", self.password)
-            input(f"[{self.name}] faça o login no navegador (resolva captcha se tiver) e aperte Enter aqui... ")
+            page.wait_for_event("close", timeout=self.login_timeout_ms)
+        return self.session_check()
+
+    def session_check(self) -> Result:
+        """A sessão salva ainda vale? Abre a página de upload e procura o formulário."""
+        out = run_dir(self.name)
+        with open_page(self.name, headless=not self.needs_headed) as page:
             page.goto(self.upload_url)
-            logged = self._has_upload_form(page)
-            shot = screenshot(page, out / "after-login.png")
-        msg = "logado, formulário de upload visível" if logged else "não achei o formulário de upload, login falhou?"
-        return Result(self.name, ok=logged, dry_run=True, message=msg, artifacts=[shot])
+            self._wait_captcha(page, 20)
+            ok = self._has_upload_form(page)
+            shot = screenshot(page, out / "session.png")
+        msg = "sessão ativa" if ok else "sem sessão: faça o login de novo"
+        return Result(self.name, ok=ok, dry_run=True, message=msg, artifacts=[shot])
+
+    def _wait_captcha(self, page: Page, timeout_s: int) -> bool:
+        """Espera o captcha/challenge sumir (sozinho ou resolvido pela pessoa)."""
+        for _ in range(timeout_s):
+            if not captcha_present(page):
+                return True
+            page.wait_for_timeout(1000)
+        return not captcha_present(page)
 
     # --- reconhecimento --------------------------------------------------------
 
@@ -80,8 +98,9 @@ class FormSite(Site):
     def discover(self) -> Result:
         """Logado: salva a estrutura do formulário de upload para conferir as heurísticas."""
         out = run_dir(self.name)
-        with open_page(self.name) as page:
+        with open_page(self.name, headless=not self.needs_headed) as page:
             page.goto(self.upload_url)
+            self._wait_captcha(page, 20)
             forms = dump_forms(page, out / "upload-forms.json")
             shot = screenshot(page, out / "upload.png")
             ok = self._has_upload_form(page)
@@ -94,15 +113,14 @@ class FormSite(Site):
         self.check_rules(post)
         out = run_dir(self.name)
         # envio real roda com navegador visível para a pessoa poder resolver captcha
-        with open_page(self.name, headless=dry_run) as page:
+        with open_page(self.name, headless=dry_run and not self.needs_headed) as page:
             page.goto(self.upload_url)
-            if captcha_present(page):
-                if dry_run:
-                    raise FormSiteError("captcha na página de upload; rode `boorubot login` antes")
-                input(f"[{self.name}] resolva o captcha no navegador e aperte Enter... ")
+            if not self._wait_captcha(page, 20 if dry_run else self.captcha_timeout_s):
+                shot = screenshot(page, out / "captcha.png")
+                raise FormSiteError(f"captcha não resolvido na página de upload. print: {shot}")
             if not self._has_upload_form(page):
                 shot = screenshot(page, out / "no-form.png")
-                raise FormSiteError(f"sem formulário de upload (rode `boorubot login {self.name}`). print: {shot}")
+                raise FormSiteError(f"sem sessão no site: faça o login (painel: Sites → Entrar). print: {shot}")
 
             self.fill(page, post)
             filled = screenshot(page, out / "filled.png")
@@ -189,6 +207,7 @@ class Gelbooru(FormSite):
 class Rule34xxx(Gelbooru):
     """Mesmo engine do Gelbooru 0.2, mas com captcha próprio + Cloudflare na frente."""
     name = "rule34xxx"
+    needs_headed = True
     home_url = "https://rule34.xxx/"
     login_url = "https://rule34.xxx/index.php?page=account&s=login&code=00"
     upload_url = "https://rule34.xxx/index.php?page=post&s=add"

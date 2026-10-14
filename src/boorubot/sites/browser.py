@@ -60,7 +60,10 @@ def open_page(site: str, headless: bool = True):
             page = ctx.pages[0] if ctx.pages else ctx.new_page()
             yield page
         finally:
-            ctx.close()
+            try:
+                ctx.close()
+            except Exception:
+                pass  # a pessoa já fechou a janela (fluxo de login)
 
 
 def captcha_present(page: Page) -> bool:

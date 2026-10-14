@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="pt-br">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}boorubot{% endblock %}</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <header class="top">
+    <a class="brand" href="/">boorubot</a>
+    <nav>
+      <a href="/" class="{{ 'on' if request.url.path == '/' or request.url.path.startswith('/posts') }}">Fila</a>
+      <a href="/sites" class="{{ 'on' if request.url.path == '/sites' }}">Sites</a>
+      <a href="/historico" class="{{ 'on' if request.url.path == '/historico' }}">Histórico</a>
+    </nav>
+    <div id="jobs" class="jobs" data-count="{{ jobs|length }}">
+      {% if jobs %}<span class="spin"></span> {{ jobs[0] }}{% if jobs|length > 1 %} (+{{ jobs|length - 1 }}){% endif %}{% endif %}
+    </div>
+  </header>
+  {% if test_mode %}
+  <div class="banner">Modo teste ligado: os posts são preenchidos mas <b>não enviados</b>. Desligue em <a href="/sites">Sites</a>.</div>
+  {% endif %}
+  <main>{% block content %}{% endblock %}</main>
+  <script>
+    // recarrega a página quando as tarefas em andamento terminam
+    (function () {
+      const el = document.getElementById("jobs");
+      let busy = Number(el.dataset.count) > 0;
+      setInterval(async () => {
+        try {
+          const { jobs } = await (await fetch("/status.json")).json();
+          el.innerHTML = jobs.length ? '<span class="spin"></span> ' + jobs[0] + (jobs.length > 1 ? " (+" + (jobs.length - 1) + ")" : "") : "";
+          if (busy && !jobs.length) location.reload();
+          busy = jobs.length > 0;
+        } catch (e) {}
+      }, 3000);
+    })();
+  </script>
+</body>
+</html>
