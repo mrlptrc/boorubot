@@ -64,14 +64,21 @@ def queue_runway(days: set[date], today: date) -> int:
 
 # --- favoritos na semana -----------------------------------------------------------
 
-def favorites_by_day(snapshots: list[dict], today: date, days: int = 7) -> list[tuple[date, int]]:
+def favorites_by_day(snapshots: list[dict], today: date, days: int = 7,
+                     published_at: dict[int, datetime] | None = None) -> list[tuple[date, int]]:
     """Ganho de favoritos por dia nos últimos `days` dias (hoje incluído).
 
-    Por publicação: diferença entre o snapshot mais recente e o mais antigo da janela, distribuída
-    pelos dias (o valor de cada dia é o último snapshot daquele dia; o primeiro snapshot é a base).
+    Por publicação: diferença entre o snapshot mais recente e a base, distribuída pelos dias
+    (o valor de cada dia é o último snapshot daquele dia). A base é:
+      - ZERO, se a publicação saiu dentro da janela: a coleta é 1x por dia, então os favoritos das
+        primeiras horas (quando o post mais ganha) só aparecem no 1º snapshot e precisam contar;
+      - o snapshot mais antigo da janela, se a publicação é de antes da janela.
     `snapshots`: linhas com publication_id, captured_at (iso) e fav_count, já filtradas pela janela.
+    `published_at`: quando cada publicação saiu (publications.created_at).
     """
     window = [today - timedelta(days=days - 1 - i) for i in range(days)]
+    window_start = datetime.combine(window[0], time.min)
+    published_at = published_at or {}
     gains = dict.fromkeys(window, 0)
     by_pub: dict[int, list[tuple[datetime, int]]] = {}
     for row in snapshots:
@@ -79,12 +86,13 @@ def favorites_by_day(snapshots: list[dict], today: date, days: int = 7) -> list[
             continue
         by_pub.setdefault(row["publication_id"], []).append(
             (datetime.fromisoformat(row["captured_at"]), int(row["fav_count"])))
-    for snaps in by_pub.values():
+    for pub_id, snaps in by_pub.items():
         snaps.sort()
         end_of_day = {}
         for when, favs in snaps:
             end_of_day[when.date()] = favs  # ordenado: o último do dia prevalece
-        previous = snaps[0][1]
+        released = published_at.get(pub_id)
+        previous = 0 if released and released >= window_start else snaps[0][1]
         for day in window:
             if day in end_of_day:
                 gains[day] += end_of_day[day] - previous
@@ -92,10 +100,14 @@ def favorites_by_day(snapshots: list[dict], today: date, days: int = 7) -> list[
     return [(day, gains[day]) for day in window]
 
 
+def publication_times(db: DB) -> dict[int, datetime]:
+    return {p["id"]: datetime.fromisoformat(p["created_at"]) for p in db.publications_with_posts()}
+
+
 def week_favorites(db: DB, now: datetime) -> dict:
     today = now.date()
     start = datetime.combine(today - timedelta(days=6), time.min)
-    series = favorites_by_day(db.metric_snapshots_since(start), today)
+    series = favorites_by_day(db.metric_snapshots_since(start), today, published_at=publication_times(db))
     peak = max([g for _, g in series] + [1])
     return {
         "has_data": db.has_metrics(),
