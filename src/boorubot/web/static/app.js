@@ -136,6 +136,8 @@
       { id: "nova-arte", title: "Subir nova arte", section: "Ações", icon: icon("puppy"), keywords: "upload imagem nova", handler: newArt },
       { id: "metricas", title: "Atualizar métricas do Danbooru", section: "Ações", icon: icon("bear"), keywords: "score favoritos", handler: post("/metricas/atualizar") },
       { id: "pg-fila", title: "Início", section: "Páginas", icon: icon("cat"), keywords: "fila painel do dia rascunhos agendados", handler: go("/") },
+      { id: "pg-calendario", title: "Calendário", section: "Páginas", icon: icon("bunny"), keywords: "agenda semana ritmo por site", handler: go("/calendario") },
+      { id: "cfg-ritmo", title: "Ritmo por site", section: "Páginas", icon: icon("bunny"), keywords: "dia sim dia não atraso desligar site", handler: go("/sites#ritmo") },
       { id: "pg-metricas", title: "Métricas", section: "Páginas", icon: icon("bear"), keywords: "favoritos score gráfico ranking", handler: go("/metricas") },
       { id: "pg-sites", title: "Sites e configurações", section: "Páginas", icon: icon("puppy"), keywords: "contas modo teste horario backup", handler: go("/sites") },
       { id: "pg-hist", title: "Histórico", section: "Páginas", icon: icon("paw"), keywords: "publicados envios", handler: go("/historico") },
