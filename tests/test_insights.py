@@ -50,8 +50,8 @@ def seeded(db):
 
 def test_thirty_days(seeded):
     m = insights.build(seeded, "30", NOW)
-    # sereia: 5 -> 28 (+23) ; maid: 2 -> 7 (+5)
-    assert m["favorites"] == 28
+    # as duas saíram dentro dos 30 dias: contam do zero. sereia 0 -> 28 ; maid 0 -> 7
+    assert m["favorites"] == 35
     assert m["first_day_score"] == pytest.approx(6.0) and m["first_day_count"] == 2
     assert m["posts"] == 3 and m["failed"] == 1
     assert [t["title"] for t in m["top"]] == ["sereia", "maid"]
@@ -61,8 +61,8 @@ def test_thirty_days(seeded):
 def test_seven_days_window(seeded):
     m = insights.build(seeded, "7", NOW)
     assert m["start"] == date(2026, 10, 8)
-    # sereia na janela só tem o snapshot de ontem (base = ele mesmo, +0); maid +5
-    assert m["favorites"] == 5
+    # sereia é de antes da janela: base = snapshot de ontem (+0); maid saiu na janela: 0 -> 7
+    assert m["favorites"] == 7
     assert m["posts"] == 2                                # sereia foi publicada antes da janela
     assert m["first_day_count"] == 1                      # só a maid foi publicada na janela
 
@@ -70,7 +70,7 @@ def test_seven_days_window(seeded):
 def test_all_time_starts_at_first_activity(seeded):
     m = insights.build(seeded, "tudo", NOW)
     assert m["start"] == (NOW - timedelta(days=20)).date()
-    assert m["favorites"] == 28
+    assert m["favorites"] == 35
 
 
 def test_invalid_period_falls_back_to_30(seeded):
