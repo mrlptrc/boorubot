@@ -1,14 +1,8 @@
 {% extends "base.html" %}
 {% block title %}Histórico · boorubot{% endblock %}
 {% block content %}
-<div class="history-head">
-  <h2>Histórico <small>só envios reais</small></h2>
-  <form method="post" action="/historico/metricas">
-    <button class="ghost">Atualizar métricas</button>
-  </form>
-</div>
-<p class="muted small">Score e favoritos do Danbooru são atualizados sozinhos 1x por dia{% if metrics_last_run %}
-  · última atualização: {{ metrics_last_run[8:10] }}/{{ metrics_last_run[5:7] }} {{ metrics_last_run[11:16] }}{% endif %}.</p>
+<h2>Histórico <small>só envios reais</small></h2>
+<p class="muted small">Score e favoritos do Danbooru, atualizados 1x por dia. Gráficos e ranking em <a href="/metricas">Métricas</a>.</p>
 {% if pubs %}
 <table class="table">
   <tr><th></th><th>Quando</th><th>Arte</th><th>Site</th><th>Status</th><th>Score · Favoritos</th><th>Detalhe</th></tr>
