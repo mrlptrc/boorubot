@@ -8,6 +8,7 @@ import queue
 import threading
 import time
 from dataclasses import dataclass, field
+from datetime import datetime
 
 from boorubot.config import build_site
 from boorubot.db import DB, to_post
@@ -18,7 +19,7 @@ log = logging.getLogger("boorubot.worker")
 
 @dataclass
 class Job:
-    kind: str  # publish (produção) | test | login | session | session_test
+    kind: str  # publish (produção) | test | login | session | session_test | metrics
     target: int | str
     label: str = ""
     started: float = field(default=0.0)
@@ -134,6 +135,10 @@ class Worker:
             publish_post(self.db, int(job.target))
         elif job.kind == "test":
             run_post_test(self.db, int(job.target))
+        elif job.kind == "metrics":
+            from boorubot.metrics import collect_danbooru_metrics
+
+            log.info("métricas: %s snapshots gravados", collect_danbooru_metrics(self.db))
         elif job.kind == "session_test":  # conta de teste do Danbooru (testbooru)
             try:
                 result = build_site("danbooru", self.db, test=True).session_check()
@@ -153,7 +158,22 @@ class Worker:
                 self.db.set_session(site.name, False, f"{type(exc).__name__}: {exc}")
 
     def tick(self) -> None:
-        """Um passo do agendador: no máximo 1 publicação por vez, liberada pelo pacer.
+        self._tick_publish()
+        self._tick_daily()
+
+    def _queued(self, kind: str) -> bool:
+        return any(j.kind == kind for j in list(self.jobs.queue)) or (
+            self.current is not None and self.current.kind == kind)
+
+    def _tick_daily(self) -> None:
+        """Manutenção 1x por dia (só leitura de produção; roda também com o modo teste ligado)."""
+        today = datetime.now().date().isoformat()
+        if (not self.db.setting("metrics_last_run").startswith(today)
+                and self.db.publications_for_metrics("danbooru") and not self._queued("metrics")):
+            self.submit("metrics", "danbooru", "atualizar métricas (diário)")
+
+    def _tick_publish(self) -> None:
+        """No máximo 1 publicação por vez, liberada pelo pacer.
         Em modo teste a fila fica pausada (testes não contam no ritmo e esvaziariam a fila)."""
         if self.db.test_mode:
             return

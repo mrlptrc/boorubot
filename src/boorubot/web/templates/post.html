@@ -108,12 +108,13 @@
 {% if pubs %}
 <h2>Publicações <small>envios reais</small></h2>
 <table class="table">
-  <tr><th>Quando</th><th>Site</th><th>Status</th><th>Detalhe</th></tr>
+  <tr><th>Quando</th><th>Site</th><th>Status</th><th>Score · Favoritos</th><th>Detalhe</th></tr>
   {% for p in pubs %}
   <tr>
     <td>{{ p.created_at[8:10] }}/{{ p.created_at[5:7] }} {{ p.created_at[11:16] }}</td>
     <td>{{ SITE_LABELS[p.site] }}</td>
     <td><span class="pill s-{{ p.status }}">{{ STATUS_LABELS[p.status] }}</span></td>
+    <td class="num">{% set m = metrics.get(p.id) %}{% if m %}<b>{{ m.score }}</b> · ♥ {{ m.fav_count }}{% elif p.site == 'danbooru' and p.status == 'ok' %}<span class="muted">—</span>{% endif %}</td>
     <td class="msg">{% if p.url %}<a href="{{ p.url }}" target="_blank">{{ p.url }}</a>{% else %}{{ p.message }}{% endif %}</td>
   </tr>
   {% endfor %}

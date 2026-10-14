@@ -130,3 +130,7 @@ code { background: var(--line); padding: 1px 5px; border-radius: 4px; font-size:
 details.tests summary, details.test-account summary { cursor: pointer; }
 details.tests summary h2 { display: inline; }
 details.test-account { margin-top: 14px; padding-top: 12px; border-top: 1px dashed var(--line); font-size: 14px; }
+
+.history-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+.history-head form { margin: 0; }
+.table td.num { white-space: nowrap; }

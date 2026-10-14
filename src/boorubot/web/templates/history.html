@@ -1,10 +1,17 @@
 {% extends "base.html" %}
 {% block title %}Histórico · boorubot{% endblock %}
 {% block content %}
-<h2>Histórico</h2>
+<div class="history-head">
+  <h2>Histórico <small>só envios reais</small></h2>
+  <form method="post" action="/historico/metricas">
+    <button class="ghost">Atualizar métricas</button>
+  </form>
+</div>
+<p class="muted small">Score e favoritos do Danbooru são atualizados sozinhos 1x por dia{% if metrics_last_run %}
+  · última atualização: {{ metrics_last_run[8:10] }}/{{ metrics_last_run[5:7] }} {{ metrics_last_run[11:16] }}{% endif %}.</p>
 {% if pubs %}
 <table class="table">
-  <tr><th></th><th>Quando</th><th>Arte</th><th>Site</th><th>Status</th><th>Detalhe</th></tr>
+  <tr><th></th><th>Quando</th><th>Arte</th><th>Site</th><th>Status</th><th>Score · Favoritos</th><th>Detalhe</th></tr>
   {% for p in pubs %}
   <tr>
     <td><a href="/posts/{{ p.post_id }}"><img class="mini" src="/images/{{ p.image }}" alt=""></a></td>
@@ -12,6 +19,7 @@
     <td><a href="/posts/{{ p.post_id }}">{{ p.title or ('#' ~ p.post_id) }}</a></td>
     <td>{{ SITE_LABELS[p.site] }}</td>
     <td><span class="pill s-{{ p.status }}">{{ STATUS_LABELS[p.status] }}</span></td>
+    <td class="num">{% set m = metrics.get(p.id) %}{% if m %}<b>{{ m.score }}</b> · ♥ {{ m.fav_count }}{% elif p.site == 'danbooru' and p.status == 'ok' %}<span class="muted">—</span>{% endif %}</td>
     <td class="msg">{% if p.url %}<a href="{{ p.url }}" target="_blank">{{ p.url }}</a>{% else %}{{ p.message }}{% endif %}</td>
   </tr>
   {% endfor %}

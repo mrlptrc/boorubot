@@ -64,6 +64,15 @@ CREATE TABLE IF NOT EXISTS test_runs (
     url TEXT NOT NULL DEFAULT '',
     message TEXT NOT NULL DEFAULT ''
 );
+CREATE TABLE IF NOT EXISTS metric_snapshots (
+    id INTEGER PRIMARY KEY,
+    publication_id INTEGER NOT NULL REFERENCES publications(id) ON DELETE CASCADE,
+    captured_at TEXT NOT NULL,
+    score INTEGER,
+    up_score INTEGER,
+    down_score INTEGER,
+    fav_count INTEGER
+);
 CREATE TABLE IF NOT EXISTS site_sessions (
     site TEXT PRIMARY KEY,
     checked_at TEXT NOT NULL,
@@ -87,6 +96,7 @@ DEFAULT_SETTINGS = {
     "danbooru_level_string": "",
     "danbooru_force_pending": "0",  # 1 = mesmo Contributor, manda para a fila de moderação
     "last_published_at": "",  # último post real: base do limitador de ritmo
+    "metrics_last_run": "",   # última coleta de métricas (1x por dia)
     "default_tags": "",      # entram em todo post novo (ex.: nome de artista, commission)
     "default_sites": json.dumps(["danbooru", "gelbooru", "paheal", "rule34us", "rule34xxx"]),
 }
@@ -267,6 +277,22 @@ class DB:
         """Sites onde o post já saiu (ou foi pulado por regra) — não reenvia."""
         return {r["site"] for r in self._all(
             "SELECT site FROM publications WHERE post_id = ? AND status IN ('ok', 'skipped')", (post_id,))}
+
+    # --- métricas (só produção) ----------------------------------------------------
+
+    def publications_for_metrics(self, site: str) -> list[dict]:
+        return self._all("SELECT * FROM publications WHERE site = ? AND status = 'ok' AND url != ''", (site,))
+
+    def add_metric_snapshot(self, publication_id: int, captured_at: str, score, up_score, down_score,
+                            fav_count) -> None:
+        self._exec("INSERT INTO metric_snapshots (publication_id, captured_at, score, up_score, down_score, "
+                   "fav_count) VALUES (?, ?, ?, ?, ?, ?)",
+                   (publication_id, captured_at, score, up_score, down_score, fav_count))
+
+    def latest_metrics(self) -> dict[int, dict]:
+        rows = self._all("SELECT m.* FROM metric_snapshots m JOIN (SELECT publication_id, MAX(id) AS id "
+                         "FROM metric_snapshots GROUP BY publication_id) last ON last.id = m.id")
+        return {r["publication_id"]: r for r in rows}
 
     # --- testes (separados da produção) -------------------------------------------
 

@@ -146,6 +146,7 @@ def create_app(db: DB | None = None, worker: Worker | None = None, start_worker:
         queue_ids = [p["id"] for p in db.queue()]
         return render(
             request, "post.html", post=row, pubs=db.publications(post_id), tests=db.test_runs(post_id), error=erro,
+            metrics=db.latest_metrics(),
             has_test_account=bool(db.setting("danbooru_test_api_key")),
             projected=db.projected_times().get(post_id),
             queue_pos=queue_ids.index(post_id) + 1 if post_id in queue_ids else None, queue_len=len(queue_ids),
@@ -324,7 +325,13 @@ def create_app(db: DB | None = None, worker: Worker | None = None, start_worker:
 
     @app.get("/historico")
     def history(request: Request):
-        return render(request, "history.html", pubs=db.publications(limit=200))
+        return render(request, "history.html", pubs=db.publications(limit=200), metrics=db.latest_metrics(),
+                      metrics_last_run=db.setting("metrics_last_run"))
+
+    @app.post("/historico/metricas")
+    def refresh_metrics():
+        worker.submit("metrics", "danbooru", "atualizar métricas")
+        return see_other("/historico")
 
     @app.get("/status.json")
     def status():
