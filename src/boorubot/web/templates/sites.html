@@ -26,6 +26,24 @@
           <option value="test" {{ 'selected' if danbooru_env == 'test' }}>Teste (testbooru, para o técnico)</option>
         </select>
       </label>
+      <div class="level-box">
+        {% if danbooru_mode == 'unknown' %}
+          <p class="muted small">Ao conectar, o painel lê o <b>nível da sua conta</b> e mostra como os posts vão entrar no Danbooru.</p>
+        {% elif danbooru_mode == 'moderated' %}
+          <p><span class="pill s-approved">{{ danbooru_level }}</span> Seus posts vão para a <b>fila de moderação</b>:
+          a staff tem até 3 dias para aprovar, e contas desse nível têm um limite de uploads pendentes ao mesmo tempo.</p>
+        {% else %}
+          <p><span class="pill s-ok">{{ danbooru_level }}</span> Sua conta tem <b>aprovação automática</b>: o post vai ao ar na hora,
+          <b>sem ninguém conferir antes</b>. Tag ou rating errado fica publicado na sua conta.</p>
+        {% endif %}
+        {% if danbooru_mode in ('direct', 'forced') %}
+        <label class="check">
+          <input type="checkbox" name="force_pending" value="true" {{ 'checked' if force_pending }}>
+          Mandar meus posts para a fila de moderação mesmo assim
+          <small>mais seguro no começo: a staff confere antes de ir ao ar</small>
+        </label>
+        {% elif force_pending %}<input type="hidden" name="force_pending" value="true">{% endif %}
+      </div>
       <div class="actions">
         <button class="primary">Salvar e testar</button>
         <button class="ghost" formaction="/sites/danbooru/session">Testar</button>

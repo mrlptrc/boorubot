@@ -18,6 +18,7 @@ class Result:
     message: str
     url: str = ""
     artifacts: list[Path] = field(default_factory=list)
+    info: dict = field(default_factory=dict)  # dados extras do site (ex.: nível da conta)
 
 
 class Site:

@@ -118,3 +118,10 @@ button:disabled { opacity: .6; cursor: wait; }
 .guide dt { font-weight: 600; margin-top: 12px; }
 .guide dd { margin: 4px 0 0 0; color: var(--muted); }
 code { background: var(--line); padding: 1px 5px; border-radius: 4px; font-size: 0.92em; }
+
+.level-box { grid-column: 1 / -1; font-size: 14px; }
+.level-box p { margin: 0 0 8px; }
+.notice { font-size: 14px; padding: 10px 14px; border-radius: 10px; margin: 16px 0 0; background: var(--bg); border: 1px solid var(--line); }
+.n-direct { background: #fff4d6; border-color: #f0d38a; color: #6b4e00; }
+@media (prefers-color-scheme: dark) { .n-direct { background: #3a3014; border-color: #6b5622; color: #f3d98b; } }
+.guide h3 { font-size: 15px; margin: 16px 0 4px; }

@@ -62,6 +62,9 @@ DEFAULT_SETTINGS = {
     "danbooru_env": "test",  # test = testbooru, live = danbooru de verdade
     "danbooru_login": "",
     "danbooru_api_key": "",
+    "danbooru_level": "",          # preenchido pelo teste de conexão (nível real da conta)
+    "danbooru_level_string": "",
+    "danbooru_force_pending": "0",  # 1 = mesmo Contributor, manda para a fila de moderação
     "default_tags": "",      # entram em todo post novo (ex.: nome de artista, commission)
     "default_sites": json.dumps(["danbooru", "gelbooru", "paheal", "rule34us", "rule34xxx"]),
 }

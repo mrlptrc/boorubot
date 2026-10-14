@@ -15,6 +15,7 @@ from fastapi.templating import Jinja2Templates
 from boorubot.config import ALL_SITES
 from boorubot.db import DB, IMAGES_DIR
 from boorubot.models import IMAGE_EXTS, RATINGS
+from boorubot.sites.danbooru import CONTRIBUTOR_LEVEL
 from boorubot.worker import Worker
 
 HERE = Path(__file__).parent
@@ -63,8 +64,19 @@ def create_app(db: DB | None = None, worker: Worker | None = None, start_worker:
         ALL_SITES=ALL_SITES,
     )
 
+    def danbooru_mode() -> str:
+        """Como o post entra no Danbooru, pelo nível REAL lido da conta (nunca presumido).
+        unknown | direct (Contributor, sem moderação) | forced (Contributor pedindo moderação) | moderated"""
+        level = db.setting("danbooru_level")
+        if not level.isdigit() or not db.sessions().get("danbooru", {}).get("ok"):
+            return "unknown"
+        if int(level) >= CONTRIBUTOR_LEVEL:
+            return "forced" if db.setting("danbooru_force_pending") == "1" else "direct"
+        return "moderated"
+
     def render(request: Request, name: str, **ctx):
-        ctx.update(test_mode=db.test_mode, jobs=worker.pending(), danbooru_env=db.setting("danbooru_env"))
+        ctx.update(test_mode=db.test_mode, jobs=worker.pending(), danbooru_env=db.setting("danbooru_env"),
+                   danbooru_mode=danbooru_mode(), danbooru_level=db.setting("danbooru_level_string"))
         return templates.TemplateResponse(request, name, ctx)
 
     def default_sites() -> list[str]:
@@ -193,10 +205,17 @@ def create_app(db: DB | None = None, worker: Worker | None = None, start_worker:
             danbooru_login=db.setting("danbooru_login"),
             danbooru_key_hint=f"••••{key[-4:]}" if key else "",
             default_tags=db.setting("default_tags"), default_sites=default_sites(),
+            force_pending=db.setting("danbooru_force_pending") == "1",
         )
 
     @app.post("/settings/danbooru")
-    def save_danbooru(login: str = Form(""), api_key: str = Form(""), env: str = Form("test")):
+    def save_danbooru(
+        login: str = Form(""), api_key: str = Form(""), env: str = Form("test"), force_pending: bool = Form(False),
+    ):
+        # conta/ambiente podem ter mudado: esquece o nível até o próximo teste
+        db.set_setting("danbooru_level", "")
+        db.set_setting("danbooru_level_string", "")
+        db.set_setting("danbooru_force_pending", "1" if force_pending else "0")
         db.set_setting("danbooru_login", login.strip())
         if api_key.strip():  # vazio = mantém a chave salva
             db.set_setting("danbooru_api_key", api_key.strip())
@@ -207,6 +226,8 @@ def create_app(db: DB | None = None, worker: Worker | None = None, start_worker:
     @app.post("/settings/danbooru/remove")
     def remove_danbooru():
         db.set_setting("danbooru_api_key", "")
+        db.set_setting("danbooru_level", "")
+        db.set_setting("danbooru_level_string", "")
         db.set_session("danbooru", False, "chave removida do painel")
         return see_other("/sites#danbooru")
 

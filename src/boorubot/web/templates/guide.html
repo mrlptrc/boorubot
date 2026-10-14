@@ -49,9 +49,23 @@
       <li>Copie a chave que aparece na lista (um texto longo de letras e números).</li>
       <li>Aqui no painel, vá em <a href="/sites#danbooru">Sites → Danbooru</a>, preencha seu <b>usuário</b>, cole a <b>chave</b>,
         escolha o ambiente <b>Real</b> e clique em <b>Salvar e testar</b>.</li>
-      <li>Em alguns segundos deve aparecer <span class="pill s-ok">conectado</span> com o seu nível de conta.
-        Sendo <b>Contributor</b>, seus posts são aprovados direto.</li>
+      <li>Em alguns segundos deve aparecer <span class="pill s-ok">conectado</span> com o <b>nível da sua conta</b>,
+        lido direto do Danbooru.</li>
     </ol>
+    <h3>O nível da conta muda como o post entra</h3>
+    <ul>
+      <li><b>Contributor ou acima</b>: aprovação automática. O post vai ao ar <b>na hora</b>, sem ninguém conferir.
+        Por isso, confira sempre rating e tags antes de aprovar. Se preferir mais segurança no começo, em Sites → Danbooru
+        marque <i>"Mandar meus posts para a fila de moderação mesmo assim"</i>.</li>
+      <li><b>Abaixo de Contributor</b> (Member, Gold...): os posts vão para a <b>fila de moderação</b>, que tem até 3 dias para aprovar,
+        e existe um limite de posts pendentes ao mesmo tempo. Posts recusados diminuem esse limite.</li>
+    </ul>
+    <p class="tip">
+      {% if danbooru_mode == 'unknown' %}Sua conta ainda não foi conectada, então o painel ainda não sabe o seu nível.
+      {% elif danbooru_mode == 'moderated' %}Sua conta: <b>{{ danbooru_level }}</b>. Seus posts passam pela moderação.
+      {% elif danbooru_mode == 'forced' %}Sua conta: <b>{{ danbooru_level }}</b>, com moderação ligada por escolha sua.
+      {% else %}Sua conta: <b>{{ danbooru_level }}</b>. Seus posts vão ao ar na hora.{% endif %}
+    </p>
     <p class="tip">Para cancelar o acesso do robô: no Danbooru, abra <a href="https://danbooru.donmai.us/api_keys" target="_blank">API Keys</a> e apague a chave <code>boorubot</code>.</p>
   </section>
 

@@ -21,6 +21,8 @@ from boorubot.sites.base import Result, Site
 
 USER_AGENT = "boorubot/0.1 (post-automation)"
 NO_KEY = "sem usuário/chave de API: preencha em Sites → Danbooru (ou DANBOORU_LOGIN/DANBOORU_API_KEY no .env)"
+# Nível >= Contributor: post aprovado na hora, sem fila de moderação (User::Levels no Danbooru).
+CONTRIBUTOR_LEVEL = 35
 RATING_CODES = {"general": "g", "sensitive": "s", "questionable": "q", "explicit": "e"}
 
 
@@ -39,8 +41,11 @@ class Danbooru(Site):
         transport: httpx.BaseTransport | None = None,
         poll_interval: float = 2.0,
         poll_timeout: float = 120.0,
+        force_pending: bool = False,
     ):
         self.base_url = base_url.rstrip("/")
+        # Contributor pode pedir para o post passar pela moderação mesmo assim
+        self.force_pending = force_pending
         self.login = login
         self.api_key = api_key
         self.poll_interval = poll_interval
@@ -66,6 +71,8 @@ class Danbooru(Site):
             "post[rating]": RATING_CODES[post.rating],
             "post[source]": post.source,
         }
+        if self.force_pending:
+            payload["post[is_pending]"] = "1"
         if post.commentary_title or post.commentary_description:
             payload["post[artist_commentary][original_title]"] = post.commentary_title
             payload["post[artist_commentary][original_description]"] = post.commentary_description
@@ -86,11 +93,20 @@ class Danbooru(Site):
             if exc.response.status_code in (401, 403):
                 return Result(self.name, ok=False, dry_run=True, message="usuário ou chave de API inválidos")
             raise
-        ok = me.get("name", "").lower() == self.login.lower()
-        level = me.get("level_string", "?")
+        if me.get("name", "").lower() != self.login.lower():
+            return Result(self.name, ok=False, dry_run=True, message="usuário ou chave de API inválidos")
+        if me.get("is_banned"):
+            return Result(self.name, ok=False, dry_run=True, message="a conta está banida no Danbooru")
+        level = int(me.get("level") or 0)
+        info = {
+            "level": level,
+            "level_string": me.get("level_string") or "?",
+            "contributor": level >= CONTRIBUTOR_LEVEL,
+            "uploads": me.get("post_upload_count"),
+        }
         where = "teste (testbooru)" if "testbooru" in self.base_url else "real"
-        msg = f"conectado como {me.get('name')} ({level}), ambiente {where}" if ok else "usuário ou chave de API inválidos"
-        return Result(self.name, ok=ok, dry_run=True, message=msg)
+        msg = f"conectado como {me.get('name')} ({info['level_string']}), ambiente {where}"
+        return Result(self.name, ok=True, dry_run=True, message=msg, info=info)
 
     def publish(self, post: Post, dry_run: bool = True) -> Result:
         if dry_run:

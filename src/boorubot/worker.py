@@ -105,6 +105,10 @@ class Worker:
             try:
                 result = site.login() if job.kind == "login" else site.session_check()
                 self.db.set_session(site.name, result.ok, result.message)
+                if site.name == "danbooru":
+                    # nível real da conta: decide se o post vai direto ao ar ou para moderação
+                    self.db.set_setting("danbooru_level", str(result.info.get("level", "")))
+                    self.db.set_setting("danbooru_level_string", result.info.get("level_string", ""))
             except Exception as exc:
                 self.db.set_session(site.name, False, f"{type(exc).__name__}: {exc}")
 

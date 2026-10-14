@@ -181,3 +181,26 @@ def test_guide_and_checklist(client, db):
     db.set_setting("danbooru_env", "live")
     db.create_post("a.png", status="done")
     assert "Configuração inicial" not in c.get("/").text
+
+
+@pytest.mark.parametrize("level, force, expected", [
+    ("", "0", "para saber se o post vai direto ao ar"),
+    ("20", "0", "vai para a fila de moderação, com até 3 dias"),
+    ("35", "0", "vai ao ar na hora"),
+    ("35", "1", "você escolheu isso em Sites"),
+])
+def test_danbooru_notice_follows_real_level(client, db, level, force, expected):
+    c, _ = client
+    post_id = upload(c)
+    db.set_session("danbooru", bool(level), "x")
+    db.set_setting("danbooru_level", level)
+    db.set_setting("danbooru_level_string", "Contributor" if level == "35" else "Member")
+    db.set_setting("danbooru_force_pending", force)
+    assert expected in c.get(f"/posts/{post_id}").text
+
+
+def test_changing_danbooru_account_forgets_level(client, db):
+    c, _ = client
+    db.set_setting("danbooru_level", "35")
+    c.post("/settings/danbooru", data={"login": "outra", "api_key": "k", "env": "live"})
+    assert db.setting("danbooru_level") == ""

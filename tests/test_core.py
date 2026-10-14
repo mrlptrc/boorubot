@@ -114,3 +114,22 @@ def test_danbooru_dry_run_sends_nothing():
     site = Danbooru("https://t", transport=httpx.MockTransport(handler))
     result = site.publish(Post.load(EXAMPLE), dry_run=True)
     assert result.dry_run and "post[tag_string]" in result.message
+
+
+@pytest.mark.parametrize("profile, ok, contributor", [
+    ({"name": "artista", "level": 35, "level_string": "Contributor"}, True, True),
+    ({"name": "artista", "level": 20, "level_string": "Member"}, True, False),
+    ({"name": "artista", "level": 35, "is_banned": True}, False, None),
+    ({"name": "Anonymous", "level": 0}, False, None),
+])
+def test_danbooru_reads_real_account_level(profile, ok, contributor):
+    transport = httpx.MockTransport(lambda r: httpx.Response(200, json=profile))
+    result = Danbooru("https://t", "artista", "k", transport=transport).session_check()
+    assert result.ok is ok
+    assert result.info.get("contributor") is contributor
+
+
+def test_danbooru_force_pending_sends_to_moderation():
+    post = Post.load(EXAMPLE)
+    assert "post[is_pending]" not in Danbooru("https://t").post_payload(post, 1)
+    assert Danbooru("https://t", force_pending=True).post_payload(post, 1)["post[is_pending]"] == "1"

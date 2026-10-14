@@ -55,6 +55,14 @@
       </div>
     </fieldset>
 
+    {% if editable and 'danbooru' in post.sites %}
+    <p class="notice n-{{ danbooru_mode }}">
+      {% if danbooru_mode == 'direct' %}<b>Danbooru:</b> sua conta tem aprovação automática, então este post <b>vai ao ar na hora</b>, sem moderação. Confira o <b>rating</b> e as <b>tags</b>.
+      {% elif danbooru_mode == 'forced' %}<b>Danbooru:</b> vai para a fila de moderação (você escolheu isso em Sites).
+      {% elif danbooru_mode == 'moderated' %}<b>Danbooru:</b> vai para a fila de moderação, com até 3 dias para ser aprovado.
+      {% else %}<b>Danbooru:</b> conecte a conta em <a href="/sites#danbooru">Sites</a> para saber se o post vai direto ao ar ou para moderação.{% endif %}
+    </p>
+    {% endif %}
     <div class="actions">
       {% if editable %}<button name="action" value="save" class="ghost">Salvar</button>{% endif %}
       {% if post.status in ('draft', 'tested') %}

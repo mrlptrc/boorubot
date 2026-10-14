@@ -27,6 +27,7 @@ def build_site(name: str, db=None):
                 base_url=DANBOORU_URLS.get(db.setting("danbooru_env"), DANBOORU_URLS["test"]),
                 login=db.setting("danbooru_login"),
                 api_key=db.setting("danbooru_api_key"),
+                force_pending=db.setting("danbooru_force_pending") == "1",
             )
         return Danbooru(
             base_url=env("DANBOORU_URL", DANBOORU_URLS["test"]),
