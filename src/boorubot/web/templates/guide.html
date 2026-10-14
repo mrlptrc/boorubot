@@ -13,23 +13,20 @@
   <p class="lead">Você sobe a arte, a IA sugere as tags, você revisa e aprova. O robô posta <b>1 arte por dia</b>
   no horário escolhido, em todos os sites marcados, usando as <b>suas</b> contas.</p>
 
-  <nav class="toc card">
-    <b>Neste guia</b>
-    <ol>
-      <li><a href="#antes">Antes de começar</a> · <a href="#pc-acordado"><b>o PC precisa estar acordado</b></a></li>
-      <li><a href="#danbooru">Conectar o Danbooru</a> {{ status('danbooru') }}</li>
-      <li><a href="#gelbooru">Conectar Gelbooru, paheal e rule34.us</a> {{ status('gelbooru') }} {{ status('paheal') }} {{ status('rule34us') }}</li>
-      <li><a href="#rule34xxx">Conectar o rule34.xxx</a> {{ status('rule34xxx') }}</li>
-      <li><a href="#teste">Fazer um post de teste</a></li>
-      <li><a href="#valendo">Começar a postar de verdade</a></li>
-      <li><a href="#dia-a-dia">Dia a dia</a></li>
-      <li><a href="#regras">Regras dos sites (para não perder a conta)</a></li>
-      <li><a href="#seguranca">Segurança das suas contas</a></li>
-      <li><a href="#problemas">Algo deu errado?</a></li>
-    </ol>
-  </nav>
+  <sl-tab-group class="guide-tabs" placement="start">
+    <sl-tab slot="nav" panel="antes"><img src="/static/pets/chick.svg" alt=""><span class="tab-n">1</span>Antes de começar</sl-tab>
+    <sl-tab slot="nav" panel="pc-acordado"><img src="/static/pets/cat-sleep.svg" alt=""><span class="tab-n">2</span>PC acordado</sl-tab>
+    <sl-tab slot="nav" panel="danbooru"><img src="/static/pets/cat.svg" alt=""><span class="tab-n">3</span>Danbooru</sl-tab>
+    <sl-tab slot="nav" panel="gelbooru"><img src="/static/pets/bunny.svg" alt=""><span class="tab-n">4</span>Gelbooru, paheal, rule34.us</sl-tab>
+    <sl-tab slot="nav" panel="rule34xxx"><img src="/static/pets/bear.svg" alt=""><span class="tab-n">5</span>rule34.xxx</sl-tab>
+    <sl-tab slot="nav" panel="teste"><img src="/static/pets/puppy.svg" alt=""><span class="tab-n">6</span>Testar um post</sl-tab>
+    <sl-tab slot="nav" panel="valendo"><img src="/static/pets/cat.svg" alt=""><span class="tab-n">7</span>Postar de verdade</sl-tab>
+    <sl-tab slot="nav" panel="dia-a-dia"><img src="/static/pets/bunny.svg" alt=""><span class="tab-n">8</span>Dia a dia</sl-tab>
+    <sl-tab slot="nav" panel="regras"><img src="/static/pets/bear.svg" alt=""><span class="tab-n">9</span>Regras dos sites</sl-tab>
+    <sl-tab slot="nav" panel="seguranca"><img src="/static/pets/puppy.svg" alt=""><span class="tab-n">10</span>Segurança</sl-tab>
+    <sl-tab slot="nav" panel="problemas"><img src="/static/pets/chick.svg" alt=""><span class="tab-n">11</span>Algo deu errado?</sl-tab>
 
-  <section id="antes">
+  <sl-tab-panel name="antes" id="antes">
     <h2>1. Antes de começar</h2>
     <ul>
       <li>Este painel roda <b>neste computador</b>. Para os posts saírem no horário, o PC precisa estar <b>ligado, acordado</b>
@@ -38,9 +35,10 @@
       <li>Enquanto o <b>modo teste</b> estiver ligado (faixa amarela no topo), nada é publicado e a fila fica <b>pausada</b>.
         Pode testar à vontade com "🧪 Testar este post", porque os testes não mexem na sua fila.</li>
     </ul>
-  </section>
+    <nav class="pager"><span></span><span class="pager-dots">1 de 11</span><a class="pager-next" href="#pc-acordado">PC acordado →</a></nav>
+  </sl-tab-panel>
 
-  <section id="pc-acordado">
+  <sl-tab-panel name="pc-acordado" id="pc-acordado">
     <h2>O PC precisa estar acordado no horário do post</h2>
     <p>O robô roda <b>dentro do seu computador</b>. Quando o PC <b>entra em suspensão</b> (a tela apaga e ele "dorme"),
       o robô dorme junto. A maioria dos PCs, e principalmente os notebooks, dorme sozinha depois de 15 a 30 minutos sem uso.</p>
@@ -70,9 +68,10 @@
       <li><b>Quando vale:</b> se os atrasos começarem a incomodar, ou se o PC fica desligado com frequência.
         Fale com o técnico: a migração aproveita tudo o que já está configurado aqui.</li>
     </ul>
-  </section>
+    <nav class="pager"><a class="pager-prev" href="#antes">← Antes de começar</a><span class="pager-dots">2 de 11</span><a class="pager-next" href="#danbooru">Danbooru →</a></nav>
+  </sl-tab-panel>
 
-  <section id="danbooru">
+  <sl-tab-panel name="danbooru" id="danbooru">
     <h2>2. Conectar o Danbooru {{ status('danbooru') }}</h2>
     <p>O Danbooru conecta por uma <b>chave de API</b>, uma senha especial só para o robô que você pode cancelar quando quiser.</p>
     <ol class="steps">
@@ -101,9 +100,10 @@
       {% else %}Sua conta: <b>{{ danbooru_level }}</b>. Seus posts vão ao ar na hora.{% endif %}
     </p>
     <p class="tip">Para cancelar o acesso do robô: no Danbooru, abra <a href="https://danbooru.donmai.us/api_keys" target="_blank">API Keys</a> e apague a chave <code>boorubot</code>.</p>
-  </section>
+    <nav class="pager"><a class="pager-prev" href="#pc-acordado">← PC acordado</a><span class="pager-dots">3 de 11</span><a class="pager-next" href="#gelbooru">Gelbooru, paheal, rule34.us →</a></nav>
+  </sl-tab-panel>
 
-  <section id="gelbooru">
+  <sl-tab-panel name="gelbooru" id="gelbooru">
     <h2>3. Conectar Gelbooru, paheal e rule34.us</h2>
     <p>Esses sites conectam pelo navegador, do mesmo jeito que você entra normalmente.</p>
     <ol class="steps">
@@ -115,9 +115,10 @@
     <p id="paheal" class="tip"><b>rule34.paheal:</b> o site não aceita artes só com personagem original (OC). Quando a arte for de OC,
       marque a caixa <i>"Só personagem original"</i> no post e o robô pula o paheal automaticamente.</p>
     <p id="rule34us" class="tip"><b>rule34.us:</b> se aparecer um "não sou um robô" na hora de entrar, resolva na própria janela.</p>
-  </section>
+    <nav class="pager"><a class="pager-prev" href="#danbooru">← Danbooru</a><span class="pager-dots">4 de 11</span><a class="pager-next" href="#rule34xxx">rule34.xxx →</a></nav>
+  </sl-tab-panel>
 
-  <section id="rule34xxx">
+  <sl-tab-panel name="rule34xxx" id="rule34xxx">
     <h2>4. Conectar o rule34.xxx {{ status('rule34xxx') }}</h2>
     <p>Igual aos anteriores, com dois detalhes:</p>
     <ul>
@@ -125,9 +126,10 @@
       <li>O login tem <b>captcha</b>: resolva antes de clicar em <i>Log in</i>.</li>
     </ul>
     <p class="tip">Nesse site, a janela do navegador também abre <b>na hora de postar</b>, porque o site bloqueia o modo invisível. É normal: não feche, ela fecha sozinha.</p>
-  </section>
+    <nav class="pager"><a class="pager-prev" href="#gelbooru">← Gelbooru, paheal, rule34.us</a><span class="pager-dots">5 de 11</span><a class="pager-next" href="#teste">Testar um post →</a></nav>
+  </sl-tab-panel>
 
-  <section id="teste">
+  <sl-tab-panel name="teste" id="teste">
     <h2>5. Testar um post</h2>
     <p><b>Teste e publicação real nunca se misturam.</b> Testar um post não muda nada nele: ele continua na mesma posição
       da fila, não conta como post do dia e não aparece no Histórico.</p>
@@ -140,18 +142,20 @@
     </ol>
     <p class="tip">Nos testes, os sites só <b>preenchem</b> o formulário, sem enviar. O Danbooru só envia de verdade se o técnico
       cadastrar uma conta de teste no <b>testbooru</b>, o site de testes deles, separado do Danbooru real.</p>
-  </section>
+    <nav class="pager"><a class="pager-prev" href="#rule34xxx">← rule34.xxx</a><span class="pager-dots">6 de 11</span><a class="pager-next" href="#valendo">Postar de verdade →</a></nav>
+  </sl-tab-panel>
 
-  <section id="valendo">
+  <sl-tab-panel name="valendo" id="valendo">
     <h2>6. Começar a postar de verdade</h2>
     <p>Quando todos os sites estiverem <span class="pill s-ok">conectado</span> e o teste tiver dado certo:</p>
     <ol class="steps">
       <li>Em <a href="/sites">Sites → Configurações</a>, <b>desmarque "Modo teste"</b>, escolha o <b>horário</b> do post diário e salve.</li>
       <li>A faixa amarela some e a fila volta a andar: os posts aprovados saem de verdade, 1 por dia, sempre pelas suas contas reais.</li>
     </ol>
-  </section>
+    <nav class="pager"><a class="pager-prev" href="#teste">← Testar um post</a><span class="pager-dots">7 de 11</span><a class="pager-next" href="#dia-a-dia">Dia a dia →</a></nav>
+  </sl-tab-panel>
 
-  <section id="dia-a-dia">
+  <sl-tab-panel name="dia-a-dia" id="dia-a-dia">
     <h2>7. Dia a dia</h2>
     <ul>
       <li><b>Aprovar e agendar</b>: o post entra no <b>fim da fila</b>. Sai 1 por dia, na ordem, no horário configurado.
@@ -165,9 +169,10 @@
       <li><b>Tags padrão</b> (em Sites → Configurações): seu nome de artista, <code>commission</code> etc. já entram em todo post novo.</li>
       <li><b>Histórico</b>: todos os envios, com o link do post em cada site.</li>
     </ul>
-  </section>
+    <nav class="pager"><a class="pager-prev" href="#valendo">← Postar de verdade</a><span class="pager-dots">8 de 11</span><a class="pager-next" href="#regras">Regras dos sites →</a></nav>
+  </sl-tab-panel>
 
-  <section id="regras">
+  <sl-tab-panel name="regras" id="regras">
     <h2>8. Regras dos sites (para não perder a conta)</h2>
     <ul>
       <li><b>Uma conta por site.</b> Danbooru e paheal proíbem contas extras. Use só a sua.</li>
@@ -177,18 +182,20 @@
       <li><b>rule34.paheal</b>: não aceita OC (veja acima) e não deixa criar tags novas sem falar com a moderação.</li>
       <li><b>Ritmo</b>: 1 post por dia é tranquilo. Postar em rajada parece spam.</li>
     </ul>
-  </section>
+    <nav class="pager"><a class="pager-prev" href="#dia-a-dia">← Dia a dia</a><span class="pager-dots">9 de 11</span><a class="pager-next" href="#seguranca">Segurança →</a></nav>
+  </sl-tab-panel>
 
-  <section id="seguranca">
+  <sl-tab-panel name="seguranca" id="seguranca">
     <h2>9. Segurança das suas contas</h2>
     <ul>
       <li>Sua <b>senha nunca é salva</b> no painel. Fica só a sessão ("lembrar de mim") no navegador do robô, neste PC.</li>
       <li>A <b>chave do Danbooru</b> fica salva só neste PC e pode ser cancelada no Danbooru a qualquer momento.</li>
       <li>O painel só abre <b>neste computador</b>. Ninguém de fora acessa.</li>
     </ul>
-  </section>
+    <nav class="pager"><a class="pager-prev" href="#regras">← Regras dos sites</a><span class="pager-dots">10 de 11</span><a class="pager-next" href="#problemas">Algo deu errado? →</a></nav>
+  </sl-tab-panel>
 
-  <section id="problemas">
+  <sl-tab-panel name="problemas" id="problemas">
     <h2>10. Algo deu errado?</h2>
     <dl>
       <dt>O post não saiu no horário.</dt>
@@ -201,6 +208,8 @@
       <dt>A sugestão de tags errou.</dt>
       <dd>É só uma sugestão: apague as tags erradas e adicione as que faltam. Confira sempre o <b>rating</b>.</dd>
     </dl>
-  </section>
+    <nav class="pager"><a class="pager-prev" href="#seguranca">← Segurança</a><span class="pager-dots">11 de 11</span><a class="pager-next" href="/">Ir para a fila ♡</a></nav>
+  </sl-tab-panel>
+  </sl-tab-group>
 </article>
 {% endblock %}

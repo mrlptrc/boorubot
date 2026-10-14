@@ -355,4 +355,12 @@ def create_app(db: DB | None = None, worker: Worker | None = None, start_worker:
     def status():
         return {"jobs": worker.pending()}
 
+    @app.get("/busca.json")
+    def search_index():
+        """Artes para a busca Ctrl+K (o filtro roda no navegador)."""
+        return {"posts": [{
+            "id": p["id"], "title": p["title"] or f"#{p['id']}", "image": p["image"], "tags": p["tags"],
+            "status": p["status"], "status_label": STATUS_LABELS.get(p["status"], p["status"]),
+        } for p in db.list_posts()]}
+
     return app

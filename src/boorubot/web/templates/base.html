@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="pt-br">
+<html lang="pt-br" class="sl-loading">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -8,43 +8,65 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600&family=Nunito:wght@400;600;700&display=swap">
+  {# Shoelace (componentes) e ninja-keys (busca Ctrl+K) por CDN, versão fixa. Se não carregarem, o painel
+     continua funcionando: gaveta, diálogos e abas têm plano B em static/app.js. #}
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.20.1/cdn/themes/light.css">
+  <script type="module" src="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.20.1/cdn/shoelace-autoloader.js" onerror="document.documentElement.classList.remove('sl-loading')"></script>
+  <script type="module" src="https://unpkg.com/ninja-keys@1.2.2?module"></script>
   <link rel="stylesheet" href="/static/style.css">
 </head>
+{% set path = request.url.path %}
+{% macro nav_links() %}
+  <a href="/" class="{{ 'on' if path == '/' or path.startswith('/posts') }}"><img src="/static/pets/cat.svg" alt=""><span>Fila</span></a>
+  <a href="/sites" class="{{ 'on' if path == '/sites' }}"><img src="/static/pets/bunny.svg" alt=""><span>Sites</span></a>
+  <a href="/historico" class="{{ 'on' if path == '/historico' }}"><img src="/static/pets/bear.svg" alt=""><span>Histórico</span></a>
+  <a href="/guia" class="{{ 'on' if path == '/guia' }}"><img src="/static/pets/chick.svg" alt=""><span>Guia</span></a>
+{% endmacro %}
 <body>
-  <header class="top">
-    <a class="brand" href="/"><img src="/static/pets/cat.svg" alt="">boorubot</a>
-    <nav>
-      <a href="/" class="{{ 'on' if request.url.path == '/' or request.url.path.startswith('/posts') }}"><img src="/static/pets/cat.svg" alt="">Fila</a>
-      <a href="/sites" class="{{ 'on' if request.url.path == '/sites' }}"><img src="/static/pets/bunny.svg" alt="">Sites</a>
-      <a href="/historico" class="{{ 'on' if request.url.path == '/historico' }}"><img src="/static/pets/bear.svg" alt="">Histórico</a>
-      <a href="/guia" class="{{ 'on' if request.url.path == '/guia' }}"><img src="/static/pets/chick.svg" alt="">Guia</a>
-    </nav>
-    <div id="jobs" class="jobs" data-count="{{ jobs|length }}">
-      {% if jobs %}<span class="spin"></span> {{ jobs[0] }}{% if jobs|length > 1 %} (+{{ jobs|length - 1 }}){% endif %}{% endif %}
+  <div class="app">
+    <aside class="side" aria-label="Menu">
+      <a class="brand" href="/"><img src="/static/pets/cat.svg" alt="">boorubot</a>
+      <button type="button" class="search-btn" data-open-search>
+        <svg class="mag" viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5" fill="none" stroke="currentColor" stroke-width="2.6"/><path d="M15.5 15.5 L20.5 20.5" stroke="currentColor" stroke-width="2.8" stroke-linecap="round"/></svg><span>Buscar…</span><kbd>Ctrl</kbd><kbd>K</kbd>
+      </button>
+      <nav class="side-nav">{{ nav_links() }}</nav>
+      <div class="side-bottom">
+        <div id="jobs" class="jobs" data-count="{{ jobs|length }}">
+          {% if jobs %}<span class="spin"></span> {{ jobs[0] }}{% if jobs|length > 1 %} (+{{ jobs|length - 1 }}){% endif %}{% endif %}
+        </div>
+        {% if test_mode %}<a class="side-test" href="/sites"><img src="/static/pets/chick.svg" alt="">modo teste ligado</a>{% endif %}
+        <div class="side-pets" aria-hidden="true">
+          <img src="/static/pets/bunny.svg" alt=""><img src="/static/pets/puppy.svg" alt=""><img src="/static/pets/bear.svg" alt="">
+        </div>
+      </div>
+    </aside>
+
+    <header class="mobile-top">
+      <button type="button" class="icon-btn" data-open-menu aria-label="Abrir menu">☰</button>
+      <a class="brand" href="/"><img src="/static/pets/cat.svg" alt="">boorubot</a>
+      <button type="button" class="icon-btn" data-open-search aria-label="Buscar"><svg class="mag" viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5" fill="none" stroke="currentColor" stroke-width="2.6"/><path d="M15.5 15.5 L20.5 20.5" stroke="currentColor" stroke-width="2.8" stroke-linecap="round"/></svg></button>
+    </header>
+
+    <div class="page">
+      {% if test_mode %}
+      <div class="banner"><img src="/static/pets/chick.svg" alt=""><span>Modo teste ligado: a fila está <b>pausada</b> e nada é publicado. Use "Testar este post" à vontade. Desligue em <a href="/sites">Sites</a>.</span></div>
+      {% endif %}
+      <main>{% block content %}{% endblock %}</main>
+      <footer class="foot"><span>boorubot · feito com ♡</span></footer>
     </div>
-  </header>
-  {% if test_mode %}
-  <div class="banner"><img src="/static/pets/chick.svg" alt=""><span>Modo teste ligado: a fila está <b>pausada</b> e nada é publicado. Use "Testar este post" à vontade. Desligue em <a href="/sites">Sites</a>.</span></div>
-  {% endif %}
-  <main>{% block content %}{% endblock %}</main>
-  <footer class="foot">
-    <span class="pets"><img src="/static/pets/bunny.svg" alt=""><img src="/static/pets/cat.svg" alt=""><img src="/static/pets/puppy.svg" alt=""></span>
-    <span>boorubot · feito com ♡</span>
-  </footer>
-  <script>
-    // recarrega a página quando as tarefas em andamento terminam
-    (function () {
-      const el = document.getElementById("jobs");
-      let busy = Number(el.dataset.count) > 0;
-      setInterval(async () => {
-        try {
-          const { jobs } = await (await fetch("/status.json")).json();
-          el.innerHTML = jobs.length ? '<span class="spin"></span> ' + jobs[0] + (jobs.length > 1 ? " (+" + (jobs.length - 1) + ")" : "") : "";
-          if (busy && !jobs.length) location.reload();
-          busy = jobs.length > 0;
-        } catch (e) {}
-      }, 3000);
-    })();
-  </script>
+  </div>
+
+  <sl-drawer id="menu-drawer" placement="start" label="boorubot" class="menu-drawer">
+    <nav class="side-nav">{{ nav_links() }}</nav>
+  </sl-drawer>
+
+  <sl-dialog id="confirm-dialog" label="Tem certeza?" class="cute-dialog">
+    <div class="confirm-body"><img src="/static/pets/bunny.svg" alt=""><p data-confirm-text></p></div>
+    <button slot="footer" type="button" class="ghost" data-confirm-no>Cancelar</button>
+    <button slot="footer" type="button" class="primary" data-confirm-yes>Sim, pode</button>
+  </sl-dialog>
+
+  <ninja-keys noAutoLoadMdIcons hideBreadcrumbs placeholder="Buscar artes, páginas, tópicos do guia, ações…"></ninja-keys>
+  <script src="/static/app.js" defer></script>
 </body>
 </html>

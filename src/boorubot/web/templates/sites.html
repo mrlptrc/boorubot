@@ -42,7 +42,7 @@
       <div class="actions">
         <button class="primary">Salvar e testar</button>
         <button class="ghost" formaction="/sites/danbooru/session">Testar</button>
-        {% if danbooru_key_hint %}<button class="danger" formaction="/settings/danbooru/remove" onclick="return confirm('Remover a chave do painel?')">Remover chave</button>{% endif %}
+        {% if danbooru_key_hint %}<button class="danger" formaction="/settings/danbooru/remove" data-confirm="Remover a chave do painel?">Remover chave</button>{% endif %}
       </div>
     </form>
 
@@ -156,7 +156,7 @@
   </div>
 </form>
 
-<h2>Configurações</h2>
+<h2 id="config">Configurações</h2>
 <form method="post" action="/settings" class="card settings">
   <label class="check">
     <input type="checkbox" name="test_mode" value="true" {{ 'checked' if test_mode }}>
