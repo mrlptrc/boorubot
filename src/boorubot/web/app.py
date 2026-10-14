@@ -219,6 +219,7 @@ def create_app(db: DB | None = None, worker: Worker | None = None, start_worker:
             default_tags=db.setting("default_tags"), default_sites=default_sites(),
             force_pending=db.setting("danbooru_force_pending") == "1",
             startup=startup.status(), error=erro,
+            rhythms={s: db.site_rhythm(s) for s in ALL_SITES}, delays={s: db.site_delay(s) for s in ALL_SITES},
             backup_dir=db.setting("backup_dir"), last_backup_at=db.setting("last_backup_at"),
             last_backup_ok=db.setting("last_backup_ok"), last_backup_msg=db.setting("last_backup_msg"),
             send_modes={s: build_site(s, db).browser_mode("send") for s in FORM_SITES},
@@ -331,6 +332,25 @@ def create_app(db: DB | None = None, worker: Worker | None = None, start_worker:
     def history(request: Request):
         return render(request, "history.html", pubs=db.publications(limit=200), metrics=db.latest_metrics(),
                       metrics_last_run=db.setting("metrics_last_run"))
+
+    @app.get("/calendario")
+    def calendar_page(request: Request):
+        from boorubot import calendar_view
+
+        return render(request, "calendar.html", c=calendar_view.build(db))
+
+    @app.post("/settings/ritmo")
+    async def save_rhythm(request: Request):
+        """Ritmo e atraso por site. Só muda o que vem a seguir: o que já saiu fica como está."""
+        from boorubot.db import MAX_DELAY_DAYS, RHYTHMS
+
+        form = await request.form()
+        for site in ALL_SITES:
+            rhythm = str(form.get(f"rhythm_{site}", "diario"))
+            delay = str(form.get(f"delay_{site}", "0"))
+            db.set_setting(f"rhythm_{site}", rhythm if rhythm in RHYTHMS else "diario")
+            db.set_setting(f"delay_{site}", delay if delay.isdigit() and int(delay) <= MAX_DELAY_DAYS else "0")
+        return see_other("/sites#ritmo")
 
     @app.get("/metricas")
     def metrics_page(request: Request, periodo: str = "30"):
