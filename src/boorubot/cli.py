@@ -5,6 +5,7 @@
   boorubot discover <site>                 salva os campos do formulário de upload (logado)
   boorubot post <pasta> [--site X] [--send]  dry-run por padrão; --send publica de verdade
   boorubot panel                           painel web local (http://127.0.0.1:8765)
+  boorubot startup install|remove|status   abrir o painel escondido quando o Windows inicia
 """
 
 from __future__ import annotations
@@ -80,21 +81,99 @@ def cmd_post(args) -> int:
     return 1 if failures else 0
 
 
+def setup_logging() -> Path:
+    """Com a janela oculta (início automático) não há console: o log vai para arquivo, com rotação."""
+    import logging
+    from logging.handlers import RotatingFileHandler
+
+    from boorubot.sites.browser import RUNS_DIR
+
+    RUNS_DIR.mkdir(exist_ok=True)
+    log_path = RUNS_DIR / "panel.log"
+    fmt = logging.Formatter("%(asctime)s %(name)s %(levelname)s %(message)s")
+    file_handler = RotatingFileHandler(log_path, maxBytes=1_000_000, backupCount=3, encoding="utf-8")
+    file_handler.setFormatter(fmt)
+    console = logging.StreamHandler()
+    console.setFormatter(fmt)
+    root = logging.getLogger()
+    root.handlers[:] = [file_handler, console]
+    root.setLevel(logging.INFO)
+    # o painel consulta /status.json a cada 3 s: o log de acesso só poluiria o arquivo
+    logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
+    return log_path
+
+
+def panel_running(host: str, port: int) -> bool:
+    """Já existe um painel boorubot respondendo nessa porta?"""
+    import httpx
+
+    probe = "127.0.0.1" if host in ("0.0.0.0", "") else host
+    try:
+        r = httpx.get(f"http://{probe}:{port}/status.json", timeout=1.5)
+        return r.status_code == 200 and "jobs" in r.json()
+    except (httpx.HTTPError, ValueError):
+        return False
+
+
+def port_in_use(host: str, port: int) -> bool:
+    import socket
+
+    probe = "127.0.0.1" if host in ("0.0.0.0", "") else host
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        sock.settimeout(1)
+        return sock.connect_ex((probe, port)) == 0
+
+
 def cmd_panel(args) -> int:
     import logging
     import threading
     import webbrowser
 
+    url = f"http://{'127.0.0.1' if args.host == '0.0.0.0' else args.host}:{args.port}"
+    # instância única: dois painéis brigariam pelo mesmo banco e pelos perfis de navegador
+    if panel_running(args.host, args.port):
+        print(f"o painel já está rodando em {url}")
+        if not args.no_browser:
+            webbrowser.open(url)
+        return 0
+    if port_in_use(args.host, args.port):
+        print(f"a porta {args.port} está ocupada por outro programa; use --port para escolher outra")
+        return 1
+
     import uvicorn
 
     from boorubot.web.app import create_app
 
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
-    url = f"http://{args.host}:{args.port}"
-    print(f"painel em {url}  (Ctrl+C para parar)")
+    log_path = setup_logging()
+    logging.getLogger("boorubot").info("painel iniciando em %s (log: %s)", url, log_path)
+    print(f"painel em {url}  (Ctrl+C para parar; log em {log_path})")
     if not args.no_browser:
         threading.Timer(1.5, webbrowser.open, (url,)).start()
-    uvicorn.run(create_app(), host=args.host, port=args.port, log_level="warning")
+    uvicorn.run(create_app(), host=args.host, port=args.port, log_config=None)
+    return 0
+
+
+def cmd_startup(args) -> int:
+    from boorubot import startup
+
+    try:
+        if args.action == "install":
+            path = startup.install(port=args.port)
+            print(f"ligado: o painel abre escondido quando o Windows iniciar ({path})")
+        elif args.action == "remove":
+            print("desligado" if startup.remove() else "já estava desligado")
+        else:
+            st = startup.status()
+            if not st.supported:
+                print("início automático só funciona no Windows")
+            elif st.installed:
+                print(f"ligado ({st.path})")
+                print(f"  uv: {st.uv}")
+            else:
+                print("desligado")
+    except startup.StartupError as exc:
+        print(f"erro: {exc}")
+        return 1
     return 0
 
 
@@ -128,6 +207,11 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--port", type=int, default=8765)
     p.add_argument("--no-browser", action="store_true")
     p.set_defaults(func=cmd_panel)
+
+    p = sub.add_parser("startup", help="abrir o painel escondido quando o Windows inicia")
+    p.add_argument("action", choices=["install", "remove", "status"])
+    p.add_argument("--port", type=int, default=8765)
+    p.set_defaults(func=cmd_startup)
 
     args = parser.parse_args(argv)
     return args.func(args)

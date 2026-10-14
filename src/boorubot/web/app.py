@@ -13,6 +13,7 @@ from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
+from boorubot import startup
 from boorubot.config import ALL_SITES
 from boorubot.db import DB, IMAGES_DIR
 from boorubot.models import IMAGE_EXTS, RATINGS
@@ -214,7 +215,7 @@ def create_app(db: DB | None = None, worker: Worker | None = None, start_worker:
     # --- sites -------------------------------------------------------------------
 
     @app.get("/sites")
-    def sites_page(request: Request):
+    def sites_page(request: Request, erro: str = ""):
         key, test_key = db.setting("danbooru_api_key"), db.setting("danbooru_test_api_key")
         return render(
             request, "sites.html", sessions=db.sessions(), daily_time=db.setting("daily_time"),
@@ -224,7 +225,19 @@ def create_app(db: DB | None = None, worker: Worker | None = None, start_worker:
             danbooru_test_key_hint=f"••••{test_key[-4:]}" if test_key else "",
             default_tags=db.setting("default_tags"), default_sites=default_sites(),
             force_pending=db.setting("danbooru_force_pending") == "1",
+            startup=startup.status(), startup_error=erro,
         )
+
+    @app.post("/settings/startup")
+    def toggle_startup(action: str = Form(...)):
+        try:
+            if action == "install":
+                startup.install()
+            elif action == "remove":
+                startup.remove()
+        except startup.StartupError as exc:
+            return see_other("/sites?erro=" + quote(str(exc)) + "#inicio")
+        return see_other("/sites#inicio")
 
     @app.post("/settings/danbooru")
     def save_danbooru(login: str = Form(""), api_key: str = Form(""), force_pending: bool = Form(False)):

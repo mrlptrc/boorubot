@@ -383,3 +383,20 @@ def test_history_shows_only_production(client, db):
     db.add_test_run(post_id, "danbooru", "dry_run", message="simulado-123")
     assert "simulado-123" not in c.get("/historico").text
     assert "simulado-123" in c.get(f"/posts/{post_id}").text   # aparece só na seção de testes do post
+
+
+def test_sites_page_toggles_startup(client, monkeypatch, tmp_path):
+    from boorubot import startup
+
+    folder = tmp_path / "Startup"
+    uv = tmp_path / "uv.exe"
+    uv.write_text("")
+    monkeypatch.setattr(startup, "startup_dir", lambda: folder)
+    monkeypatch.setenv("UV", str(uv))
+    c, _ = client
+    assert "desligado" in c.get("/sites").text
+    c.post("/settings/startup", data={"action": "install"})
+    assert (folder / startup.SCRIPT_NAME).exists()
+    assert "ligado</span>" in c.get("/sites").text
+    c.post("/settings/startup", data={"action": "remove"})
+    assert not (folder / startup.SCRIPT_NAME).exists()

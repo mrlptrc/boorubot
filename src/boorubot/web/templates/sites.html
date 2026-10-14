@@ -90,6 +90,31 @@
   {% endfor %}
 </div>
 
+<h2 id="inicio">Iniciar com o Windows</h2>
+<div class="card site">
+  <div>
+    {% if not startup.supported %}
+      <strong>Início automático</strong> <span class="pill">só no Windows</span>
+    {% elif startup.installed %}
+      <strong>Início automático</strong> <span class="pill s-ok">ligado</span>
+      <div class="muted small">O painel abre escondido quando o Windows inicia, sem janela na tela. Os posts saem mesmo se você esquecer de abrir.</div>
+    {% else %}
+      <strong>Início automático</strong> <span class="pill s-failed">desligado</span>
+      <div class="muted small">Se o painel não estiver aberto no horário, o post do dia não sai. Recomendado: ligar.</div>
+    {% endif %}
+    {% if startup_error %}<div class="alert small">{{ startup_error }}</div>{% endif %}
+  </div>
+  {% if startup.supported %}
+  <form method="post" action="/settings/startup" class="actions">
+    {% if startup.installed %}
+      <button class="ghost" name="action" value="remove">Desligar</button>
+    {% else %}
+      <button class="primary" name="action" value="install">Ligar</button>
+    {% endif %}
+  </form>
+  {% endif %}
+</div>
+
 <h2>Configurações</h2>
 <form method="post" action="/settings" class="card settings">
   <label class="check">
