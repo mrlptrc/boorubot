@@ -1,0 +1,108 @@
+{% extends "base.html" %}
+{% block title %}Métricas · boorubot{% endblock %}
+{% block content %}
+<header class="hello">
+  <div>
+    <h1>Métricas</h1>
+    <p class="muted">Score e favoritos dos boorus. Hoje só o Danbooru informa favoritos.
+      {% if m.last_run %}Atualizado em {{ m.last_run[8:10] }}/{{ m.last_run[5:7] }} {{ m.last_run[11:16] }}.{% endif %}</p>
+  </div>
+  <div class="hello-actions">
+    <nav class="segmented" aria-label="Período">
+      {% for key, (label, _) in m.periods.items() %}
+      <a href="/metricas?periodo={{ key }}" class="{{ 'on' if m.period == key }}"{% if m.period == key %} aria-current="page"{% endif %}>{{ label }}</a>
+      {% endfor %}
+    </nav>
+    <form method="post" action="/metricas/atualizar"><button class="ghost">Atualizar métricas</button></form>
+  </div>
+</header>
+
+<section class="summary" aria-label="Números do período">
+  <div class="card stat">
+    <img class="stat-pet" src="/static/pets/cat.svg" alt="">
+    <div class="stat-body">
+      <span class="stat-label">Favoritos ganhos</span>
+      <span class="stat-big">{{ '%+d'|format(m.favorites) if m.has_data else '—' }} <span class="heart">♡</span></span>
+      <span class="small">{{ m.periods[m.period][0]|lower if m.period != 'tudo' else 'desde o começo' }}</span>
+    </div>
+  </div>
+  <div class="card stat">
+    <img class="stat-pet" src="/static/pets/chick.svg" alt="">
+    <div class="stat-body">
+      <span class="stat-label">Score médio nas primeiras 24&nbsp;h</span>
+      <span class="stat-big">{{ ('%.1f'|format(m.first_day_score)).replace('.', ',') if m.first_day_score is not none else '—' }}</span>
+      <span class="small">{% if m.first_day_count %}{{ m.first_day_count }} post{{ 's' if m.first_day_count != 1 }} medido{{ 's' if m.first_day_count != 1 }}{% else %}precisa de um snapshot no 1º&nbsp;dia{% endif %}</span>
+    </div>
+  </div>
+  <div class="card stat">
+    <img class="stat-pet" src="/static/pets/bear.svg" alt="">
+    <div class="stat-body">
+      <span class="stat-label">Posts publicados</span>
+      <span class="stat-big">{{ m.posts }}</span>
+      <span class="small">{% if m.failed %}{{ m.failed }} falh{{ 'aram' if m.failed != 1 else 'ou' }} em todos os sites{% else %}nenhuma falha total{% endif %}</span>
+    </div>
+  </div>
+</section>
+
+{% if not m.has_data %}
+<div class="empty"><img src="/static/pets/cat-sleep.svg" alt="">
+  <p>As métricas aparecem depois do primeiro post no Danbooru. O painel busca score e favoritos 1x por dia.</p></div>
+{% endif %}
+
+<div class="metrics-grid">
+  <section class="card" aria-labelledby="graf">
+    <h2 id="graf">Favoritos por semana</h2>
+    {% if m.has_data and m.weeks %}
+    <div class="bars" role="img" aria-label="Favoritos por semana: {% for w in m.weeks %}semana de {{ w.label }}: {{ w.gain }}{{ ', ' if not loop.last }}{% endfor %}">
+      {% for w in m.weeks %}
+      <div class="bar-col">
+        <span class="bar-val{{ ' last' if loop.last }}">{{ w.gain }}{{ ' ♡' if loop.last }}</span>
+        <span class="bar-fill{{ ' last' if loop.last }}" style="height: {{ [w.pct, 3]|max }}%"></span>
+      </div>
+      {% endfor %}
+    </div>
+    <div class="bar-labels" aria-hidden="true">{% for w in m.weeks %}<span>{{ w.label }}</span>{% endfor %}</div>
+    {% else %}
+    <p class="muted">Sem favoritos registrados neste período.</p>
+    {% endif %}
+  </section>
+
+  <section class="card" aria-labelledby="top">
+    <h2 id="top">Artes mais amadas</h2>
+    {% if m.top %}
+    <ol class="loved">
+      {% for t in m.top %}
+      <li>
+        <span class="rank{{ ' first' if loop.first }}">{{ loop.index }}</span>
+        <a href="/posts/{{ t.post_id }}"><img src="/images/{{ t.image }}" alt=""></a>
+        <span class="loved-info"><a href="/posts/{{ t.post_id }}"><b>{{ t.title or ('#' ~ t.post_id) }}</b></a>
+          <span class="small">score {{ t.score }} · {{ t.site }}</span></span>
+        <b class="heart">{{ t.favs }} ♡</b>
+      </li>
+      {% endfor %}
+    </ol>
+    {% else %}
+    <p class="muted">Ainda sem favoritos neste período.</p>
+    {% endif %}
+  </section>
+</div>
+
+<section aria-labelledby="porsite">
+  <h2 id="porsite">Por site</h2>
+  <table class="table">
+    <tr><th>Site</th><th>Posts</th><th>Score médio</th><th>Favoritos</th></tr>
+    {% for s in m.by_site %}
+    <tr>
+      <td><b>{{ s.label }}</b></td>
+      <td>{{ s.posts }}</td>
+      {% if s.has_metrics %}
+      <td>{{ ('%.1f'|format(s.avg_score)).replace('.', ',') }}</td>
+      <td class="heart"><b>{{ s.favs }} ♡</b></td>
+      {% else %}
+      <td colspan="2" class="muted">sem métrica por enquanto</td>
+      {% endif %}
+    </tr>
+    {% endfor %}
+  </table>
+</section>
+{% endblock %}
