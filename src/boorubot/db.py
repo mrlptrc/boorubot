@@ -304,6 +304,13 @@ class DB:
                    "fav_count) VALUES (?, ?, ?, ?, ?, ?)",
                    (publication_id, captured_at, score, up_score, down_score, fav_count))
 
+    def metric_snapshots_since(self, since: datetime) -> list[dict]:
+        return self._all("SELECT * FROM metric_snapshots WHERE captured_at >= ? ORDER BY captured_at, id",
+                         (since.isoformat(timespec="seconds"),))
+
+    def has_metrics(self) -> bool:
+        return bool(self._all("SELECT 1 FROM metric_snapshots LIMIT 1"))
+
     def latest_metrics(self) -> dict[int, dict]:
         rows = self._all("SELECT m.* FROM metric_snapshots m JOIN (SELECT publication_id, MAX(id) AS id "
                          "FROM metric_snapshots GROUP BY publication_id) last ON last.id = m.id")
