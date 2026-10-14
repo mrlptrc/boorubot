@@ -134,10 +134,11 @@
   function baseActions() {
     const actions = [
       { id: "nova-arte", title: "Subir nova arte", section: "Ações", icon: icon("puppy"), keywords: "upload imagem nova", handler: newArt },
-      { id: "metricas", title: "Atualizar métricas do Danbooru", section: "Ações", icon: icon("bear"), keywords: "score favoritos", handler: post("/historico/metricas") },
-      { id: "pg-fila", title: "Fila", section: "Páginas", icon: icon("cat"), keywords: "rascunhos agendados inicio", handler: go("/") },
-      { id: "pg-sites", title: "Sites e configurações", section: "Páginas", icon: icon("bunny"), keywords: "contas modo teste horario backup", handler: go("/sites") },
-      { id: "pg-hist", title: "Histórico", section: "Páginas", icon: icon("bear"), keywords: "publicados envios", handler: go("/historico") },
+      { id: "metricas", title: "Atualizar métricas do Danbooru", section: "Ações", icon: icon("bear"), keywords: "score favoritos", handler: post("/metricas/atualizar") },
+      { id: "pg-fila", title: "Início", section: "Páginas", icon: icon("cat"), keywords: "fila painel do dia rascunhos agendados", handler: go("/") },
+      { id: "pg-metricas", title: "Métricas", section: "Páginas", icon: icon("bear"), keywords: "favoritos score gráfico ranking", handler: go("/metricas") },
+      { id: "pg-sites", title: "Sites e configurações", section: "Páginas", icon: icon("puppy"), keywords: "contas modo teste horario backup", handler: go("/sites") },
+      { id: "pg-hist", title: "Histórico", section: "Páginas", icon: icon("paw"), keywords: "publicados envios", handler: go("/historico") },
       { id: "pg-guia", title: "Guia", section: "Páginas", icon: icon("chick"), keywords: "ajuda tutorial", handler: go("/guia") },
       { id: "cfg-teste", title: "Modo teste e horário do post", section: "Páginas", icon: icon("chick"), keywords: "configurações tags padrão", handler: go("/sites#config") },
     ];
