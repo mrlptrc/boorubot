@@ -32,7 +32,7 @@
       <nav class="side-nav">{{ nav_links() }}</nav>
       <div class="side-bottom">
         <div id="jobs" class="jobs" data-count="{{ jobs|length }}">
-          {% if jobs %}<span class="spin"></span> {{ jobs[0] }}{% if jobs|length > 1 %} (+{{ jobs|length - 1 }}){% endif %}{% endif %}
+          {%- if jobs %}<span class="spin"></span> {{ jobs[0] }}{% if jobs|length > 1 %} (+{{ jobs|length - 1 }}){% endif %}{% endif -%}
         </div>
         {% if test_mode %}<a class="side-test" href="/sites"><img src="/static/pets/chick.svg" alt="">modo teste ligado</a>{% endif %}
         <div class="side-pets" aria-hidden="true">
