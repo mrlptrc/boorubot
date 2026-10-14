@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" role="img" aria-label="pintinho">
+  <path d="M48 22 C44 12 50 8 52 14 C54 8 60 12 54 22" fill="none" stroke="#4a3043" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+  <g stroke="#4a3043" stroke-width="3.6" stroke-linejoin="round" fill="#ffe7a0">
+    <path d="M50 22 C74 22 86 40 86 60 C86 82 72 90 50 90 C28 90 14 82 14 60 C14 40 26 22 50 22 Z"/>
+    <path d="M16 60 C6 58 6 70 16 72" />
+    <path d="M84 60 C94 58 94 70 84 72" />
+  </g>
+  <ellipse cx="38" cy="52" rx="3.6" ry="4.6" fill="#4a3043"/><ellipse cx="62" cy="52" rx="3.6" ry="4.6" fill="#4a3043"/>
+  <circle cx="39.3" cy="50.3" r="1.3" fill="#fff"/><circle cx="63.3" cy="50.3" r="1.3" fill="#fff"/>
+  <path d="M44 59 L56 59 L50 66 Z" fill="#ffad6b" stroke="#4a3043" stroke-width="2.2" stroke-linejoin="round"/>
+  <ellipse cx="28" cy="63" rx="5.5" ry="3.2" fill="#ff9ec4" opacity=".8"/><ellipse cx="72" cy="63" rx="5.5" ry="3.2" fill="#ff9ec4" opacity=".8"/>
+  <g stroke="#4a3043" stroke-width="2.6" stroke-linecap="round" fill="none"><path d="M42 90 L40 96 M42 90 L44 96"/><path d="M58 90 L56 96 M58 90 L60 96"/></g>
+</svg>
