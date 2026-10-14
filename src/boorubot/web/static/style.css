@@ -29,7 +29,7 @@ body {
 }
 a { color: var(--link); text-decoration-thickness: 1.5px; text-underline-offset: 2px; }
 a:hover { color: var(--ink); }
-main { max-width: 1100px; margin: 0 auto; padding: 20px 16px 8px; }
+main { width: 100%; max-width: 1100px; margin: 0 auto; padding: 20px 16px 8px; }
 h1, h2, h3, .brand, button, .pill, summary { font-family: var(--font-cute); }
 h2 { margin: 30px 0 12px; font-size: 20px; font-weight: 600; display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
 h2::before { content: "✿"; color: var(--pink); font-size: 17px; }
@@ -91,7 +91,7 @@ kbd {
 .icon-btn { width: 42px; height: 42px; padding: 0; font-size: 20px; line-height: 1; border-radius: 14px; display: inline-flex; align-items: center; justify-content: center; }
 
 @media (max-width: 860px) {
-  .app { grid-template-columns: 1fr; }
+  .app { grid-template-columns: minmax(0, 1fr); }
   .side { display: none; }
   .mobile-top {
     display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 12px;
@@ -355,7 +355,7 @@ html.sl-loading .guide-tabs { visibility: hidden; }
 .guide-tabs sl-tab[active]::part(base) { background: var(--pink-soft); color: var(--ink); }
 .guide-tabs sl-tab img { width: 26px; height: 26px; }
 .guide-tabs sl-tab .tab-n { font-size: 11px; color: var(--muted); min-width: 14px; }
-.guide-tabs[placement="top"]::part(nav) { position: static; }
+.guide-tabs[placement="top"]::part(nav) { position: static; align-self: stretch; min-width: 0; }
 .guide-tabs[placement="top"] sl-tab::part(base) { padding: 6px 10px; }
 .guide-tabs[placement="top"] sl-tab .tab-n { display: none; }
 .guide-tabs sl-tab-panel::part(base) { padding: 0; }
@@ -396,4 +396,72 @@ html.sl-loading .guide-tabs { visibility: hidden; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
   ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation: none !important; }
+}
+
+/* --- início: painel do dia ------------------------------------------------ */
+.hello { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 14px; margin-bottom: 18px; }
+.hello h1 { margin: 0; font-size: 32px; font-weight: 600; }
+.hello p { margin: 4px 0 0; }
+.hello p b { color: var(--ink); }
+.hello button.primary { padding: 10px 22px; font-size: 16px; }
+
+.summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; margin-bottom: 18px; }
+.stat { display: flex; gap: 14px; align-items: center; padding: 16px 18px; }
+.stat-col { flex-direction: column; align-items: stretch; gap: 6px; }
+.stat-pet { width: 84px; height: 84px; flex: none; }
+.stat-body { display: flex; flex-direction: column; gap: 5px; min-width: 0; align-items: flex-start; }
+.stat-label { font-size: 13px; font-weight: 700; color: var(--muted); }
+.stat-big { font-family: var(--font-cute); font-weight: 600; font-size: 36px; line-height: 1; }
+.stat-title { font-family: var(--font-cute); font-weight: 600; font-size: 20px; color: var(--ink); text-decoration: none; overflow-wrap: anywhere; }
+.stat-thumb img { width: 92px; height: 108px; object-fit: cover; border-radius: 14px; border: 2px solid var(--line); display: block; }
+.heart { color: #e0568f; }
+.paws { display: flex; gap: 4px; }
+.paws img, .paw-empty { width: 18px; height: 18px; }
+.paw-empty { border-radius: 50%; border: 2px dashed var(--line-strong); }
+.fav-row { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; }
+.minibars { display: flex; align-items: flex-end; gap: 5px; height: 48px; }
+.minibars span { width: 10px; border-radius: 6px; background: var(--line); }
+.minibars span.top { background: #e0568f; }
+
+.alert-strip {
+  display: flex; align-items: center; gap: 12px; padding: 10px 16px; margin-bottom: 18px; border-radius: 18px;
+  background: var(--butter); border: 2px dashed #f2d77c; color: #6b4e00; font-size: 14px;
+}
+.alert-strip img { width: 40px; height: 40px; flex: none; }
+.alert-strip span { flex: 1; }
+.alert-strip a { font-weight: 700; color: #6b4e00; white-space: nowrap; }
+
+.section-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.week { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 12px; }
+.day {
+  background: var(--card); border: 2px solid var(--line); border-radius: 18px; box-shadow: var(--shadow);
+  padding: 8px; display: flex; flex-direction: column; gap: 6px; text-decoration: none; color: var(--ink); min-width: 0;
+}
+.day.today { border-color: var(--pink); }
+.day-label { font: 600 13px var(--font-cute); color: var(--muted); }
+.day.today .day-label { color: #e0568f; }
+.day img { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 12px; }
+.day-title { font-size: 12px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.empty-day { background: rgba(255, 255, 255, .6); border-style: dashed; border-color: var(--line-strong); box-shadow: none; align-items: center; }
+.empty-day .day-label { align-self: flex-start; }
+.empty-day img { width: 70%; object-fit: contain; }
+
+.review { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 16px; }
+.review form { display: flex; }
+.review .drop { flex: 1; flex-direction: column; text-align: center; justify-content: center; min-height: 220px; }
+.s-draft { background: var(--pink-soft); color: var(--ink); }
+
+@media (max-width: 1100px) {
+  .summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .summary .stat:first-child { grid-column: 1 / -1; }
+}
+@media (max-width: 860px) {
+  .hello h1 { font-size: 26px; }
+  .summary { grid-template-columns: 1fr; }
+  /* 7 dias rolam dentro da própria faixa: a página nunca rola na horizontal */
+  .week { display: flex; overflow-x: auto; padding-bottom: 8px; scroll-snap-type: x mandatory; }
+  .day { flex: 0 0 132px; scroll-snap-align: start; }
+  .review { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .review .drop { min-height: 170px; }
+  .stat-pet { width: 64px; height: 64px; }
 }
