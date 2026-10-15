@@ -90,9 +90,12 @@ O `.env` (veja `.env.example`) é só para a CLI do técnico. O painel usa apena
 
 1. Danbooru no **testbooru** (conta de teste em Sites → Danbooru → "Conta de teste") e "Testar este post".
 2. `login` + `discover` em cada site de formulário; conferir as heurísticas de `src/boorubot/sites/forms.py`
-   (tags/source/title/rating) contra os campos reais. A URL de upload do rule34.us ainda não foi confirmada.
+   (tags/source/title/rating) contra os campos reais.
 3. "Testar este post" com a conta real dela → conferir os prints em `runs/` → primeiro envio real.
 4. Escolher o horário do post diário num horário em que o PC dela costuma estar ligado.
+
+**O que ainda falta para postar em cada site** (Gelbooru sem reputação, rule34.us sem upload,
+paheal sem login, rule34.xxx com Cloudflare): [docs/PENDENCIAS-SITES.md](docs/PENDENCIAS-SITES.md).
 
 ## Próxima fase (se ela pedir)
 
