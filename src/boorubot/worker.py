@@ -12,8 +12,8 @@ from datetime import datetime
 
 from boorubot.config import ALL_SITES, build_site
 from boorubot.db import DB, to_post
-from boorubot.scheduler import BACKOFF, rule_skips, site_due
-from boorubot.sites.base import SkipPost
+from boorubot.scheduler import BACKOFF, RECHECK_EVERY, pending_posts, rule_skips, site_due
+from boorubot.sites.base import SiteUnavailable, SkipPost
 
 log = logging.getLogger("boorubot.worker")
 
@@ -35,6 +35,12 @@ def _send(db: DB, post, post_id: int, site: str) -> str:
     except SkipPost as exc:
         status = "skipped"
         db.add_publication(post_id, site, status, message=str(exc))
+    except SiteUnavailable as exc:
+        # o problema é o site: pausa o site inteiro (sessão = desconectado) e não gasta tentativa da arte
+        status = "site_down"
+        db.add_publication(post_id, site, status, message=str(exc))
+        db.set_session(site, False, str(exc)[:300])
+        log.warning("site %s pausado: %s", site, exc)
     except Exception as exc:  # uma falha num site não impede os outros
         status = "failed"
         log.exception("falha publicando post %s em %s", post_id, site)
@@ -217,11 +223,28 @@ class Worker:
 
     def tick(self) -> None:
         self._tick_sites()
+        self._tick_recheck()
         self._tick_daily()
 
     def _queued(self, kind: str) -> bool:
         return any(j.kind == kind for j in list(self.jobs.queue)) or (
             self.current is not None and self.current.kind == kind)
+
+    def _tick_recheck(self) -> None:
+        """Site pausado (desconectado) com arte esperando: roda o "Testar" a cada 30 min.
+        Se a sessão voltou (login feito, internet de volta), a fila do site continua sozinha."""
+        if self.db.test_mode or self._queued("session") or self._queued("login"):
+            return
+        now = datetime.now()
+        for site, sess in self.db.sessions().items():
+            if site not in ALL_SITES or sess["ok"] or not pending_posts(self.db, site):
+                continue
+            last = self.db.setting(f"recheck_{site}")
+            if last and now - datetime.fromisoformat(last) < RECHECK_EVERY:
+                continue
+            self.db.set_setting(f"recheck_{site}", now.isoformat(timespec="seconds"))
+            self.submit("session", site, f"testar sessão {site} (site pausado)")
+            return
 
     def _tick_daily(self) -> None:
         """Manutenção 1x por dia (não publica nada; roda também com o modo teste ligado).

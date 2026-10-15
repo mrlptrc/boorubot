@@ -35,6 +35,7 @@ STATUS_LABELS = {
     "done": "publicado", "partial": "parcial", "failed": "falhou",
     "ok": "publicado", "skipped": "pulado",
     "uncertain": "conferir no site", "not_published": "não saiu (conferido)",
+    "site_down": "site pausado (login/captcha/fora do ar)",
     "dry_run": "simulado", "test_upload": "enviado ao testbooru",
 }
 

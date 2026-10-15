@@ -10,6 +10,11 @@ class SkipPost(Exception):
     """O post não deve ir para este site (regra do site, não erro técnico)."""
 
 
+class SiteUnavailable(Exception):
+    """O problema é o SITE, não a arte: sem login, captcha, fora do ar, chave recusada.
+    O site inteiro pausa até a sessão voltar; nenhuma arte perde tentativa."""
+
+
 @dataclass
 class Result:
     site: str

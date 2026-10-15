@@ -25,6 +25,8 @@ from boorubot.sites.base import SkipPost
 BACKOFF = timedelta(hours=1)
 # depois de tantas falhas seguidas, a arte sai do automático naquele site até alguém mandar tentar de novo
 MAX_AUTO_TRIES = 3
+# site pausado (sem login/captcha/fora do ar): o "Testar" roda sozinho de tempos em tempos
+RECHECK_EVERY = timedelta(minutes=30)
 
 
 @dataclass
@@ -136,6 +138,9 @@ def plan(db: DB, now: datetime | None = None, days: int = 14) -> dict[str, dict[
 def site_due(db: DB, site: str, now: datetime | None = None) -> dict | None:
     """O que o worker deve publicar AGORA neste site (no máximo 1), segundo a mesma simulação."""
     now = now or datetime.now()
+    session = db.sessions().get(site)
+    if session and not session["ok"]:
+        return None  # site pausado: só volta quando a sessão voltar (Entrar / Testar)
     first_day = {p["id"]: datetime.fromisoformat(p["published_at"]).date()
                  for p in db.queue() if p["published_at"]}
     cell = simulate_site(db, site, now, 1, first_day).get(now.date())

@@ -13,7 +13,7 @@ import re
 from playwright.sync_api import Page
 
 from boorubot.models import Post
-from boorubot.sites.base import Result, Site, SkipPost
+from boorubot.sites.base import Result, Site, SiteUnavailable, SkipPost
 from boorubot.sites.browser import (
     BROWSER_MODES, captcha_present, dump_forms, open_page, reveal_window, run_dir, screenshot,
 )
@@ -23,6 +23,10 @@ CAPTCHA_MSG = "o site pediu captcha: entre de novo em Sites → Entrar (e resolv
 
 class FormSiteError(RuntimeError):
     pass
+
+
+class FormSiteDown(FormSiteError, SiteUnavailable):
+    """Sem sessão, captcha ou site fora do ar: pausa o site, não conta contra a arte."""
 
 
 class FormSite(Site):
@@ -131,21 +135,24 @@ class FormSite(Site):
         out = run_dir(self.name)
         mode = self.browser_mode("dry_run" if dry_run else "send")
         with open_page(self.name, mode) as page:
-            page.goto(self.upload_url)
+            try:
+                page.goto(self.upload_url)
+            except Exception as exc:  # sem internet / site fora do ar: nada foi enviado
+                raise FormSiteDown(f"não consegui abrir o site ({type(exc).__name__}: {exc})") from exc
             # challenge do Cloudflare às vezes passa sozinho em alguns segundos
             if not self._wait_captcha(page, 20):
                 if dry_run or mode == "headless":
                     # sem janela não há como uma pessoa resolver; nunca tentar contornar
                     shot = screenshot(page, out / "captcha.png")
-                    raise FormSiteError(f"{CAPTCHA_MSG}. print: {shot}")
+                    raise FormSiteDown(f"{CAPTCHA_MSG}. print: {shot}")
                 if mode == "hidden":
                     reveal_window(page)
                 if not self._wait_captcha(page, self.captcha_timeout_s):
                     shot = screenshot(page, out / "captcha.png")
-                    raise FormSiteError(f"captcha não resolvido a tempo na página de upload. print: {shot}")
+                    raise FormSiteDown(f"captcha não resolvido a tempo na página de upload. print: {shot}")
             if not self._has_upload_form(page):
                 shot = screenshot(page, out / "no-form.png")
-                raise FormSiteError(f"sem sessão no site: faça o login (painel: Sites → Entrar). print: {shot}")
+                raise FormSiteDown(f"sem sessão no site: faça o login (painel: Sites → Entrar). print: {shot}")
 
             self.fill(page, post)
             filled = screenshot(page, out / "filled.png")

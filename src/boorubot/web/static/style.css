@@ -566,3 +566,4 @@ html.sl-loading .guide-tabs { visibility: hidden; }
 .pin-form input[type=date] { width: auto; }
 .s-uncertain { background: var(--peach); color: var(--warn); }
 .s-not_published { background: var(--line); color: var(--ink); }
+.s-site_down { background: var(--butter); color: #6b4e00; }

@@ -17,7 +17,7 @@ import time
 import httpx
 
 from boorubot.models import Post
-from boorubot.sites.base import Result, Site
+from boorubot.sites.base import Result, Site, SiteUnavailable
 
 USER_AGENT = "boorubot/0.1 (post-automation)"
 NO_KEY = "sem usuário/chave de API: preencha em Sites → Danbooru (ou DANBOORU_LOGIN/DANBOORU_API_KEY no .env)"
@@ -28,6 +28,10 @@ RATING_CODES = {"general": "g", "sensitive": "s", "questionable": "q", "explicit
 
 class DanbooruError(RuntimeError):
     pass
+
+
+class DanbooruDown(DanbooruError, SiteUnavailable):
+    """Sem chave, chave recusada ou Danbooru fora do ar: pausa o site, não conta contra a arte."""
 
 
 class Danbooru(Site):
@@ -117,9 +121,16 @@ class Danbooru(Site):
                 message=f"enviaria {post.image.name} para {self.base_url}\n  " + "\n  ".join(lines),
             )
         if not (self.login and self.api_key):
-            raise DanbooruError(NO_KEY)
+            raise DanbooruDown(NO_KEY)
 
-        asset_id = self._upload_file(post)
+        try:
+            asset_id = self._upload_file(post)
+        except httpx.TransportError as exc:
+            raise DanbooruDown(f"Danbooru fora do ar ou sem internet ({type(exc).__name__}: {exc})") from exc
+        except DanbooruError as exc:
+            if any(f"({code})" in str(exc) for code in (401, 403)):
+                raise DanbooruDown(f"chave de API recusada: confira em Sites → Danbooru ({exc})") from exc
+            raise
         r = self.client.post("/posts.json", data=self.post_payload(post, asset_id))
         if r.status_code >= 400:
             raise DanbooruError(f"criar post falhou ({r.status_code}): {r.text[:300]}")
