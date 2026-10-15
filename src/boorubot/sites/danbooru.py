@@ -34,6 +34,18 @@ class DanbooruDown(DanbooruError, SiteUnavailable):
     """Sem chave, chave recusada ou Danbooru fora do ar: pausa o site, não conta contra a arte."""
 
 
+def _check(r: httpx.Response, what: str) -> None:
+    """Classifica a resposta: problema do SITE pausa o site; erro do pedido conta contra a arte."""
+    code = r.status_code
+    if code < 400:
+        return
+    if code in (401, 403):
+        raise DanbooruDown(f"{what}: chave de API recusada ({code}); confira em Sites → Danbooru")
+    if code == 429 or code >= 500:  # muitas requisições ou Danbooru fora do ar/instável
+        raise DanbooruDown(f"{what}: Danbooru indisponível agora ({code})")
+    raise DanbooruError(f"{what} falhou ({code}): {r.text[:300]}")
+
+
 class Danbooru(Site):
     name = "danbooru"
 
@@ -125,15 +137,11 @@ class Danbooru(Site):
 
         try:
             asset_id = self._upload_file(post)
+            r = self.client.post("/posts.json", data=self.post_payload(post, asset_id))
         except httpx.TransportError as exc:
             raise DanbooruDown(f"Danbooru fora do ar ou sem internet ({type(exc).__name__}: {exc})") from exc
-        except DanbooruError as exc:
-            if any(f"({code})" in str(exc) for code in (401, 403)):
-                raise DanbooruDown(f"chave de API recusada: confira em Sites → Danbooru ({exc})") from exc
-            raise
-        r = self.client.post("/posts.json", data=self.post_payload(post, asset_id))
-        if r.status_code >= 400:
-            raise DanbooruError(f"criar post falhou ({r.status_code}): {r.text[:300]}")
+        # se o post foi criado mas a resposta se perdeu, reenviar é seguro: o Danbooru junta pelo md5
+        _check(r, "criar post")
         post_id = r.json()["id"]
         return Result(self.name, ok=True, dry_run=False, message=f"post #{post_id} criado",
                       url=f"{self.base_url}/posts/{post_id}")
@@ -142,8 +150,7 @@ class Danbooru(Site):
         mime = mimetypes.guess_type(post.image.name)[0] or "application/octet-stream"
         with post.image.open("rb") as fh:
             r = self.client.post("/uploads.json", files={"upload[files][0]": (post.image.name, fh, mime)})
-        if r.status_code >= 400:
-            raise DanbooruError(f"upload falhou ({r.status_code}): {r.text[:300]}")
+        _check(r, "upload")
         upload = r.json()
 
         deadline = time.monotonic() + self.poll_timeout
@@ -152,14 +159,14 @@ class Danbooru(Site):
                 raise DanbooruError(f"upload #{upload['id']} não terminou em {self.poll_timeout}s")
             time.sleep(self.poll_interval)
             r = self.client.get(f"/uploads/{upload['id']}.json", params={"include": "upload_media_assets"})
-            r.raise_for_status()
+            _check(r, "acompanhar upload")
             upload = r.json()
 
         if upload["status"] == "error":
             raise DanbooruError(f"upload #{upload['id']} deu erro: {upload.get('error')}")
         if "upload_media_assets" not in upload:
             r = self.client.get(f"/uploads/{upload['id']}.json", params={"include": "upload_media_assets"})
-            r.raise_for_status()
+            _check(r, "acompanhar upload")
             upload = r.json()
         assets = upload.get("upload_media_assets") or []
         if not assets:

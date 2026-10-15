@@ -171,3 +171,34 @@ def test_danbooru_without_key_or_rejected_key_is_site_down():
                        transport=httpx.MockTransport(lambda r: (_ for _ in ()).throw(httpx.ConnectError("sem rede"))))
     with pytest.raises(SiteUnavailable):
         offline.publish(Post.load(EXAMPLE), dry_run=False)
+
+
+def danbooru_with(fail_step, status):
+    """Danbooru simulado que responde `status` numa etapa: upload, poll ou post."""
+    def handler(request):
+        path = request.url.path
+        if path == "/uploads.json":
+            return httpx.Response(status if fail_step == "upload" else 201, json={"id": 1, "status": "pending"})
+        if path == "/uploads/1.json":
+            if fail_step == "poll":
+                return httpx.Response(status)
+            return httpx.Response(200, json={"id": 1, "status": "completed", "upload_media_assets": [{"id": 5}]})
+        if path == "/posts.json":
+            return httpx.Response(status if fail_step == "post" else 201, json={"id": 9})
+        return httpx.Response(404)
+    return Danbooru("https://t", "u", "k", transport=httpx.MockTransport(handler), poll_interval=0)
+
+
+@pytest.mark.parametrize("step", ["upload", "poll", "post"])
+@pytest.mark.parametrize("status", [500, 502, 503, 429])
+def test_danbooru_outage_or_rate_limit_is_site_down(step, status):
+    with pytest.raises(SiteUnavailable):
+        danbooru_with(step, status).publish(Post.load(EXAMPLE), dry_run=False)
+
+
+def test_danbooru_real_post_error_still_counts_against_the_art():
+    from boorubot.sites.danbooru import DanbooruError
+
+    with pytest.raises(DanbooruError) as info:
+        danbooru_with("post", 422).publish(Post.load(EXAMPLE), dry_run=False)
+    assert not isinstance(info.value, SiteUnavailable)
