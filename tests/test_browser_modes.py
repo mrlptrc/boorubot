@@ -162,3 +162,54 @@ def test_login_cookies_visible_to_headless_sends(tmp_path, monkeypatch):
     finally:
         server.shutdown()
     assert names == ["user_id"]
+
+
+# --- depois do clique em enviar: sucesso só com certeza --------------------------------
+
+@pytest.fixture
+def submit_page(monkeypatch, tmp_path):
+    """Página falsa já no formulário (sem captcha); a URL depois do envio é controlada."""
+    state = {"url": "", "raise": None}
+
+    class Page(FakePage):
+        @property
+        def url(self):
+            return state["url"]
+
+        def wait_for_load_state(self, *a):
+            pass
+
+    @contextmanager
+    def fake_open(site, mode="headless"):
+        yield Page()
+
+    def fake_submit(self, page):
+        if state["raise"]:
+            raise state["raise"]
+
+    monkeypatch.setattr(forms, "open_page", fake_open)
+    monkeypatch.setattr(forms, "captcha_present", lambda page: False)
+    monkeypatch.setattr(forms, "screenshot", lambda page, out: out)
+    monkeypatch.setattr(forms, "run_dir", lambda site: tmp_path)
+    monkeypatch.setattr(forms.FormSite, "_has_upload_form", lambda self, page: True)
+    monkeypatch.setattr(forms.FormSite, "fill", lambda self, page, post: None)
+    monkeypatch.setattr(forms.FormSite, "_submit", fake_submit)
+    return state
+
+
+def test_success_page_recognized(submit_page):
+    submit_page["url"] = "https://gelbooru.com/index.php?page=post&s=view&id=123"
+    r = Gelbooru().publish(Post.load(EXAMPLE), dry_run=False)
+    assert r.ok and not r.info.get("uncertain") and r.url.endswith("id=123")
+
+
+def test_unknown_page_after_submit_is_uncertain(submit_page):
+    submit_page["url"] = "https://gelbooru.com/index.php?page=post&s=add"
+    r = Gelbooru().publish(Post.load(EXAMPLE), dry_run=False)
+    assert not r.ok and r.info["uncertain"] and "confira no site" in r.message
+
+
+def test_error_after_submit_is_uncertain(submit_page):
+    submit_page["raise"] = TimeoutError("demorou")
+    r = Gelbooru().publish(Post.load(EXAMPLE), dry_run=False)
+    assert not r.ok and r.info["uncertain"]

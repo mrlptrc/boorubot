@@ -34,6 +34,7 @@ STATUS_LABELS = {
     "draft": "rascunho", "approved": "na fila", "publishing": "publicando",
     "done": "publicado", "partial": "parcial", "failed": "falhou",
     "ok": "publicado", "skipped": "pulado",
+    "uncertain": "conferir no site", "not_published": "não saiu (conferido)",
     "dry_run": "simulado", "test_upload": "enviado ao testbooru",
 }
 
@@ -128,16 +129,93 @@ def create_app(db: DB | None = None, worker: Worker | None = None, start_worker:
 
     @app.get("/posts/{post_id}")
     def edit_post(request: Request, post_id: int, erro: str = ""):
+        from boorubot.scheduler import plan
+
         row = post_or_404(post_id)
         queue_ids = [p["id"] for p in db.queue()]
+        today = datetime.now().date()
+        plans = plan(db, days=60) if post_id in queue_ids else {}
+        pins, done = db.post_pins(post_id), db.published_sites(post_id)
+        site_days = []
+        for site in row["sites"]:
+            when = next((c.when for c in plans.get(site, {}).values() if c.kind == "post" and c.post["id"] == post_id),
+                        None)
+            site_days.append({"site": site, "label": SITE_LABELS[site], "when": when, "pinned": pins.get(site),
+                              "done": site in done, "off": db.site_rhythm(site) == "desligado"})
+        planned = [s["when"] for s in site_days if s["when"]]
         return render(
             request, "post.html", post=row, pubs=db.publications(post_id), tests=db.test_runs(post_id), error=erro,
             metrics=db.latest_metrics(),
             has_test_account=bool(db.setting("danbooru_test_api_key")),
-            projected=db.projected_times().get(post_id),
+            projected=min(planned) if planned else None, site_days=site_days, today=today.isoformat(),
+            uncertain=[(s, SITE_LABELS[s]) for s in db.uncertain_sites(post_id)],
             queue_pos=queue_ids.index(post_id) + 1 if post_id in queue_ids else None, queue_len=len(queue_ids),
-            published_today=bool(db.last_published() and db.last_published().date() == datetime.now().date()),
+            published_today=any(db.site_last_published(s) and db.site_last_published(s).date() == today
+                                for s in row["sites"]),
         )
+
+    def pin_post(post_id: int, site: str, day: str, add_site: bool = False) -> str | None:
+        """Fixa a arte num dia, num site. Devolve um erro em texto ou None."""
+        from datetime import date as _date
+
+        row = db.get_post(post_id)
+        if not row or row["status"] != "approved":
+            return "só dá para fixar o dia de uma arte aprovada (na fila)"
+        if site not in ALL_SITES or db.site_rhythm(site) == "desligado":
+            return "site desligado ou desconhecido"
+        try:
+            when = _date.fromisoformat(day)
+        except ValueError:
+            return "data inválida"
+        if when < datetime.now().date():
+            return "não dá para fixar num dia que já passou"
+        if site in db.published_sites(post_id):
+            return "essa arte já saiu nesse site"
+        if site not in row["sites"]:
+            if not add_site:
+                return "essa arte não está marcada para esse site"
+            db.update_post(post_id, sites=[s for s in ALL_SITES if s in row["sites"] or s == site])
+        db.pin(post_id, site, when)
+        return None
+
+    @app.post("/posts/{post_id}/conferir")
+    def check_uncertain(post_id: int, site: str = Form(...), action: str = Form(...), url: str = Form("")):
+        """Envio incerto: uma pessoa olhou no site e diz se saiu. Só ela decide reenviar (sem duplicata)."""
+        from boorubot.worker import refresh_post_status
+
+        row = post_or_404(post_id)
+        if site not in db.uncertain_sites(post_id):
+            return see_other(f"/posts/{post_id}")
+        if action == "saiu":
+            link = url.strip() if url.strip().startswith("http") else ""
+            db.add_publication(post_id, site, "ok", link, "conferido: saiu no site")
+            db.mark_post_published_at(post_id)
+        elif action == "nao_saiu":
+            # não conta como falha: volta para a fila daquele site
+            db.add_publication(post_id, site, "not_published", message="conferido: não saiu; volta para a fila")
+            if row["status"] != "approved":
+                db.update_post(post_id, status="approved")
+        refresh_post_status(db, post_id)
+        return see_other(f"/posts/{post_id}#conferir")
+
+    @app.post("/posts/{post_id}/dia")
+    def post_pin(post_id: int, site: str = Form(...), day: str = Form(""), action: str = Form("pin")):
+        if action == "unpin":
+            db.unpin(post_id, site)
+            return see_other(f"/posts/{post_id}#dias")
+        error = pin_post(post_id, site, day)
+        return see_other(f"/posts/{post_id}" + (f"?erro={quote(error)}" if error else "") + "#dias")
+
+    @app.post("/calendario/fixar")
+    def calendar_pin(post_id: int = Form(...), site: str = Form(...), day: str = Form(...),
+                     add_site: bool = Form(False)):
+        error = pin_post(post_id, site, day, add_site)
+        return JSONResponse({"ok": error is None, "error": error}, status_code=200 if error is None else 400)
+
+    @app.post("/calendario/desafixar")
+    def calendar_unpin(post_id: int = Form(...), site: str = Form(...), semana: int = Form(0)):
+        db.unpin(post_id, site)
+        return see_other(f"/calendario?semana={semana}")
 
     @app.post("/posts/{post_id}")
     def save_post(
@@ -181,7 +259,7 @@ def create_app(db: DB | None = None, worker: Worker | None = None, start_worker:
         if action == "approve":
             db.approve(post_id)
         elif action == "publish_now":  # clique explícito em produção vale como confirmação
-            db.update_post(post_id, status="publishing", queue_pos=None, approved_in_test=0)
+            db.update_post(post_id, approved_in_test=0)
             worker.submit("publish", post_id, f"publicar #{post_id} (agora)")
         elif action == "test":  # não muda nada no post: só grava em test_runs
             worker.submit("test", post_id, f"testar #{post_id}")
@@ -346,10 +424,10 @@ def create_app(db: DB | None = None, worker: Worker | None = None, start_worker:
                       metrics_last_run=db.setting("metrics_last_run"))
 
     @app.get("/calendario")
-    def calendar_page(request: Request):
+    def calendar_page(request: Request, semana: int = 0, erro: str = ""):
         from boorubot import calendar_view
 
-        return render(request, "calendar.html", c=calendar_view.build(db))
+        return render(request, "calendar.html", c=calendar_view.build(db, week=semana), error=erro)
 
     @app.post("/settings/ritmo")
     async def save_rhythm(request: Request):

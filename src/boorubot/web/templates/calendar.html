@@ -4,14 +4,20 @@
 <header class="hello">
   <div>
     <h1>Calendário</h1>
-    <p class="muted">Cada site tem o próprio ritmo. As datas são previsões; para mudar a ordem, use
-      "passar para o início / fim da fila" na arte.</p>
+    <p class="muted">Cada site tem a própria fila. <b>Arraste uma arte para outro dia</b> para fixar quando ela sai
+      naquele site (📌); clique no 📌 para desfixar. No celular, use "Dia por site" na página da arte.</p>
   </div>
-  <a class="small" href="/sites#ritmo">ajustar ritmo por site →</a>
+  <nav class="week-nav" aria-label="Semana">
+    {% if c.week > 0 %}<a class="pill-btn" href="/calendario?semana={{ c.week - 1 }}">← semana anterior</a>{% endif %}
+    <span class="small">{{ c.range_label }}</span>
+    {% if c.week < c.max_weeks %}<a class="pill-btn" href="/calendario?semana={{ c.week + 1 }}">próxima semana →</a>{% endif %}
+  </nav>
 </header>
+{% if error %}<div class="alert">{{ error }}</div>{% endif %}
+<div class="alert" id="cal-error" hidden></div>
 
 <div class="cal-wrap card">
-  <div class="cal" role="table" aria-label="Próximos 7 dias por site">
+  <div class="cal" role="table" aria-label="Dias por site">
     <div class="cal-row" role="row">
       <span class="cal-head" role="columnheader"></span>
       {% for d in c.dates %}<span class="cal-day{{ ' today' if d.today }}" role="columnheader">{{ d.label }}</span>{% endfor %}
@@ -22,20 +28,30 @@
         <small class="{{ 'warn' if r.session_down and not r.off }}">{{ 'pedir login' if r.session_down and not r.off else r.rhythm }}</small></span>
       {% for cell in r.cells %}
         {% set p = cell.post %}
-        {% if cell.kind in ('post', 'published', 'waiting') %}
-        <a class="cal-cell {{ cell.kind }}{{ ' today' if c.dates[loop.index0].today }}" role="cell" href="/posts/{{ p.id }}"
-           title="{{ p.title or ('#' ~ p.id) }}{{ ' · já saiu' if cell.kind == 'published' }}{{ ' · esperando login' if cell.kind == 'waiting' }}">
-          <img src="/images/{{ p.image }}" alt="">
+        {% set drop = '' if r.off else ' data-drop-site="' ~ r.site ~ '" data-drop-day="' ~ cell.day ~ '"' %}
+        {% if cell.kind in ('post', 'waiting') %}
+        <div class="cal-cell {{ cell.kind }}{{ ' today' if cell.today }}{{ ' pinned' if cell.pinned }}" role="cell" draggable="true"
+             data-post="{{ p.id }}" data-site="{{ r.site }}"{{ drop|safe }}
+             title="{{ p.title or ('#' ~ p.id) }}{{ ' · fixada neste dia' if cell.pinned }}{{ ' · esperando login' if cell.kind == 'waiting' }} · arraste para mudar o dia">
+          <a href="/posts/{{ p.id }}" draggable="false"><img src="/images/{{ p.image }}" alt="" draggable="false"></a>
           <span>{{ 'esperando' if cell.kind == 'waiting' else (p.title or ('#' ~ p.id))|truncate(14, True, '…') }}</span>
-        </a>
-        {% elif cell.kind == 'skipped' %}
-        <span class="cal-cell skipped" role="cell">pulado (OC)</span>
+          {% if cell.pinned %}
+          <form method="post" action="/calendario/desafixar" class="unpin">
+            <input type="hidden" name="post_id" value="{{ p.id }}"><input type="hidden" name="site" value="{{ r.site }}">
+            <input type="hidden" name="semana" value="{{ c.week }}">
+            <button class="pin-btn" aria-label="Desafixar {{ p.title }} do {{ r.label }}" title="desafixar">📌</button>
+          </form>
+          {% endif %}
+        </div>
+        {% elif cell.kind == 'published' %}
+        <a class="cal-cell published" role="cell" href="/posts/{{ p.id }}" title="{{ p.title or ('#' ~ p.id) }} · já saiu hoje">
+          <img src="/images/{{ p.image }}" alt=""><span>{{ (p.title or ('#' ~ p.id))|truncate(14, True, '…') }}</span></a>
         {% elif cell.kind == 'off' %}
         <span class="cal-cell off" role="cell">desligado</span>
         {% elif cell.kind == 'rest' %}
-        <span class="cal-cell rest" role="cell"><span class="sr-only">folga</span></span>
+        <span class="cal-cell rest" role="cell"{{ drop|safe }}><span class="sr-only">folga</span></span>
         {% else %}
-        <span class="cal-cell empty" role="cell">vazio</span>
+        <span class="cal-cell empty" role="cell"{{ drop|safe }}>vazio</span>
         {% endif %}
       {% endfor %}
     </div>
@@ -45,24 +61,59 @@
 
 <div class="cal-bottom">
   <section class="card" aria-labelledby="sem-dia">
-    <h2 id="sem-dia">Na fila, sem dia ainda</h2>
+    <h2 id="sem-dia">Na fila, sem dia ainda <small>arraste para um dia de um site</small></h2>
     {% if c.beyond %}
     <div class="chips-row">
       {% for p in c.beyond %}
-      <a class="art-chip" href="/posts/{{ p.id }}"><img src="/images/{{ p.image }}" alt="">{{ p.title or ('#' ~ p.id) }}</a>
+      <a class="art-chip" href="/posts/{{ p.id }}" draggable="true" data-post="{{ p.id }}" data-site="">
+        <img src="/images/{{ p.image }}" alt="" draggable="false">{{ p.title or ('#' ~ p.id) }}</a>
       {% endfor %}
     </div>
     {% else %}
-    <p class="muted">Tudo o que está aprovado já tem dia nesta semana.</p>
+    <p class="muted">Tudo o que está aprovado já tem dia até o fim desta semana.</p>
     {% endif %}
   </section>
   {% if c.empty_days %}
   <section class="card cal-tip">
     <img src="/static/pets/bunny.svg" alt="">
     <p>{{ c.empty_days|join(', ') }} {{ 'está vazio' if c.empty_days|length == 1 else 'estão vazios' }}.
-      {% if c.suggestion and c.suggestion_is_draft %}Aprove <a href="/posts/{{ c.suggestion.id }}"><b>{{ c.suggestion.title or ('#' ~ c.suggestion.id) }}</b></a>
+      {% if c.suggestion %}Aprove <a href="/posts/{{ c.suggestion.id }}"><b>{{ c.suggestion.title or ('#' ~ c.suggestion.id) }}</b></a>
       ou suba uma arte nova.{% else %}Aprove mais artes para preencher a semana.{% endif %}</p>
   </section>
   {% endif %}
 </div>
+
+<script>
+  // arrastar = fixar o dia daquela arte naquele site (POST /calendario/fixar)
+  (function () {
+    const errorBox = document.getElementById("cal-error");
+    let drag = null;
+    document.querySelectorAll("[draggable=true][data-post]").forEach((el) => {
+      el.addEventListener("dragstart", (ev) => {
+        drag = { post: el.dataset.post, site: el.dataset.site };
+        ev.dataTransfer.effectAllowed = "move";
+        ev.dataTransfer.setData("text/plain", el.dataset.post);
+        el.classList.add("dragging");
+      });
+      el.addEventListener("dragend", () => { el.classList.remove("dragging"); drag = null; });
+    });
+    document.querySelectorAll("[data-drop-site]").forEach((cell) => {
+      const ok = () => drag && (!drag.site || drag.site === cell.dataset.dropSite);  // na mesma linha
+      cell.addEventListener("dragover", (ev) => { if (ok()) { ev.preventDefault(); cell.classList.add("drop-over"); } });
+      cell.addEventListener("dragleave", () => cell.classList.remove("drop-over"));
+      cell.addEventListener("drop", async (ev) => {
+        cell.classList.remove("drop-over");
+        if (!ok()) return;
+        ev.preventDefault();
+        const body = new URLSearchParams({ post_id: drag.post, site: cell.dataset.dropSite, day: cell.dataset.dropDay,
+                                           add_site: drag.site ? "false" : "true" });
+        const r = await fetch("/calendario/fixar", { method: "POST", body });
+        if (r.ok) { location.reload(); return; }
+        const data = await r.json().catch(() => ({}));
+        errorBox.textContent = "Não deu para mudar o dia: " + (data.error || "erro desconhecido");
+        errorBox.hidden = false;
+      });
+    });
+  })();
+</script>
 {% endblock %}

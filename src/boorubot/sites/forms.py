@@ -153,13 +153,20 @@ class FormSite(Site):
                 return Result(self.name, ok=True, dry_run=True, message="formulário preenchido, NÃO enviado",
                               artifacts=[filled])
 
-            self._submit(page)
-            page.wait_for_load_state("domcontentloaded")
-            done = screenshot(page, out / "submitted.png")
-            ok = bool(self.success_url.search(page.url))
-            msg = "post criado" if ok else f"enviado, mas não reconheci a página de sucesso ({page.url})"
-            return Result(self.name, ok=ok, dry_run=False, message=msg, url=page.url if ok else "",
-                          artifacts=[filled, done])
+            # Depois do clique, o post PODE ter saído. Se não der para confirmar, o resultado é
+            # "incerto": o robô nunca reenvia sozinho (evita duplicata); uma pessoa confere no site.
+            try:
+                self._submit(page)
+                page.wait_for_load_state("domcontentloaded")
+                done = screenshot(page, out / "submitted.png")
+            except Exception as exc:
+                return Result(self.name, ok=False, dry_run=False, artifacts=[filled], info={"uncertain": True},
+                              message=f"erro depois do clique em enviar ({type(exc).__name__}: {exc}); confira no site")
+            if self.success_url.search(page.url):
+                return Result(self.name, ok=True, dry_run=False, message="post criado", url=page.url,
+                              artifacts=[filled, done])
+            return Result(self.name, ok=False, dry_run=False, artifacts=[filled, done], info={"uncertain": True},
+                          message=f"enviado, mas não reconheci a página de sucesso ({page.url}); confira no site")
 
     def fill(self, page: Page, post: Post) -> None:
         form = self._upload_form(page)

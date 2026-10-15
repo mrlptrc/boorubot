@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import sqlite3
 import threading
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from pathlib import Path
 
 from boorubot.models import Post
@@ -15,19 +15,18 @@ DATA_DIR = ROOT / "data"
 IMAGES_DIR = DATA_DIR / "images"
 DB_PATH = DATA_DIR / "boorubot.db"
 
-# draft -> approved (na fila) -> publishing -> done | partial | failed
+# draft -> approved (na fila, enquanto falta algum site) -> done (todos os sites receberam)
 #
 # TESTE E PRODUÇÃO NUNCA SE MISTURAM: testar um post grava só em `test_runs` e não muda
 # status, fila, published_at nem o ritmo. `publications` guarda apenas envios reais.
 #
-# Agendamento = fila + limitador de ritmo. Post aprovado não tem data: tem posição na fila.
-# O "pacer" (next_due) libera o primeiro da fila quando: já passou do horário diário, ainda
-# não saiu post hoje e o último saiu há >= MIN_GAP. Atraso (PC desligado) nunca acumula:
-# ao voltar sai 1 post e o resto segue 1 por dia. As datas na tela são só previsões.
+# Agendamento = uma fila por site (scheduler.py). Post aprovado não tem data: tem posição na
+# fila, e cada site pega a próxima arte dele, 1 por dia, >= MIN_GAP entre posts do site, sem
+# acumular atraso. Dias fixados no calendário (site_pins) passam na frente.
 MIN_GAP = timedelta(hours=12)
 
-# Ritmo por site. A fila principal (acima) define o "dia 0" de cada arte; cada site percorre
-# a mesma fila no seu ritmo. Padrão = diário com atraso 0 = todos os sites no dia 0, como sempre.
+# Ritmo por site: diário (padrão), dia sim/dia não ou desligado, e atraso em dias contado a
+# partir do 1º site em que a arte saiu.
 RHYTHMS = ("diario", "dia_sim_dia_nao", "desligado")
 MAX_DELAY_DAYS = 7
 POST_STATUSES = ("draft", "approved", "publishing", "done", "partial", "failed")
@@ -85,6 +84,12 @@ CREATE TABLE IF NOT EXISTS site_schedule (
     due_at TEXT NOT NULL,          -- a partir de quando o site pode receber; o pacer do site decide o dia
     status TEXT NOT NULL DEFAULT 'agendado',  -- agendado | publicado | falhou | pulado
     updated_at TEXT NOT NULL,
+    PRIMARY KEY (post_id, site)
+);
+CREATE TABLE IF NOT EXISTS site_pins (
+    post_id INTEGER NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
+    site TEXT NOT NULL,
+    day TEXT NOT NULL,             -- dia fixado (arrastado no calendário) para esta arte neste site
     PRIMARY KEY (post_id, site)
 );
 CREATE TABLE IF NOT EXISTS site_sessions (
@@ -150,6 +155,8 @@ class DB:
             # versões antigas consumiam o post no teste ("tested"); teste não muda mais o post
             self.conn.execute("UPDATE posts SET status = 'draft' WHERE status = 'tested'")
             self.conn.execute("DELETE FROM settings WHERE key = 'danbooru_env'")
+            # fila por site: "publicando" (sites agendados do modelo antigo) volta para a fila
+            self.conn.execute("UPDATE posts SET status = 'approved' WHERE status = 'publishing'")
             for key, value in DEFAULT_SETTINGS.items():
                 self.conn.execute("INSERT OR IGNORE INTO settings VALUES (?, ?)", (key, value))
 
@@ -245,89 +252,19 @@ class DB:
         edge = self._all(f"SELECT {agg}(queue_pos) AS v FROM posts WHERE status = 'approved'")[0]["v"] or 0
         self.update_post(post_id, queue_pos=edge - 1 if where == "first" else edge + 1)
 
-    def last_published(self) -> datetime | None:
-        value = self.setting("last_published_at")
-        return datetime.fromisoformat(value) if value else None
-
-    def mark_published(self, post_id: int, when: datetime | None = None) -> None:
-        when = when or datetime.now()
-        self.mark_post_published_at(post_id, when)
-        self.mark_released(when)
-
     def mark_post_published_at(self, post_id: int, when: datetime | None = None) -> None:
-        """Primeira vez que a arte saiu em algum site. Não mexe no ritmo da fila principal."""
+        """Primeira vez que a arte saiu em algum site (referência do atraso por site)."""
         when = when or datetime.now()
         row = self.get_post(post_id)
         if row and not row["published_at"]:
             self.update_post(post_id, published_at=when.isoformat(timespec="seconds"))
 
-    def mark_released(self, when: datetime | None = None) -> None:
-        """O "dia 0" de uma arte aconteceu: conta para o ritmo da fila principal."""
-        when = when or datetime.now()
-        last = self.last_published()
-        if last is None or when > last:
-            self.set_setting("last_published_at", when.isoformat(timespec="seconds"))
-
-    def _daily_slot(self, day: datetime) -> datetime:
+    def daily_slot(self, day: datetime) -> datetime:
+        """O horário do post diário no dia de `day`."""
         hour, minute = (int(x) for x in self.setting("daily_time").split(":"))
         return day.replace(hour=hour, minute=minute, second=0, microsecond=0)
 
-    def daily_slot(self, day: datetime) -> datetime:
-        """O horário do post diário no dia de `day`."""
-        return self._daily_slot(day)
-
-    def earliest_after(self, ref: datetime, last: datetime | None, day_gap: int = 1) -> datetime:
-        return self._earliest_after(ref, last, day_gap)
-
-    def _earliest_after(self, ref: datetime, last: datetime | None, day_gap: int = 1) -> datetime:
-        """Menor instante >= ref em que o pacer libera um post:
-        depois do horário do dia, nenhum post nesse dia e >= MIN_GAP desde o último.
-        day_gap=2 é o "dia sim, dia não": o próximo só sai 2 dias depois do último."""
-        day = ref.date()
-        while True:
-            slot = self._daily_slot(datetime.combine(day, ref.time()))
-            if last and last.date() + timedelta(days=day_gap - 1) >= day:
-                day += timedelta(days=1)
-                continue
-            start = max(ref, slot)
-            if last:
-                start = max(start, last + MIN_GAP)
-            if start.date() != day:  # o intervalo mínimo empurrou para outro dia
-                day = start.date()
-                ref = max(ref, start)
-                continue
-            return start
-
-    def slot_open(self, ref: datetime | None = None) -> bool:
-        ref = ref or datetime.now()
-        return self._earliest_after(ref, self.last_published()) <= ref
-
-    def next_due(self, ref: datetime | None = None) -> dict | None:
-        """O pacer: devolve no máximo UM post, e só se o ritmo permitir agora."""
-        queue = self.queue()
-        return queue[0] if queue and self.slot_open(ref) else None
-
-    def projected_times(self, ref: datetime | None = None) -> dict[int, datetime]:
-        """Previsão de quando cada post da fila sai, mantendo o ritmo de 1 por dia."""
-        ref = ref or datetime.now()
-        last, out = self.last_published(), {}
-        cursor = ref
-        for row in self.queue():
-            when = self._earliest_after(cursor, last)
-            out[row["id"]] = when
-            last, cursor = when, when
-        return out
-
-    def projected_next(self, ref: datetime | None = None) -> datetime:
-        """Quando sairia um post aprovado agora (entrando no fim da fila)."""
-        ref = ref or datetime.now()
-        times = self.projected_times(ref)
-        if not times:
-            return self._earliest_after(ref, self.last_published())
-        last = max(times.values())
-        return self._earliest_after(last, last)
-
-    # --- ritmo por site ----------------------------------------------------------
+    # --- ritmo por site (o agendador em si está em scheduler.py) ----------------
 
     def site_rhythm(self, site: str) -> str:
         value = self.setting(f"rhythm_{site}")
@@ -337,10 +274,6 @@ class DB:
         value = self.setting(f"delay_{site}")
         return min(int(value), MAX_DELAY_DAYS) if value.isdigit() else 0
 
-    def site_follows_queue(self, site: str) -> bool:
-        """Diário e sem atraso: o site recebe a arte no dia 0, junto com a fila principal."""
-        return self.site_rhythm(site) == "diario" and self.site_delay(site) == 0
-
     def site_day_gap(self, site: str) -> int:
         return 2 if self.site_rhythm(site) == "dia_sim_dia_nao" else 1
 
@@ -349,36 +282,44 @@ class DB:
                           (site,))[0]["m"]
         return datetime.fromisoformat(value) if value else None
 
-    def site_slot_open(self, site: str, ref: datetime | None = None) -> bool:
-        ref = ref or datetime.now()
-        last = self.site_last_published(site)
-        return self._earliest_after(ref, last, self.site_day_gap(site)) <= ref
+    def site_backoff(self, site: str) -> datetime | None:
+        """Depois de uma falha, o site só tenta de novo a partir daqui."""
+        value = self.setting(f"backoff_{site}")
+        return datetime.fromisoformat(value) if value else None
 
-    def schedule_site(self, post_id: int, site: str, due_at: datetime, status: str = "agendado") -> None:
-        self._exec("INSERT OR REPLACE INTO site_schedule (post_id, site, due_at, status, updated_at) "
-                   "VALUES (?, ?, ?, ?, ?)", (post_id, site, due_at.isoformat(timespec="seconds"), status, now()))
+    def set_site_backoff(self, site: str, until: datetime | None) -> None:
+        self.set_setting(f"backoff_{site}", until.isoformat(timespec="seconds") if until else "")
 
-    def set_schedule_status(self, post_id: int, site: str, status: str) -> None:
-        self._exec("UPDATE site_schedule SET status = ?, updated_at = ? WHERE post_id = ? AND site = ?",
-                   (status, now(), post_id, site))
+    def pending_sites(self, post: dict) -> list[str]:
+        """Sites marcados na arte que ainda não receberam (nem pularam) e não estão desligados."""
+        done = self.published_sites(post["id"])
+        return [s for s in post["sites"] if s not in done and self.site_rhythm(s) != "desligado"]
 
-    def site_schedule(self, post_id: int | None = None, site: str | None = None,
-                      status: str | None = None) -> list[dict]:
-        sql, params = "SELECT * FROM site_schedule WHERE 1 = 1", []
-        for col, value in (("post_id", post_id), ("site", site), ("status", status)):
-            if value is not None:
-                sql += f" AND {col} = ?"
-                params.append(value)
-        return self._all(sql + " ORDER BY due_at, post_id", tuple(params))
+    # --- dias fixados no calendário ----------------------------------------------
 
-    def next_site_due(self, site: str, ref: datetime | None = None) -> dict | None:
-        """Pacer do site: no máximo UM envio atrasado por vez, e só se o ritmo do site permitir."""
-        ref = ref or datetime.now()
-        if self.site_rhythm(site) == "desligado":
-            return None
-        due = [r for r in self.site_schedule(site=site, status="agendado")
-               if datetime.fromisoformat(r["due_at"]) <= ref]
-        return due[0] if due and self.site_slot_open(site, ref) else None
+    def site_pins(self, site: str) -> dict[int, date]:
+        return {r["post_id"]: date.fromisoformat(r["day"]) for r in self._all(
+            "SELECT post_id, day FROM site_pins WHERE site = ?", (site,))}
+
+    def post_pins(self, post_id: int) -> dict[str, date]:
+        return {r["site"]: date.fromisoformat(r["day"]) for r in self._all(
+            "SELECT site, day FROM site_pins WHERE post_id = ?", (post_id,))}
+
+    def pin(self, post_id: int, site: str, day: date) -> None:
+        """Fixa a arte num dia, naquele site. Se outra arte já estava fixada nesse dia, as duas trocam."""
+        current = self.post_pins(post_id).get(site)
+        for other_id, other_day in self.site_pins(site).items():
+            if other_day == day and other_id != post_id:
+                if current:
+                    self._exec("UPDATE site_pins SET day = ? WHERE post_id = ? AND site = ?",
+                               (current.isoformat(), other_id, site))
+                else:
+                    self.unpin(other_id, site)
+        self._exec("INSERT OR REPLACE INTO site_pins (post_id, site, day) VALUES (?, ?, ?)",
+                   (post_id, site, day.isoformat()))
+
+    def unpin(self, post_id: int, site: str) -> None:
+        self._exec("DELETE FROM site_pins WHERE post_id = ? AND site = ?", (post_id, site))
 
     # --- publicações -------------------------------------------------------------
 
@@ -393,9 +334,29 @@ class DB:
                          "JOIN posts ON posts.id = p.post_id ORDER BY p.id DESC LIMIT ?", (limit,))
 
     def published_sites(self, post_id: int) -> set[str]:
-        """Sites onde o post já saiu (ou foi pulado por regra) — não reenvia."""
-        return {r["site"] for r in self._all(
-            "SELECT site FROM publications WHERE post_id = ? AND status IN ('ok', 'skipped')", (post_id,))}
+        """Sites que NÃO recebem mais esta arte automaticamente: já saiu, foi pulada pela regra,
+        ou o último envio ficou incerto (pode ter saído: só uma pessoa decide, para não duplicar)."""
+        rows = self._all("SELECT site, status FROM publications WHERE post_id = ? ORDER BY id", (post_id,))
+        latest = {r["site"]: r["status"] for r in rows}
+        ever = {r["site"] for r in rows if r["status"] in ("ok", "skipped")}
+        return ever | {site for site, status in latest.items() if status == "uncertain"}
+
+    def uncertain_sites(self, post_id: int) -> list[str]:
+        """Sites em que o último envio desta arte ficou incerto e ninguém conferiu ainda."""
+        rows = self._all("SELECT site, status FROM publications WHERE post_id = ? ORDER BY id", (post_id,))
+        latest = {r["site"]: r["status"] for r in rows}
+        ok = {r["site"] for r in rows if r["status"] == "ok"}
+        return [s for s, st in latest.items() if st == "uncertain" and s not in ok]
+
+    def failures_in_a_row(self, post_id: int, site: str) -> int:
+        """Falhas seguidas (as mais recentes) desta arte neste site."""
+        count = 0
+        for r in self._all("SELECT status FROM publications WHERE post_id = ? AND site = ? ORDER BY id DESC",
+                           (post_id, site)):
+            if r["status"] != "failed":
+                break
+            count += 1
+        return count
 
     # --- métricas (só produção) ----------------------------------------------------
 

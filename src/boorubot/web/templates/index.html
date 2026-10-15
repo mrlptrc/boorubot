@@ -6,7 +6,8 @@
   <div>
     <h1>{{ d.greeting }} ♡</h1>
     <p class="muted">
-      {% if n and n.is_today %}Hoje sai <b>{{ n.post.title or ('#' ~ n.post.id) }}</b> às {{ n.when.strftime('%H:%M') }}
+      {% if d.today_posts|length > 1 %}Hoje saem <b>{{ d.today_posts|length }} artes</b> em {{ d.today_sites }} sites.
+      {% elif n and n.is_today %}Hoje sai <b>{{ n.post.title or ('#' ~ n.post.id) }}</b> às {{ n.when.strftime('%H:%M') }}
         em {{ n.sites|length }} site{{ 's' if n.sites|length != 1 }}.
       {% else %}Nada agendado para hoje.{% endif %}
       {% if d.review %}{{ d.review|length }} arte{{ 's' if d.review|length != 1 }} para revisar.{% else %}Nada pendente para você.{% endif %}
@@ -136,6 +137,7 @@
         <img src="/images/{{ w.post.image }}" alt="{{ w.post.title }}">
         <span class="day-title">{{ w.post.title or ('#' ~ w.post.id) }}</span>
         <span class="when">{{ w.position }}º · prev. {{ w.when.strftime('%H:%M') }}</span>
+        {% if w.extra %}<span class="more" title="{{ w.extra|map(attribute='title')|join(', ') }}">+{{ w.extra|length }} em outros sites</span>{% endif %}
       </a>
       {% else %}
       <div class="day empty-day{{ ' today' if w.today }}">
@@ -166,6 +168,8 @@
         {% if p.status == 'draft' %}
           <span class="pill s-draft">rascunho</span>
           <span class="when">{{ p.tag_list|length ~ ' tags' if p.tag_list else 'sem tags ainda' }}</span>
+        {% elif d.to_check.get(p.id) %}
+          <span class="pill s-partial">conferir no {{ d.to_check[p.id]|join(', ') }}</span>
         {% else %}
           <span class="pill s-failed">falhou{{ ' no ' ~ d.failed_sites[p.id]|join(', ') if d.failed_sites.get(p.id) }}</span>
         {% endif %}

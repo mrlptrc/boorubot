@@ -8,6 +8,7 @@ from fastapi.testclient import TestClient
 
 from boorubot import dashboard
 from boorubot.db import DB
+from boorubot.scheduler import site_due
 from boorubot.web import app as app_mod
 from boorubot.worker import Worker
 
@@ -42,7 +43,7 @@ def test_test_approvals_leave_the_production_queue(db):
     db.approve(pid)                                   # aprovada no modo teste
     assert [p["id"] for p in db.queue()] == [pid]     # no modo teste aparece na prévia
     db.set_setting("test_mode", "0")
-    assert db.queue() == [] and db.next_due() is None  # desligou o teste: NÃO vai ao ar
+    assert db.queue() == [] and site_due(db, "danbooru") is None  # desligou o teste: NÃO vai ao ar
     assert [p["id"] for p in db.needs_confirmation()] == [pid]
 
 

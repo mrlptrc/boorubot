@@ -97,51 +97,6 @@ def published(db, post_id, when):
     db.mark_published(post_id, when)
 
 
-def test_queue_order_and_projection(db):
-    db.set_setting("daily_time", "18:00")
-    a, b, c = approve_n(db, 3)
-    assert [p["id"] for p in db.queue()] == [a, b, c]
-    proj = db.projected_times(at(14, 12))
-    assert proj == {a: at(14, 18), b: at(15, 18), c: at(16, 18)}
-
-
-def test_pc_off_for_days_publishes_only_one(db):
-    """Painel fechado 3 dias: ao voltar sai 1 post, o resto segue 1 por dia."""
-    db.set_setting("daily_time", "18:00")
-    a, b, c = approve_n(db, 3)
-    db.set_setting("last_published_at", at(11, 18).isoformat())
-    assert db.next_due(at(14, 19))["id"] == a
-    published(db, a, at(14, 19))
-    assert db.next_due(at(14, 23)) is None          # já saiu um hoje
-    assert db.next_due(at(15, 17, 59)) is None      # antes do horário
-    assert db.next_due(at(15, 18))["id"] == b
-
-
-def test_before_daily_time_waits(db):
-    db.set_setting("daily_time", "18:00")
-    approve_n(db, 1)
-    assert db.next_due(at(14, 9)) is None
-
-
-def test_publish_now_counts_as_todays_post(db):
-    db.set_setting("daily_time", "18:00")
-    a, b = approve_n(db, 2)
-    published(db, a, at(14, 10))                     # "Publicar agora" de manhã
-    assert db.next_due(at(14, 18)) is None           # o agendado de hoje vai para amanhã
-    assert db.projected_times(at(14, 18, 30))[b] == at(15, 18)
-    assert db.next_due(at(15, 18))["id"] == b
-
-
-def test_min_gap_after_late_post(db):
-    """Post às 23h; no dia seguinte espera completar 12h desde o último."""
-    db.set_setting("daily_time", "08:00")
-    a, b = approve_n(db, 2)
-    published(db, a, at(14, 23))
-    assert db.next_due(at(15, 8)) is None
-    assert db.next_due(at(15, 11))["id"] == b
-    assert db.projected_times(at(15, 8))[b] == at(15, 11)
-
-
 def test_move_in_queue(db):
     a, b, c = approve_n(db, 3)
     db.move_in_queue(c, "first")
@@ -168,9 +123,11 @@ def test_publish_records_each_site_and_retries_only_failures(db, monkeypatch):
     db.set_setting("test_mode", "0")
     post_id = db.create_post("a.png", tags="x", sites=["danbooru", "paheal", "gelbooru"])
 
-    assert publish_post(db, post_id) == "partial"
+    # o Gelbooru falhou: a arte continua na fila só para ele (tentativa automática depois)
+    assert publish_post(db, post_id) == "approved"
     assert {p["site"]: p["status"] for p in db.publications(post_id)} == {
         "danbooru": "ok", "paheal": "skipped", "gelbooru": "failed"}
+    assert db.pending_sites(db.get_post(post_id)) == ["gelbooru"]
 
     outcomes["gelbooru"] = "ok"
     assert publish_post(db, post_id) == "done"
@@ -265,7 +222,7 @@ def test_real_publish_marks_the_day(db, monkeypatch):
     db.set_setting("test_mode", "0")
     post_id = db.create_post("a.png", tags="x", sites=["danbooru"])
     publish_post(db, post_id)
-    assert db.get_post(post_id)["published_at"] and db.setting("last_published_at")
+    assert db.get_post(post_id)["published_at"] and db.site_last_published("danbooru")
 
 
 def test_scheduler_submits_only_one(db):
@@ -275,8 +232,7 @@ def test_scheduler_submits_only_one(db):
     w = Worker(db)
     w.tick()
     w.tick()  # job anterior ainda na fila: não empilha outro
-    assert [j.kind for j in w.jobs.queue] == ["publish"]
-    assert len(db.queue()) == 2
+    assert [j.kind for j in w.jobs.queue] == ["publish_site"]
 
 
 def test_home_shows_queue_positions(client, db):

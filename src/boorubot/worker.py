@@ -8,10 +8,11 @@ import queue
 import threading
 import time
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import datetime
 
 from boorubot.config import ALL_SITES, build_site
 from boorubot.db import DB, to_post
+from boorubot.scheduler import BACKOFF, rule_skips, site_due
 from boorubot.sites.base import SkipPost
 
 log = logging.getLogger("boorubot.worker")
@@ -26,10 +27,10 @@ class Job:
 
 
 def _send(db: DB, post, post_id: int, site: str) -> str:
-    """Um envio REAL para um site; grava em publications. Retorna ok | skipped | failed."""
+    """Um envio REAL para um site; grava em publications. Retorna ok | skipped | failed | uncertain."""
     try:
         result = build_site(site, db).publish(post, dry_run=False)
-        status = "ok" if result.ok else "failed"
+        status = "ok" if result.ok else ("uncertain" if result.info.get("uncertain") else "failed")
         db.add_publication(post_id, site, status, result.url, result.message)
     except SkipPost as exc:
         status = "skipped"
@@ -41,36 +42,32 @@ def _send(db: DB, post, post_id: int, site: str) -> str:
     return status
 
 
-SCHEDULE_STATUS = {"ok": "publicado", "failed": "falhou", "skipped": "pulado"}
-
-
-def _status_from(results: list[str]) -> str:
-    if results and all(s == "failed" for s in results):
-        return "failed"
-    if "failed" in results:
-        return "partial"
-    return "done"
+def _after_send(db: DB, post_id: int, site: str, status: str) -> None:
+    if status == "ok":
+        db.mark_post_published_at(post_id)  # 1º site: referência do atraso dos outros
+        db.set_site_backoff(site, None)
+    elif status == "failed":
+        # sem cascata: o site espera um pouco e tenta a MESMA arte de novo (não pula para a próxima)
+        db.set_site_backoff(site, datetime.now() + BACKOFF)
 
 
 def refresh_post_status(db: DB, post_id: int) -> str:
-    """Status de um post que tem sites agendados: publicando enquanto falta algum site;
-    depois, o último resultado de cada site decide (done | partial | failed)."""
+    """Na fila enquanto falta algum site; publicado quando todos receberam (ou pularam pela regra)."""
     row = db.get_post(post_id)
-    schedule = {r["site"]: r for r in db.site_schedule(post_id=post_id)}
-    if any(r["status"] == "agendado" for r in schedule.values()):
-        final = "publishing"
-    else:
-        latest: dict[str, str] = {}
-        for pub in reversed(db.publications(post_id)):  # do mais antigo para o mais novo
-            latest[pub["site"]] = pub["status"]
-        final = _status_from([latest[s] for s in row["sites"] if s in latest])
-    db.update_post(post_id, status=final)
+    if not row or row["status"] not in ("approved", "partial", "failed", "publishing"):
+        return row["status"] if row else "missing"
+    if db.pending_sites(row):
+        final = "approved"
+    else:  # nada mais automático: incerto vira "parcial" e aparece em "Para revisar"
+        final = "partial" if db.uncertain_sites(post_id) else "done"
+    if final != row["status"]:
+        db.update_post(post_id, status=final, queue_pos=row["queue_pos"] if final == "approved" else None)
     return final
 
 
 def publish_post(db: DB, post_id: int) -> str:
-    """PRODUÇÃO: o "dia 0" de uma arte. Publica agora nos sites que seguem a fila (diário, sem
-    atraso: o padrão) e agenda em site_schedule os sites com atraso ou dia sim/dia não.
+    """PRODUÇÃO, "Publicar agora": manda a arte para todos os sites pendentes dela, já.
+    Conta como o post do dia nesses sites (a fila de cada um segue amanhã).
     Recusa rodar com o modo teste ligado: produção e teste nunca se misturam."""
     row = db.get_post(post_id)
     if not row:
@@ -78,62 +75,44 @@ def publish_post(db: DB, post_id: int) -> str:
     if db.test_mode:
         log.warning("post %s: produção bloqueada com o modo teste ligado", post_id)
         return "blocked"
-    db.update_post(post_id, status="publishing", queue_pos=None)
     post = to_post(row)
-    done = db.published_sites(post_id)
-    schedule = {r["site"]: r for r in db.site_schedule(post_id=post_id)}
-    now = datetime.now()
-    results, scheduled = [], 0
-    for name in row["sites"]:
-        if name in done:
-            continue
-        existing = schedule.get(name)
-        if existing and existing["status"] in ("agendado", "pulado"):
-            continue  # já tem dia próprio no calendário do site (ou o site está desligado)
-        rhythm, delay = db.site_rhythm(name), db.site_delay(name)
-        if rhythm == "desligado":
-            db.schedule_site(post_id, name, now, status="pulado")
-            continue
-        retry = existing is not None and existing["status"] == "falhou"  # "Tentar de novo" manual
-        if not retry and (delay > 0 or (rhythm == "dia_sim_dia_nao" and not db.site_slot_open(name, now))):
-            due = db.daily_slot(now + timedelta(days=delay)) if delay else now
-            db.schedule_site(post_id, name, due)
-            scheduled += 1
-            continue
-        status = _send(db, post, post_id, name)
-        if existing:
-            db.set_schedule_status(post_id, name, SCHEDULE_STATUS[status])
+    results = []
+    for site in db.pending_sites(row):
+        status = _send(db, post, post_id, site)
+        _after_send(db, post_id, site, status)
         results.append(status)
-
-    if "ok" in results:
-        db.mark_published(post_id)  # conta para o ritmo só se saiu de verdade em algum site
-    elif scheduled:
-        db.mark_released(now)  # nada saiu agora, mas hoje foi o dia 0 desta arte
-    if db.site_schedule(post_id=post_id):
-        return refresh_post_status(db, post_id)
-    final = _status_from(results)  # sem agenda por site: exatamente como sempre foi
-    db.update_post(post_id, status=final)
+    if row["status"] in ("partial", "failed", "draft", "publishing"):
+        db.update_post(post_id, status="approved")  # "Tentar de novo": volta para a fila do site
+    final = refresh_post_status(db, post_id)
+    if final == "approved" and results and all(r == "failed" for r in results):
+        return "failed"
     return final
 
 
 def publish_site(db: DB, post_id: int, site: str) -> str:
-    """PRODUÇÃO: envio agendado de UM site (atraso / dia sim, dia não). Nunca duplica."""
+    """PRODUÇÃO: o envio do dia de UM site (o worker chama quando scheduler.site_due manda). Nunca duplica."""
     if db.test_mode:
         return "blocked"
     row = db.get_post(post_id)
     if not row:
-        db.set_schedule_status(post_id, site, "pulado")
         return "missing"
     if site in db.published_sites(post_id):
-        db.set_schedule_status(post_id, site, "publicado")
         refresh_post_status(db, post_id)
         return "ok"
     status = _send(db, to_post(row), post_id, site)
-    db.set_schedule_status(post_id, site, SCHEDULE_STATUS[status])
-    if status == "ok":
-        db.mark_post_published_at(post_id)  # não conta como "post do dia" da fila principal
+    _after_send(db, post_id, site, status)
     refresh_post_status(db, post_id)
     return status
+
+
+def record_rule_skips(db: DB) -> None:
+    """Arte que o site recusa pela regra (ex.: só OC no paheal) é marcada como pulada na hora,
+    sem gastar o dia do site e sem tentativa de envio."""
+    for post in db.queue():
+        for site in db.pending_sites(post):
+            if rule_skips(site, post):
+                db.add_publication(post["id"], site, "skipped", message="regra do site (pulado)")
+        refresh_post_status(db, post["id"])
 
 
 def run_post_test(db: DB, post_id: int) -> list[str]:
@@ -237,7 +216,6 @@ class Worker:
                 self.db.set_session(site.name, False, f"{type(exc).__name__}: {exc}")
 
     def tick(self) -> None:
-        self._tick_publish()
         self._tick_sites()
         self._tick_daily()
 
@@ -258,28 +236,20 @@ class Worker:
             self.db.set_setting("backup_last_attempt", today)
             self.submit("backup", "backup", "backup diário")
 
-    def _tick_publish(self) -> None:
-        """No máximo 1 publicação por vez, liberada pelo pacer.
-        Em modo teste a fila fica pausada (testes não contam no ritmo e esvaziariam a fila)."""
-        if self.db.test_mode or self._publishing():
-            return
-        row = self.db.next_due()
-        if row:
-            self.db.update_post(row["id"], status="publishing", queue_pos=None)
-            self.submit("publish", row["id"], f"publicar #{row['id']} (agendado)")
-
     def _publishing(self) -> bool:
-        """Só 1 envio de produção por vez (fila principal ou agenda de site)."""
+        """Só 1 envio de produção por vez."""
         return self._queued("publish") or self._queued("publish_site")
 
     def _tick_sites(self) -> None:
-        """Envios atrasados por site: cada site no próprio ritmo, no máximo 1 por vez no total."""
+        """Fila por site: cada site publica a próxima arte dele quando o ritmo do site deixa.
+        No máximo 1 envio por vez no total. Modo teste pausa tudo."""
         if self.db.test_mode or self._publishing():
             return
+        record_rule_skips(self.db)
         for site in ALL_SITES:
-            row = self.db.next_site_due(site)
-            if row:
-                self.submit("publish_site", f"{row['post_id']}:{site}", f"publicar #{row['post_id']} no {site}")
+            post = site_due(self.db, site)
+            if post:
+                self.submit("publish_site", f"{post['id']}:{site}", f"publicar #{post['id']} no {site}")
                 return
 
     def _run_scheduler(self) -> None:

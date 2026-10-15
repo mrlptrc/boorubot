@@ -47,10 +47,12 @@ def test_runway_counts_consecutive_days_from_today():
     assert queue_runway({TODAY + timedelta(1)}, TODAY) == 0  # hoje sem post: folga zero
 
 
-def test_post_already_published_today_covers_today():
-    projected = {1: at(15, 18), 2: at(16, 18)}
-    days = covered_days(projected, last_published=at(14, 10), today=TODAY)
-    assert queue_runway(days, TODAY) == 3
+def test_covered_days_any_site():
+    from boorubot.scheduler import Cell
+    plans = {"danbooru": {TODAY: Cell("published"), TODAY + timedelta(1): Cell("empty")},
+             "gelbooru": {TODAY: Cell("empty"), TODAY + timedelta(1): Cell("post"), TODAY + timedelta(2): Cell("rest")}}
+    assert covered_days(plans) == {TODAY, TODAY + timedelta(1)}
+    assert queue_runway(covered_days(plans), TODAY) == 2
 
 
 def test_runway_from_real_queue(db):

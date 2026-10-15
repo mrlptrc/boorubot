@@ -11,7 +11,7 @@
     <figcaption>
       <span class="pill s-{{ post.status }}">{{ STATUS_LABELS[post.status] }}</span>
       {% if queue_pos %}
-        <b>{{ queue_pos }}º de {{ queue_len }}</b> na fila · previsão: <b>{{ projected.strftime('%d/%m às %H:%M') }}</b>
+        <b>{{ queue_pos }}º de {{ queue_len }}</b> na fila{% if projected %} · próxima saída: <b>{{ projected.strftime('%d/%m às %H:%M') }}</b>{% endif %}
       {% endif %}
       {% if post.published_at %}<span class="muted small">publicado em {{ post.published_at[8:10] }}/{{ post.published_at[5:7] }} {{ post.published_at[11:16] }}</span>{% endif %}
     </figcaption>
@@ -96,6 +96,50 @@
     </div>
   </form>
 </div>
+
+{% if uncertain %}
+<section class="card confirm-box" id="conferir" aria-labelledby="conferir-t">
+  <h2 id="conferir-t">Confira no site</h2>
+  <p class="small">O robô clicou em enviar mas <b>não teve certeza se o post saiu</b>. Para não correr o risco de
+    postar duas vezes, ele <b>não reenvia sozinho</b>. Abra o site, procure a arte no seu perfil e diga o que aconteceu.</p>
+  {% for site, label in uncertain %}
+  <form method="post" action="/posts/{{ post.id }}/conferir" class="pin-form">
+    <input type="hidden" name="site" value="{{ site }}">
+    <b>{{ label }}</b>
+    <label class="sr-only" for="url-{{ site }}">Link do post no {{ label }}</label>
+    <input id="url-{{ site }}" name="url" placeholder="link do post (opcional)">
+    <button class="primary" name="action" value="saiu">Saiu sim</button>
+    <button class="ghost" name="action" value="nao_saiu" data-confirm="Confirma que a arte NÃO apareceu no {{ label }}? Ela volta para a fila desse site.">Não saiu, tentar de novo</button>
+  </form>
+  {% endfor %}
+</section>
+{% endif %}
+
+{% if post.status == 'approved' %}
+<section class="card site-days" id="dias" aria-labelledby="dias-t">
+  <h2 id="dias-t">Dia por site <small>cada site tem a própria fila; fixe um dia se quiser</small></h2>
+  <table class="table">
+    <tr><th>Site</th><th>Previsão</th><th>Fixar num dia</th></tr>
+    {% for s in site_days %}
+    <tr>
+      <td><b>{{ s.label }}</b></td>
+      <td>{% if s.done %}<span class="pill s-ok">já saiu</span>
+        {% elif s.off %}<span class="muted">site desligado</span>
+        {% elif s.when %}{{ s.when.strftime('%d/%m às %H:%M') }}{% if s.pinned %} 📌{% endif %}
+        {% else %}<span class="muted">depois dos próximos 60 dias</span>{% endif %}</td>
+      <td>{% if not s.done and not s.off %}
+        <form method="post" action="/posts/{{ post.id }}/dia" class="pin-form">
+          <input type="hidden" name="site" value="{{ s.site }}">
+          <label class="sr-only" for="dia-{{ s.site }}">Dia no {{ s.label }}</label>
+          <input type="date" id="dia-{{ s.site }}" name="day" min="{{ today }}" value="{{ s.pinned.isoformat() if s.pinned else '' }}">
+          <button class="ghost" name="action" value="pin">Fixar</button>
+          {% if s.pinned %}<button class="ghost" name="action" value="unpin">Desafixar</button>{% endif %}
+        </form>{% endif %}</td>
+    </tr>
+    {% endfor %}
+  </table>
+</section>
+{% endif %}
 
 {% if tests %}
 <details class="tests" {{ 'open' if test_mode or not pubs }}>

@@ -541,3 +541,28 @@ html.sl-loading .guide-tabs { visibility: hidden; }
 
 .confirm-box { margin-bottom: 18px; border-color: #f2d77c; box-shadow: 0 4px 0 #f2d77c; background: #fffbea; }
 .confirm-box h2 { margin-top: 0; }
+
+.day .more { font-size: 11px; font-weight: 700; color: var(--info); background: var(--lav); border-radius: 999px; padding: 1px 8px; align-self: flex-start; }
+
+/* --- calendário: arrastar para fixar o dia ---------------------------------------- */
+.week-nav { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.pill-btn {
+  text-decoration: none; font: 500 14px var(--font-cute); color: var(--ink); padding: 5px 14px; border-radius: 999px;
+  border: 2px solid var(--line-strong); background: #fff; box-shadow: 0 3px 0 var(--line-strong);
+}
+.pill-btn:hover { background: var(--pink-soft); }
+.cal-cell[draggable=true] { cursor: grab; position: relative; }
+.cal-cell[draggable=true] a { display: flex; flex: none; }
+.cal-cell.dragging { opacity: .45; }
+.cal-cell.pinned { border-color: var(--pink); box-shadow: 0 0 0 2px var(--pink-soft) inset; }
+.cal-cell.drop-over { border-color: #e0568f; background: var(--pink-soft); border-style: solid; }
+.cal-cell .unpin { margin: 0 0 0 auto; }
+.pin-btn { padding: 0 2px; border: 0; background: none; box-shadow: none; font-size: 13px; line-height: 1; cursor: pointer; }
+.pin-btn:hover { background: none; transform: scale(1.2); }
+.art-chip[draggable=true] { cursor: grab; }
+.site-days { margin-top: 18px; }
+.site-days h2 { margin-top: 0; }
+.pin-form { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.pin-form input[type=date] { width: auto; }
+.s-uncertain { background: var(--peach); color: var(--warn); }
+.s-not_published { background: var(--line); color: var(--ink); }

@@ -1,6 +1,6 @@
 """Painel do dia (tela inicial): cálculos sobre o banco, sem HTML.
 
-Tudo aqui só LÊ: fila e previsões vêm do pacer (`db.projected_times`), favoritos vêm de
+Tudo aqui só LÊ: fila e previsões vêm da simulação por site (`scheduler.plan`), favoritos vêm de
 `metric_snapshots` (produção). Nada mexe em fila, status ou ritmo.
 """
 
@@ -45,12 +45,9 @@ def countdown(delta: timedelta) -> str:
 
 # --- folga da fila ---------------------------------------------------------------
 
-def covered_days(projected: dict[int, datetime], last_published: datetime | None, today: date) -> set[date]:
-    """Dias com post: os previstos pela fila + hoje, se o post de hoje já saiu."""
-    days = {when.date() for when in projected.values()}
-    if last_published and last_published.date() == today:
-        days.add(today)
-    return days
+def covered_days(plans: dict[str, dict[date, "Cell"]]) -> set[date]:
+    """Dias com post em algum site (previsto ou que já saiu hoje)."""
+    return {d for cells in plans.values() for d, cell in cells.items() if cell.kind in ("post", "published")}
 
 
 def queue_runway(days: set[date], today: date) -> int:
@@ -155,54 +152,81 @@ def default_sites(db: DB) -> list[str]:
         return list(ALL_SITES)
 
 
+def failed_pending_sites(db: DB, post: dict) -> list[str]:
+    """Sites em que a última tentativa desta arte falhou e que ainda estão pendentes."""
+    latest: dict[str, str] = {}
+    for pub in reversed(db.publications(post["id"])):  # do mais antigo para o mais novo
+        latest[pub["site"]] = pub["status"]
+    pending = set(db.pending_sites(post))
+    return [SITE_LABELS[s] for s in post["sites"] if latest.get(s) == "failed" and s in pending]
+
+
 def build(db: DB, now: datetime | None = None) -> dict:
+    from boorubot.scheduler import next_free_day, plan
+
     now = now or datetime.now()
     today = now.date()
     queue = db.queue()
-    projected = db.projected_times(now)
-    by_id = {p["id"]: p for p in queue}
+    position = {p["id"]: i + 1 for i, p in enumerate(queue)}
+    plans = plan(db, now, 14)
 
-    days = covered_days(projected, db.last_published(), today)
+    days = covered_days(plans)
     runway = queue_runway(days, today)
 
-    next_post = queue[0] if queue else None
+    # cada envio previsto: (quando, site, arte); fila por site = artes diferentes no mesmo dia
+    events = sorted(((c.when, site, c.post) for site, cells in plans.items() for c in cells.values()
+                     if c.kind == "post"), key=lambda e: (e[0], ALL_SITES.index(e[1])))
+
     next_info = None
-    if next_post:
-        when = projected[next_post["id"]]
+    if events:
+        when, _, post = events[0]
+        sites = [SITE_LABELS[s] for w, s, p in events if p["id"] == post["id"] and w.date() == when.date()]
         next_info = {
-            "post": next_post, "when": when, "countdown": countdown(when - now),
-            "is_today": when.date() == today,
+            "post": post, "when": when, "countdown": countdown(when - now), "is_today": when.date() == today,
             "when_label": ("hoje" if when.date() == today else day_label(when.date(), today)) + when.strftime(" %H:%M"),
-            "sites": [SITE_LABELS[s] for s in next_post["sites"]],
+            "sites": sites,
         }
 
     week = []
     for i in range(7):
         day = today + timedelta(days=i)
-        post_id = next((pid for pid, when in projected.items() if when.date() == day), None)
+        posts, seen = [], set()
+        for when, site, post in events:
+            if when.date() == day and post["id"] not in seen:
+                seen.add(post["id"])
+                posts.append((post, when))
+        main = posts[0] if posts else (None, None)
         week.append({
             "day": day, "label": day_label(day, today), "today": i == 0,
-            "post": by_id.get(post_id), "when": projected.get(post_id),
-            "position": list(projected).index(post_id) + 1 if post_id else None,
+            "post": main[0], "when": main[1], "extra": [p for p, _ in posts[1:]],
+            "position": position.get(main[0]["id"]) if main[0] else None,
         })
+    today_posts = {p["id"]: p for w, s, p in events if w.date() == today}
+    today_sites = len({s for w, s, p in events if w.date() == today})
 
     in_use = sorted(set(default_sites(db)) | {s for p in queue for s in p["sites"]}, key=ALL_SITES.index)
     review = [p for p in db.list_posts() if p["status"] in ("draft", "failed", "partial")]
-    failed_sites = {p["id"]: [SITE_LABELS[r["site"]] for r in db.publications(p["id"]) if r["status"] == "failed"]
-                    for p in review if p["status"] in ("failed", "partial")}
+    review += [p for p in queue if failed_pending_sites(db, p) or db.uncertain_sites(p["id"])]
+    failed_sites = {p["id"]: failed_pending_sites(db, p) or
+                    [SITE_LABELS[r["site"]] for r in db.publications(p["id"]) if r["status"] == "failed"]
+                    for p in review if p["status"] != "draft"}
+    to_check = {p["id"]: [SITE_LABELS[s] for s in db.uncertain_sites(p["id"])] for p in review}
 
     return {
         "greeting": greeting(now),
         "next": next_info,
+        "today_posts": list(today_posts.values()),
+        "today_sites": today_sites,
         "runway": runway,
         "runway_low": runway < LOW_RUNWAY_DAYS,
         "missing_for_week": max(0, 7 - runway),
         "paws": [today + timedelta(days=i) in days for i in range(7)],
         "favorites": week_favorites(db, now),
-        "alert": (alerts(db, in_use, next_post) or [None])[0],
+        "alert": (alerts(db, in_use, queue[0] if queue else None) or [None])[0],
         "week": week,
         "review": review,
         "failed_sites": failed_sites,
-        "next_slot": db.projected_next(now),
+        "to_check": to_check,
+        "next_slot": next_free_day(db, default_sites(db), now),
         "to_confirm": [] if db.test_mode else db.needs_confirmation(),
     }
