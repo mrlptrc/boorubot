@@ -189,7 +189,7 @@ def test_home_with_queue_and_session_alert(db):
     failed = db.create_post("f.png", title="falhou-x", status="failed")
     db.add_publication(failed, "paheal", "failed", message="caiu")
     page = client(db).get("/").text
-    assert "Próximos 7 dias" in page and "1º · prev." in page and "2º · prev." in page
+    assert "Próximos 7 dias" in page and "1º na fila" in page and "2º na fila" in page
     assert "pediu login de novo" in page and "/sites#gelbooru" in page
     assert "rascunho-x" in page and "3 tags" in page
     assert "falhou no rule34.paheal" in page and "falhou-x" in page
@@ -200,3 +200,32 @@ def test_titles_are_escaped(db):
     db.approve(pid)
     page = client(db).get("/").text
     assert "<script>alert(1)</script>" not in page and "&lt;script&gt;" in page
+
+
+def test_week_lists_each_art_with_its_sites(db):
+    a, b = approve_n(db, 2)                                   # as duas vão para Danbooru e Gelbooru
+    c = db.create_post("c.png", title="só paheal", tags="x", sites=["paheal"])
+    db.approve(c)
+    day0 = dashboard.build(db, at(14))["week"][0]["entries"]
+    assert [(e["post"]["id"], e["sites"]) for e in day0] == [(a, ["danbooru", "gelbooru"]), (c, ["paheal"])]
+    assert not day0[0]["all_sites"] and day0[0]["site_names"] == ["Dan", "Gel"]
+    db.set_setting("delay_gelbooru", "1")                     # Gelbooru um dia depois: dia 2 tem b no Dan e a no Gel
+    day1 = dashboard.build(db, at(14))["week"][1]["entries"]
+    assert {e["post"]["id"]: e["sites"] for e in day1} == {b: ["danbooru"], a: ["gelbooru"]}
+    page = TestClient(app_mod.create_app(db, Worker(db), start_worker=False)).get("/").text
+    assert 'class="site-tag">Dan<' in page and 'class="site-tag">paheal<' in page
+
+
+def test_week_says_all_sites_when_the_art_goes_everywhere(db):
+    approve_n(db, 1)
+    entry = dashboard.build(db, at(14))["week"][0]["entries"][0]
+    assert entry["all_sites"]
+
+
+def test_week_marks_site_waiting_for_login(db):
+    approve_n(db, 1)
+    db.set_session("gelbooru", False, "sem sessão")
+    entry = dashboard.build(db, at(14))["week"][0]["entries"][0]
+    assert not entry["all_sites"] and [t["down"] for t in entry["tags"]] == [False, True]
+    page = TestClient(app_mod.create_app(db, Worker(db), start_worker=False)).get("/").text
+    assert 'class="site-tag down">Gel' in page and "esperando login" in page

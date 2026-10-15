@@ -441,6 +441,17 @@ html.sl-loading .guide-tabs { visibility: hidden; }
 .day.today .day-label { color: #e0568f; }
 .day img { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 12px; }
 .day-title { font-size: 12px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.day-label small { font-weight: 400; font-size: 12px; }
+.day-entry { align-self: stretch; display: flex; flex-direction: column; gap: 4px; text-decoration: none; color: var(--ink); min-width: 0; border-radius: 12px; }
+.day-entry:hover .day-title { color: #e0568f; }
+.day-entry.extra { flex-direction: row; align-items: center; gap: 6px; padding-top: 6px; border-top: 1.5px dashed var(--line); }
+.day .day-entry.extra img { width: 30px; height: 30px; flex: none; border-radius: 8px; }
+.day-text { display: flex; flex-direction: column; gap: 3px; min-width: 0; flex: 1; }
+.day-sites { display: flex; flex-wrap: wrap; gap: 3px; }
+.site-tag { font-size: 10.5px; font-weight: 700; line-height: 1.5; padding: 0 6px; border-radius: 99px; background: var(--pink-soft); color: var(--ink); }
+.site-tag.all { background: var(--mint); }
+.site-tag.down { position: relative; background: var(--butter); color: #6b4e00; border: 1px dashed #f2d77c; }
+.site-tag.down::before { content: "⏸ "; }
 .empty-day { background: rgba(255, 255, 255, .6); border-style: dashed; border-color: var(--line-strong); box-shadow: none; align-items: center; }
 .empty-day .day-label { align-self: flex-start; }
 .empty-day img { width: 70%; object-fit: contain; }

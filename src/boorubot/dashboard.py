@@ -13,6 +13,8 @@ from datetime import date, datetime, time, timedelta
 from boorubot.config import ALL_SITES, SITE_LABELS
 from boorubot.db import DB
 
+# nomes curtos para caber no cartão do dia (o nome completo vai no title)
+SITE_SHORT = {"danbooru": "Dan", "gelbooru": "Gel", "paheal": "paheal", "rule34us": "r34.us", "rule34xxx": "r34.xxx"}
 WEEKDAYS = ("seg", "ter", "qua", "qui", "sex", "sáb", "dom")
 LOW_RUNWAY_DAYS = 3
 
@@ -187,20 +189,27 @@ def build(db: DB, now: datetime | None = None) -> dict:
             "sites": sites,
         }
 
+    down = {s for s, sess in db.sessions().items() if not sess["ok"]}  # sem login: espera, como no calendário
+    active = [s for s in ALL_SITES if any(c.kind == "post" for c in plans.get(s, {}).values())]
     week = []
     for i in range(7):
         day = today + timedelta(days=i)
-        posts, seen = [], set()
+        entries: dict[int, dict] = {}  # uma entrada por arte; cada arte lista os sites em que sai no dia
         for when, site, post in events:
-            if when.date() == day and post["id"] not in seen:
-                seen.add(post["id"])
-                posts.append((post, when))
-        main = posts[0] if posts else (None, None)
-        week.append({
-            "day": day, "label": day_label(day, today), "today": i == 0,
-            "post": main[0], "when": main[1], "extra": [p for p, _ in posts[1:]],
-            "position": position.get(main[0]["id"]) if main[0] else None,
-        })
+            if when.date() != day:
+                continue
+            e = entries.setdefault(post["id"], {"post": post, "when": when, "sites": [],
+                                                "position": position.get(post["id"])})
+            e["sites"].append(site)
+        for e in entries.values():
+            e["all_sites"] = len(active) > 1 and e["sites"] == active
+            e["all_sites"] = e["all_sites"] and not down & set(e["sites"])
+            e["site_names"] = [SITE_SHORT[s] for s in e["sites"]]
+            e["tags"] = [{"name": SITE_SHORT[s], "down": s in down} for s in e["sites"]]
+            e["site_title"] = ", ".join(SITE_LABELS[s] + (" (esperando login)" if s in down else "")
+                                        for s in e["sites"])
+        week.append({"day": day, "label": day_label(day, today), "today": i == 0,
+                     "entries": list(entries.values())})
     today_posts = {p["id"]: p for w, s, p in events if w.date() == today}
     today_sites = len({s for w, s, p in events if w.date() == today})
 

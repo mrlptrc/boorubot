@@ -241,7 +241,7 @@ def test_home_shows_queue_positions(client, db):
     for i in ids:
         c.post(f"/posts/{i}", data={"action": "approve", "tags": "x", "sites": ["danbooru"]})
     home = c.get("/").text
-    assert "1º · prev." in home and "2º · prev." in home
+    assert "1º na fila" in home and "2º na fila" in home
     assert "1º de 2" in c.get(f"/posts/{ids[0]}").text
     c.post(f"/posts/{ids[1]}", data={"action": "first", "tags": "x", "sites": ["danbooru"]})
     assert [p["id"] for p in db.queue()] == [ids[1], ids[0]]

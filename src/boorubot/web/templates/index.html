@@ -131,14 +131,25 @@
   </div>
   <div class="week">
     {% for w in d.week %}
-      {% if w.post %}
-      <a class="day{{ ' today' if w.today }}" href="/posts/{{ w.post.id }}">
-        <span class="day-label">{{ w.label }}</span>
-        <img src="/images/{{ w.post.image }}" alt="{{ w.post.title }}">
-        <span class="day-title">{{ w.post.title or ('#' ~ w.post.id) }}</span>
-        <span class="when">{{ w.position }}º · prev. {{ w.when.strftime('%H:%M') }}</span>
-        {% if w.extra %}<span class="more" title="{{ w.extra|map(attribute='title')|join(', ') }}">+{{ w.extra|length }} em outros sites</span>{% endif %}
-      </a>
+      {% if w.entries %}
+      {% set first = w.entries[0] %}
+      <div class="day{{ ' today' if w.today }}">
+        <span class="day-label">{{ w.label }} <small>· {{ first.when.strftime('%H:%M') }}</small></span>
+        {% for e in w.entries %}
+        <a class="day-entry{{ ' main' if loop.first else ' extra' }}" href="/posts/{{ e.post.id }}"
+           title="{{ e.post.title or ('#' ~ e.post.id) }} · {{ e.position }}º na fila · sai no {{ e.site_title }}">
+          <img src="/images/{{ e.post.image }}" alt="">
+          <span class="day-text">
+            <span class="day-title">{{ e.post.title or ('#' ~ e.post.id) }}</span>
+            <span class="day-sites">
+              {% if e.all_sites %}<span class="site-tag all">todos os sites</span>
+              {% else %}{% for t in e.tags %}<span class="site-tag{{ ' down' if t.down }}">{{ t.name }}{% if t.down %}<span class="sr-only"> (esperando login)</span>{% endif %}</span>{% endfor %}{% endif %}
+            </span>
+            {% if loop.first %}<span class="when">{{ e.position }}º na fila</span>{% endif %}
+          </span>
+        </a>
+        {% endfor %}
+      </div>
       {% else %}
       <div class="day empty-day{{ ' today' if w.today }}">
         <span class="day-label">{{ w.label }}</span>
