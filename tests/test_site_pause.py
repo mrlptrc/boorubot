@@ -202,3 +202,35 @@ def test_danbooru_real_post_error_still_counts_against_the_art():
     with pytest.raises(DanbooruError) as info:
         danbooru_with("post", 422).publish(Post.load(EXAMPLE), dry_run=False)
     assert not isinstance(info.value, SiteUnavailable)
+
+
+# --- teste de sessão: motivo real na mensagem ------------------------------------------------------
+
+def test_session_message_says_why():
+    msg = forms.FormSite._session_message
+    assert msg(True, False, True) == "sessão ativa"
+    assert "captcha" in msg(False, True, False)
+    assert "não registrou o login" in msg(False, False, False)
+    assert "permissão" in msg(False, False, True)
+
+
+def test_login_cookie_detection_accepts_prefix():
+    class Ctx:
+        def __init__(self, names):
+            self.names = names
+
+        def cookies(self):
+            return [{"name": n} for n in self.names]
+
+    class Pg:
+        def __init__(self, names):
+            self.context = Ctx(names)
+
+    assert forms.Paheal()._logged_in(Pg(["shm_user", "shm_session", "_ga"]))
+    assert not forms.Paheal()._logged_in(Pg(["shm_accepted_terms", "_ga"]))
+    assert forms.Rule34us()._logged_in(Pg(["user_id", "pass_hash"]))
+    assert not forms.Rule34xxx()._logged_in(Pg(["cf_clearance"]))
+
+
+def test_rule34us_upload_page_is_posts_create():
+    assert forms.Rule34us.upload_url.endswith("r=posts/create")

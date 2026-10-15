@@ -41,6 +41,8 @@ class FormSite(Site):
     needs_headed = False
     # modo do navegador no ENVIO REAL; pode ser trocado por site no painel (settings browser_mode_<site>)
     send_mode = "headless"
+    # cookies que o site só grava depois do login: dizem se a pessoa chegou a entrar na conta
+    login_cookies: tuple[str, ...] = ("user_id", "pass_hash")
     login_timeout_ms = 10 * 60 * 1000
     captcha_timeout_s = 5 * 60
 
@@ -65,9 +67,10 @@ class FormSite(Site):
         A pessoa entra, resolve captcha se tiver e FECHA a janela; a sessão fica em .profiles/<site>."""
         with open_page(self.name, self.browser_mode("login")) as page:
             page.goto(self.login_url)
+            # .first: o paheal tem dois formulários de login na mesma página (lateral e centro)
             if self.username and self.password and page.locator("input[name=pass]").count():
-                page.fill("input[name=user]", self.username)
-                page.fill("input[name=pass]", self.password)
+                page.locator("input[name=user]").first.fill(self.username)
+                page.locator("input[name=pass]").first.fill(self.password)
             page.wait_for_event("close", timeout=self.login_timeout_ms)
         return self.session_check()
 
@@ -76,12 +79,31 @@ class FormSite(Site):
         out = run_dir(self.name)
         with open_page(self.name, self.browser_mode("session")) as page:
             page.goto(self.upload_url)
-            self._wait_captcha(page, 20)
+            captcha = not self._wait_captcha(page, 20)
             ok = self._has_upload_form(page)
             dump_forms(page, out / "upload-forms.json")  # diagnóstico dos campos reais
             shot = screenshot(page, out / "session.png")
-        msg = "sessão ativa" if ok else "sem sessão: faça o login de novo"
-        return Result(self.name, ok=ok, dry_run=True, message=msg, artifacts=[shot])
+            logged = self._logged_in(page)
+        return Result(self.name, ok=ok, dry_run=True, message=self._session_message(ok, captcha, logged),
+                      artifacts=[shot])
+
+    def _logged_in(self, page: Page) -> bool:
+        names = {c["name"] for c in page.context.cookies()}
+        # aceita prefixo (Shimmie usa <prefixo>_user / <prefixo>_session)
+        return all(any(n == want or n.endswith("_" + want) for n in names) for want in self.login_cookies)
+
+    @staticmethod
+    def _session_message(ok: bool, captcha: bool, logged: bool) -> str:
+        """Diz o motivo real, para a pessoa saber o que fazer."""
+        if ok:
+            return "sessão ativa"
+        if captcha:
+            return "o site pediu captcha: clique em Entrar e resolva na janela"
+        if not logged:
+            return ("o site não registrou o login: clique em Entrar, entre na sua conta e só feche "
+                    "a janela depois de ver que está logada")
+        return "logada, mas a página de upload não abriu (a conta pode não ter permissão de enviar)"
+
 
     def _wait_captcha(self, page: Page, timeout_s: int) -> bool:
         """Espera o captcha/challenge sumir (sozinho ou resolvido pela pessoa)."""
@@ -182,6 +204,9 @@ class FormSite(Site):
         self._fill_text(form, "source", post.source)
         self._fill_text(form, "title", post.title)
         self._set_rating(form, post.rating)
+        # rule34.us só mostra source/tags (com animação) depois de escolher o arquivo:
+        # espera terminar para o print mostrar o que foi preenchido
+        page.wait_for_timeout(1000)
 
     # --- heurísticas -----------------------------------------------------------
 
@@ -266,6 +291,7 @@ class Paheal(FormSite):
     home_url = "https://rule34.paheal.net/"
     login_url = "https://rule34.paheal.net/user_admin/login"
     upload_url = "https://rule34.paheal.net/upload"
+    login_cookies = ("user", "session")  # Shimmie: shm_user / shm_session
     success_url = re.compile(r"/post/view/\d+")
 
     def check_rules(self, post: Post) -> None:
@@ -278,8 +304,9 @@ class Rule34us(FormSite):
     name = "rule34us"
     home_url = "https://rule34.us/"
     login_url = "https://rule34.us/index.php?r=account/login"
-    # URL do upload ainda não confirmada: sem login o site redireciona. Conferir com `discover`.
-    upload_url = "https://rule34.us/index.php?r=posts/upload"
+    # conferido logado: não há link no menu; o formulário fica em posts/create
+    # (arquivo; source e tags aparecem depois de escolher o arquivo; não tem campo de rating)
+    upload_url = "https://rule34.us/index.php?r=posts/create"
     rating_values = {
         "general": ["safe", "s", "general"],
         "sensitive": ["questionable", "q"],
