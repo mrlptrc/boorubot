@@ -15,6 +15,12 @@ class SiteUnavailable(Exception):
     O site inteiro pausa até a sessão voltar; nenhuma arte perde tentativa."""
 
 
+class AccountRefused(SiteUnavailable):
+    """O site recusou o envio por causa da CONTA (ex.: Gelbooru "not enough reputation").
+    Nada foi publicado. O site fica bloqueado até uma pessoa clicar em Testar/Entrar:
+    o re-teste automático não insiste, para o robô não ficar batendo na conta."""
+
+
 @dataclass
 class Result:
     site: str

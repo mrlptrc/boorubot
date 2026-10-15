@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 import httpx
+from fastapi.testclient import TestClient
 import pytest
 
 from boorubot import worker as worker_mod
@@ -234,3 +235,40 @@ def test_login_cookie_detection_accepts_prefix():
 
 def test_rule34us_upload_page_is_posts_create():
     assert forms.Rule34us.upload_url.endswith("r=posts/create")
+
+
+# --- conta recusada pelo site (ex.: Gelbooru sem reputação) ---------------------------------------
+
+def test_account_refused_blocks_site_until_a_person_tests(db):
+    from boorubot.sites.base import AccountRefused
+
+    class Refused(Fake):
+        def publish(self, post, dry_run=True):
+            Fake.calls += 1
+            raise AccountRefused("o site recusou o envio por causa da conta")
+
+    worker_mod.build_site = lambda n, db=None, test=False: Refused(n)
+    a = art(db, "a")
+    assert publish_site(db, a, "gelbooru") == "site_down"
+    assert db.failures_in_a_row(a, "gelbooru") == 0 and db.get_post(a)["status"] == "approved"
+    assert db.setting("blocked_gelbooru") == "1"
+    db.set_setting("recheck_gelbooru", (datetime.now() - timedelta(hours=2)).isoformat(timespec="seconds"))
+    w = Worker(db)
+    w.tick()
+    assert w.jobs.empty()                                     # não re-testa sozinho
+    client = TestClient(app_mod.create_app(db, w, start_worker=False))
+    client.post("/sites/gelbooru/session")                    # a pessoa clicou em Testar
+    assert db.setting("blocked_gelbooru") == "" and [j.kind for j in w.jobs.queue] == ["session"]
+
+
+def test_refusal_text_is_recognized():
+    class Pg:
+        def __init__(self, text):
+            self.text = text
+
+        def inner_text(self, sel):
+            return self.text
+
+    gel = "Your account does not have enough reputation to add images to the site.\n\nPlease try again later"
+    assert "enough reputation" in forms.FormSite._account_refused(Pg(gel))
+    assert forms.FormSite._account_refused(Pg("Post added! view it here")) == ""

@@ -13,7 +13,7 @@ import re
 from playwright.sync_api import Page
 
 from boorubot.models import Post
-from boorubot.sites.base import Result, Site, SiteUnavailable, SkipPost
+from boorubot.sites.base import AccountRefused, Result, Site, SiteUnavailable, SkipPost
 from boorubot.sites.browser import (
     BROWSER_MODES, captcha_present, dump_forms, open_page, reveal_window, run_dir, screenshot,
 )
@@ -27,6 +27,11 @@ class FormSiteError(RuntimeError):
 
 class FormSiteDown(FormSiteError, SiteUnavailable):
     """Sem sessão, captcha ou site fora do ar: pausa o site, não conta contra a arte."""
+
+
+# página depois do envio dizendo que a CONTA não pode enviar (nada foi publicado)
+ACCOUNT_REFUSED = re.compile(
+    r"not have enough reputation|lacks permission|permission denied|not allowed to (upload|add)", re.I)
 
 
 class FormSite(Site):
@@ -86,6 +91,19 @@ class FormSite(Site):
             logged = self._logged_in(page)
         return Result(self.name, ok=ok, dry_run=True, message=self._session_message(ok, captcha, logged),
                       artifacts=[shot])
+
+    @staticmethod
+    def _account_refused(page: Page) -> str:
+        """Frase do site recusando a conta (ou "" se não houver)."""
+        try:
+            text = page.inner_text("body")
+        except Exception:
+            return ""
+        m = ACCOUNT_REFUSED.search(text)
+        if not m:
+            return ""
+        line = next((ln.strip() for ln in text.splitlines() if m.group(0).lower() in ln.lower()), m.group(0))
+        return line[:200]
 
     def _logged_in(self, page: Page) -> bool:
         names = {c["name"] for c in page.context.cookies()}
@@ -191,6 +209,10 @@ class FormSite(Site):
             except Exception as exc:
                 return Result(self.name, ok=False, dry_run=False, artifacts=[filled], info={"uncertain": True},
                               message=f"erro depois do clique em enviar ({type(exc).__name__}: {exc}); confira no site")
+            refused = self._account_refused(page)
+            if refused:
+                raise AccountRefused(f"o site recusou o envio por causa da conta: \"{refused}\". "
+                                     f"Nada foi publicado. print: {done}")
             if self.success_url.search(page.url):
                 return Result(self.name, ok=True, dry_run=False, message="post criado", url=page.url,
                               artifacts=[filled, done])

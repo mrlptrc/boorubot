@@ -13,7 +13,7 @@ from datetime import datetime
 from boorubot.config import ALL_SITES, build_site
 from boorubot.db import DB, to_post
 from boorubot.scheduler import BACKOFF, RECHECK_EVERY, pending_posts, rule_skips, site_due
-from boorubot.sites.base import SiteUnavailable, SkipPost
+from boorubot.sites.base import AccountRefused, SiteUnavailable, SkipPost
 
 log = logging.getLogger("boorubot.worker")
 
@@ -40,6 +40,8 @@ def _send(db: DB, post, post_id: int, site: str) -> str:
         status = "site_down"
         db.add_publication(post_id, site, status, message=str(exc))
         db.set_session(site, False, str(exc)[:300])
+        if isinstance(exc, AccountRefused):
+            db.set_setting(f"blocked_{site}", "1")  # só uma pessoa libera (Testar/Entrar)
         log.warning("site %s pausado: %s", site, exc)
     except Exception as exc:  # uma falha num site não impede os outros
         status = "failed"
@@ -239,6 +241,8 @@ class Worker:
         for site, sess in self.db.sessions().items():
             if site not in ALL_SITES or sess["ok"] or not pending_posts(self.db, site):
                 continue
+            if self.db.setting(f"blocked_{site}") == "1":
+                continue  # conta recusada pelo site: re-testar sozinho não resolve e pode piorar
             last = self.db.setting(f"recheck_{site}")
             if last and now - datetime.fromisoformat(last) < RECHECK_EVERY:
                 continue

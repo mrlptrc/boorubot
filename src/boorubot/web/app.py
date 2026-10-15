@@ -399,6 +399,7 @@ def create_app(db: DB | None = None, worker: Worker | None = None, start_worker:
         if kind == "login" and name == "danbooru":
             raise HTTPException(400, "Danbooru conecta por chave de API, não precisa de login no navegador")
         label = f"{'login' if kind == 'login' else 'testar sessão'} {SITE_LABELS[name]}"
+        db.set_setting(f"blocked_{name}", "")  # uma pessoa pediu: libera site bloqueado por recusa da conta
         worker.submit(kind, name, label)
         return see_other("/sites")
 
