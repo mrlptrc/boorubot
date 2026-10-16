@@ -23,7 +23,7 @@
 
       <div class="tags-head">
         <span>Tags <small>separadas por espaço, padrão Danbooru (long_hair, 1girl...)</small></span>
-        <button type="button" class="ghost" id="suggest">✨ Sugerir com IA</button>
+        <button type="button" class="ghost" id="suggest">✨ Sugerir de novo</button>
       </div>
       <textarea name="tags" id="tags" rows="6" placeholder="1girl long_hair commission ...">{{ post.tags }}</textarea>
       <p class="muted small" id="suggest-info"></p>
@@ -175,27 +175,33 @@
 {% endif %}
 
 <script>
-  document.getElementById("suggest").addEventListener("click", async (ev) => {
-    const btn = ev.currentTarget, info = document.getElementById("suggest-info");
-    btn.disabled = true; btn.textContent = "Analisando...";
-    info.textContent = "Na primeira vez o modelo é baixado (~380 MB), pode demorar alguns minutos.";
-    try {
-      const r = await fetch("/posts/{{ post.id }}/suggest", { method: "POST" });
-      if (!r.ok) throw new Error(await r.text());
-      const s = await r.json();
-      const box = document.getElementById("tags");
-      const current = box.value.split(/\s+/).filter(Boolean);
-      const added = s.tags.filter(t => !current.includes(t));
-      box.value = current.concat(added).join(" ");
-      document.getElementById("rating").value = s.rating;
-      const pct = Object.entries(s.rating_scores).map(([k, v]) => `${k} ${Math.round(v * 100)}%`).join(" · ");
-      info.textContent = `+${added.length} tags sugeridas` + (s.characters.length ? ` (personagens: ${s.characters.join(", ")})` : "") +
-        `. Rating sugerido: ${s.rating} (${pct}). Revise antes de aprovar.`;
-    } catch (e) {
-      info.textContent = "Falhou: " + e.message;
-    } finally {
-      btn.disabled = false; btn.textContent = "✨ Sugerir com IA";
+  (() => {
+    const btn = document.getElementById("suggest"), info = document.getElementById("suggest-info");
+    const box = document.getElementById("tags");
+    const base = "/posts/{{ post.id }}/suggest";
+    let timer = null;
+    const show = (st) => {
+      if (st.state === "pendente") info.textContent = st.waiting ? `A IA vai olhar esta arte em seguida (${st.waiting} na frente).` : "A IA vai olhar esta arte agora.";
+      else if (st.state === "analisando") info.textContent = st.model_ready ? "A IA está olhando a arte…" : "Na primeira vez a IA baixa o modelo de tags (380 MB), pode levar alguns minutos.";
+      else if (st.state === "falhou") info.textContent = "A IA não conseguiu analisar: " + st.error;
+      else if (st.state === "pronta") {
+        const current = box.value.split(/\s+/).filter(Boolean);
+        const added = st.tags.filter(t => !current.includes(t));
+        box.value = current.concat(added).join(" ");
+        info.textContent = added.length ? `+${added.length} tags da IA. Revise antes de aprovar.` : "A IA já olhou esta arte.";
+      }
+      const busy = st.state === "pendente" || st.state === "analisando";
+      btn.disabled = busy;
+      if (busy && !timer) timer = setInterval(poll, 2000);
+      if (!busy && timer) { clearInterval(timer); timer = null; }
+    };
+    async function poll() {
+      try { show(await (await fetch(base + "/status")).json()); } catch (e) {}
     }
-  });
+    btn.addEventListener("click", async () => {
+      try { show(await (await fetch(base, { method: "POST" })).json()); } catch (e) { info.textContent = "Falhou: " + e.message; }
+    });
+    {% if post.suggest_state in ('pendente', 'analisando') %}poll();{% endif %}
+  })();
 </script>
 {% endblock %}
