@@ -103,6 +103,17 @@ def create_app(db: DB | None = None, worker: Worker | None = None, start_worker:
                       "href": "/guia#valendo"})
         return steps
 
+    def approval_errors(row: dict) -> list[str]:
+        """O que falta para aprovar, testar ou publicar (mesma lista na tela e no backend)."""
+        errors = []
+        if not row["tags"]:
+            errors.append("sem tags")
+        if row["rating"] not in RATINGS:
+            errors.append("escolha o rating")
+        if not row["sites"]:
+            errors.append("nenhum site marcado")
+        return errors
+
     def post_or_404(post_id: int) -> dict:
         row = db.get_post(post_id)
         if not row:
@@ -124,7 +135,8 @@ def create_app(db: DB | None = None, worker: Worker | None = None, start_worker:
             raise HTTPException(400, f"formato não suportado: {ext or '?'} (use {', '.join(IMAGE_EXTS)})")
         filename = f"{uuid.uuid4().hex}{ext}"
         (IMAGES_DIR / filename).write_bytes(await image.read())
-        post_id = db.create_post(filename, title=Path(image.filename).stem, sites=default_sites(),
+        # rating vazio = "não escolhido": nunca sai um rating que ninguém conferiu
+        post_id = db.create_post(filename, title=Path(image.filename).stem, sites=default_sites(), rating="",
                                  tags=" ".join(normalize_tags(db.setting("default_tags"))))
         worker.submit_suggest(post_id)  # fila própria da IA: não atrasa nenhum envio
         return see_other(f"/posts/{post_id}")
@@ -149,6 +161,7 @@ def create_app(db: DB | None = None, worker: Worker | None = None, start_worker:
         return render(
             request, "post.html", post=row, pubs=db.publications(post_id), tests=db.test_runs(post_id), error=erro,
             default_tags=normalize_tags(db.setting("default_tags")), mochi=mochi_note(row),
+            approval_errors=approval_errors(row),
             metrics=db.latest_metrics(),
             has_test_account=bool(db.setting("danbooru_test_api_key")),
             projected=min(planned) if planned else None, site_days=site_days, today=today.isoformat(),
@@ -227,7 +240,7 @@ def create_app(db: DB | None = None, worker: Worker | None = None, start_worker:
         action: str = Form("save"),
         title: str = Form(""),
         tags: str = Form(""),
-        rating: str = Form("general"),
+        rating: str = Form(""),
         source: str = Form(""),
         commentary_title: str = Form(""),
         commentary_description: str = Form(""),
@@ -247,7 +260,7 @@ def create_app(db: DB | None = None, worker: Worker | None = None, start_worker:
             db.update_post(
                 post_id, title=title.strip(), tags=" ".join(tag_list), **accept_weak(row, tag_list),
                 **oc_fields(row, original_character),
-                rating=rating if rating in RATINGS else "general", source=source.strip(),
+                rating=rating if rating in RATINGS else "", source=source.strip(),
                 commentary_title=commentary_title.strip(), commentary_description=commentary_description.strip(),
                 original_character=original_character, sites=[s for s in ALL_SITES if s in sites],
             )
@@ -256,11 +269,7 @@ def create_app(db: DB | None = None, worker: Worker | None = None, start_worker:
             return see_other(f"/posts/{post_id}?erro=" + quote(
                 "modo teste ligado: nada é publicado. Use \"Testar este post\" ou desligue o modo teste em Sites."))
         if action in ("approve", "publish_now", "test"):
-            errors = []
-            if not db.get_post(post_id)["tags"]:
-                errors.append("sem tags")
-            if not sites:
-                errors.append("nenhum site marcado")
+            errors = approval_errors(db.get_post(post_id))
             if errors:
                 return see_other(f"/posts/{post_id}?erro=" + quote("não dá para aprovar: " + ", ".join(errors)))
         if action == "approve":
@@ -298,6 +307,7 @@ def create_app(db: DB | None = None, worker: Worker | None = None, start_worker:
             "model_ready": (worker.tagger or tagger).model_ready,
             "tags": row["tag_list"], "scores": row["tag_scores"], "weak": row["weak_tags"],
             "original_character": row["original_character"], "mochi": mochi_note(row),
+            "rating_suggestion": row["rating_suggestion"], "rating_confidence": row["rating_confidence"],
         }
 
     @app.post("/posts/{post_id}/suggest")
