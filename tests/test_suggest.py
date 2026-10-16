@@ -164,3 +164,33 @@ def test_tagger_splits_weak_suggestions():
     s = t.suggest(Path("x.png"))
     assert [g for g, _ in s.general] == ["smile"] and [w for w, _ in s.weak] == ["blush"]
     assert [c for c, _ in s.characters] == ["other_char"]  # personagem abaixo de 0,85 não entra
+
+
+def test_no_character_marks_oc_and_mochi_explains(db):
+    w = Worker(db, tagger=FakeTagger())
+    c = TestClient(app_mod.create_app(db, w, start_worker=False))
+    post_id = db.create_post("x.png", sites=["danbooru", "paheal"])
+    run_suggestion(db, post_id, FakeTagger(characters=[]))
+    row = db.get_post(post_id)
+    assert row["original_character"] and row["oc_auto"]
+    note = c.get(f"/posts/{post_id}/suggest/status").json()["mochi"]
+    assert "nenhum personagem conhecido" in note and "paheal" in note
+
+
+def test_character_found_does_not_mark_oc(db):
+    post_id = db.create_post("x.png")
+    run_suggestion(db, post_id, FakeTagger(characters=[("hatsune_miku", 0.97)]))
+    assert not db.get_post(post_id)["original_character"]
+
+
+def test_unchecked_oc_is_not_marked_again(db):
+    w = Worker(db, tagger=FakeTagger())
+    c = TestClient(app_mod.create_app(db, w, start_worker=False))
+    post_id = db.create_post("x.png", tags="a")
+    run_suggestion(db, post_id, FakeTagger())
+    assert db.get_post(post_id)["original_character"]
+    # ela desmarca (o checkbox desmarcado não vai no form)
+    c.post(f"/posts/{post_id}", data={"action": "save", "tags": "a", "sites": ["danbooru"]})
+    run_suggestion(db, post_id, FakeTagger())  # "sugerir de novo"
+    row = db.get_post(post_id)
+    assert not row["original_character"] and row["oc_touched"] and not row["oc_auto"]
