@@ -5,7 +5,7 @@
 <p><a href="/">&larr; Fila</a></p>
 {% if error %}<div class="alert">{{ error }}</div>{% endif %}
 
-<div class="post-layout">
+<div class="post-layout v2">
   <figure class="preview card">
     <img src="/images/{{ post.image }}" alt="">
     <figcaption>
@@ -25,7 +25,9 @@
         <span>Tags <small>separadas por espaço, padrão Danbooru (long_hair, 1girl...)</small></span>
         <button type="button" class="ghost" id="suggest">✨ Sugerir de novo</button>
       </div>
-      <textarea name="tags" id="tags" rows="6" placeholder="1girl long_hair commission ...">{{ post.tags }}</textarea>
+      <div class="tag-field" data-tag-field='{{ {"scores": post.tag_scores, "weak": post.weak_tags, "defaults": default_tags}|tojson|forceescape }}'>
+        <textarea name="tags" id="tags" rows="6" placeholder="1girl long_hair commission ...">{{ post.tags }}</textarea>
+      </div>
       <p class="muted small" id="suggest-info"></p>
 
       <div class="row">
@@ -174,10 +176,10 @@
 </table>
 {% endif %}
 
+<script src="/static/editor.js"></script>
 <script>
   (() => {
     const btn = document.getElementById("suggest"), info = document.getElementById("suggest-info");
-    const box = document.getElementById("tags");
     const base = "/posts/{{ post.id }}/suggest";
     let timer = null;
     const show = (st) => {
@@ -185,10 +187,8 @@
       else if (st.state === "analisando") info.textContent = st.model_ready ? "A IA está olhando a arte…" : "Na primeira vez a IA baixa o modelo de tags (380 MB), pode levar alguns minutos.";
       else if (st.state === "falhou") info.textContent = "A IA não conseguiu analisar: " + st.error;
       else if (st.state === "pronta") {
-        const current = box.value.split(/\s+/).filter(Boolean);
-        const added = st.tags.filter(t => !current.includes(t));
-        box.value = current.concat(added).join(" ");
-        info.textContent = added.length ? `+${added.length} tags da IA. Revise antes de aprovar.` : "A IA já olhou esta arte.";
+        const added = window.boorubotEditor.tagField.update(st);
+        info.textContent = added ? `+${added} tags da IA. Revise antes de aprovar.` : "A IA já olhou esta arte.";
       }
       const busy = st.state === "pendente" || st.state === "analisando";
       btn.disabled = busy;
