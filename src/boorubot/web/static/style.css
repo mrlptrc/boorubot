@@ -578,3 +578,55 @@ html.sl-loading .guide-tabs { visibility: hidden; }
 .s-uncertain { background: var(--peach); color: var(--warn); }
 .s-not_published { background: var(--line); color: var(--ink); }
 .s-site_down { background: var(--butter); color: #6b4e00; }
+
+/* --- v2 (editor da arte, Nova arte) -------------------------------------
+   Padrão visual da v2: menos caixas, Quicksand nos títulos, Nunito no texto,
+   acento rosa só na ação principal. Vale para tudo dentro de .v2. */
+:root {
+  --v2-bg: #FFF6FA; --v2-surface: #FFFFFF; --v2-ink: #3B2234; --v2-muted: #7A5A6E;
+  --v2-line: #F6D9E5; --v2-pink-soft: #FFE4EE; --v2-accent: #E8467F; --v2-primary: #CF336B;
+  --v2-info: #7B5BD6; --v2-info-bg: #EFE9FF; --v2-ok: #2E7D5B; --v2-ok-bg: #DDF4E8;
+  --v2-warn: #7A5600; --v2-warn-bg: #FFE7A3; --v2-bad: #B3263E; --v2-bad-bg: #FDE3E7;
+  --v2-title: "Quicksand", "Nunito", "Segoe UI", system-ui, sans-serif;
+  --v2-text: "Nunito", "Segoe UI", system-ui, sans-serif;
+}
+.v2 { color: var(--v2-ink); font: 400 15px/1.55 var(--v2-text); }
+.v2 h1, .v2 h2, .v2 h3 { font-family: var(--v2-title); font-weight: 700; color: var(--v2-ink); }
+.v2 h2::before { content: none; }
+.v2 :focus-visible { outline: 3px solid var(--v2-accent); outline-offset: 2px; }
+.v2 button { font-family: var(--v2-text); }
+.v2 .link-btn {
+  background: none; border: 0; box-shadow: none; padding: 0 4px; min-height: 44px; color: var(--v2-primary);
+  font: 700 14px var(--v2-text); text-decoration: underline; text-underline-offset: 3px; cursor: pointer;
+}
+
+/* tags: etiquetas com a confiança da IA */
+.tag-field.enhanced textarea { display: none; }
+.tag-chips { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; }
+.tag {
+  display: inline-flex; align-items: center; gap: 4px; min-height: 36px; padding: 0 4px 0 12px; border-radius: 999px;
+  font: 700 14px/1 var(--v2-text); background: #F7F1F4; color: var(--v2-ink); border: 1.5px solid transparent;
+}
+.tag-sure { background: var(--v2-ok-bg); color: var(--v2-ok); }
+.tag-check { background: var(--v2-warn-bg); color: var(--v2-warn); }
+.tag-default { background: var(--v2-info-bg); color: var(--v2-info); }
+.tag-new { background: var(--v2-warn-bg); color: var(--v2-warn); border-color: var(--v2-warn); border-style: dashed; }
+.tag-own { background: #F7F1F4; }
+.tag-pct { font-weight: 600; font-size: 13px; opacity: .85; }
+.tag-x {
+  display: inline-grid; place-items: center; width: 32px; height: 32px; min-height: 0; padding: 0; margin: 0;
+  border-radius: 50%; border: 0; box-shadow: none; background: transparent; color: inherit; cursor: pointer;
+}
+.tag-x svg { width: 14px; height: 14px; }
+.tag-x:hover { background: rgba(0, 0, 0, .07); transform: none; }
+.tag-input {
+  margin-top: 10px; width: 100%; min-height: 44px; padding: 8px 14px; border-radius: 12px;
+  border: 1.5px solid var(--v2-line); background: var(--v2-surface); font: 400 15px var(--v2-text); color: var(--v2-ink);
+}
+.tag-weak { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 10px; }
+.tag-weak-label { color: var(--v2-muted); font-size: 14px; font-weight: 700; margin-right: 2px; }
+.tag-add {
+  min-height: 36px; padding: 0 12px; border-radius: 999px; border: 1.5px solid var(--v2-line); box-shadow: none;
+  background: var(--v2-surface); color: var(--v2-ink); font: 700 14px var(--v2-text); cursor: pointer;
+}
+.tag-add:hover { border-color: var(--v2-accent); transform: none; }
