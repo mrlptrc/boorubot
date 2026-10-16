@@ -37,6 +37,7 @@ STATUS_LABELS = {
     "uncertain": "conferir no site", "not_published": "não saiu (conferido)",
     "site_down": "site pausado (login/captcha/fora do ar)",
     "dry_run": "simulado", "test_upload": "enviado ao testbooru",
+    "deleted": "apagada",
 }
 
 
@@ -284,6 +285,12 @@ def create_app(db: DB | None = None, worker: Worker | None = None, start_worker:
         db.pin(post_id, site, when)
         return None
 
+    @app.post("/posts/{post_id}/desfazer")
+    def undo_delete(post_id: int):
+        if not db.restore_post(post_id):
+            return see_other("/?aviso=" + quote("Não deu para desfazer: a arte já foi removida de vez."))
+        return see_other(f"/posts/{post_id}?aviso=" + quote("Arte de volta."))
+
     @app.post("/posts/{post_id}/conferir")
     def check_uncertain(post_id: int, site: str = Form(...), action: str = Form(...), url: str = Form("")):
         """Envio incerto: uma pessoa olhou no site e diz se saiu. Só ela decide reenviar (sem duplicata)."""
@@ -337,10 +344,9 @@ def create_app(db: DB | None = None, worker: Worker | None = None, start_worker:
         sites: list[str] = Form([]),
     ):
         row = post_or_404(post_id)
-        if action == "delete":
+        if action == "delete":  # esconde; o worker remove de vez depois de 24 h
             db.delete_post(post_id)
-            (IMAGES_DIR / row["image"]).unlink(missing_ok=True)
-            return see_other("/")
+            return see_other(f"/?aviso={quote('Arte apagada')}&desfazer={post_id}")
 
         if row["status"] in EDITABLE:
             db.update_post(post_id, **clean_post_fields(row, {
@@ -551,7 +557,8 @@ def create_app(db: DB | None = None, worker: Worker | None = None, start_worker:
 
     @app.get("/historico")
     def history(request: Request):
-        return render(request, "history.html", pubs=db.publications(limit=200), metrics=db.latest_metrics(),
+        pubs = [p for p in db.publications(limit=200) if p["post_status"] != "deleted"]
+        return render(request, "history.html", pubs=pubs, metrics=db.latest_metrics(),
                       metrics_last_run=db.setting("metrics_last_run"))
 
     @app.get("/calendario")
