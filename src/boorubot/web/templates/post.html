@@ -31,12 +31,27 @@
       </div>
       <p class="muted small" id="suggest-info"></p>
 
+      {% set rating_cards = [
+        ('general', 'Geral', 'sem nudez nem insinuação'),
+        ('sensitive', 'Sensível', 'decote, roupa de banho, insinuação leve'),
+        ('questionable', 'Questionável', 'nudez sem ato sexual'),
+        ('explicit', 'Explícito', 'sexo ou genitais à mostra'),
+      ] %}
+      <fieldset class="rating-pick" id="rating" data-suggestion="{{ post.rating_suggestion }}">
+        <legend>Rating {% if not post.rating %}<span class="need">escolha um</span>{% endif %}</legend>
+        <div class="rating-cards">
+          {% for value, label, example in rating_cards %}
+          <label class="rating-card{{ ' suggested' if post.rating_suggestion == value }}">
+            <input type="radio" name="rating" value="{{ value }}" {{ 'checked' if post.rating == value }}>
+            <span class="rating-name">{{ label }}</span>
+            <span class="rating-example">{{ example }}</span>
+            <span class="rating-ai" {{ 'hidden' if post.rating_suggestion != value }}>sugestão da IA{% if post.rating_confidence %} · {{ (post.rating_confidence * 100)|round|int }}%{% endif %}</span>
+          </label>
+          {% endfor %}
+        </div>
+      </fieldset>
+
       <div class="row">
-        <label>Rating
-          <select name="rating" id="rating">
-            {% for r in RATINGS %}<option value="{{ r }}" {{ 'selected' if post.rating == r }}>{{ RATINGS_PT[r] }}</option>{% endfor %}
-          </select>
-        </label>
         <label>Link original (source) <input name="source" value="{{ post.source }}" placeholder="https://x.com/..."></label>
       </div>
 
@@ -77,7 +92,8 @@
     <div class="actions">
       {% if editable %}<button name="action" value="save" class="ghost">Salvar</button>{% endif %}
       {% if post.status == 'draft' %}
-        <button name="action" value="approve" class="primary">Aprovar e agendar</button>
+        <button name="action" value="approve" class="primary" data-needs-ready>Aprovar e agendar</button>
+        <p class="approve-why" id="approve-why" role="status" {{ 'hidden' if not approval_errors }}>{% if approval_errors %}Falta: {{ approval_errors|join(', ') }}{% endif %}</p>
       {% elif post.status == 'approved' %}
         <button name="action" value="unapprove" class="ghost">Voltar para rascunho</button>
         {% if post.approved_in_test and not test_mode %}<button name="action" value="confirm" class="primary"
@@ -191,6 +207,13 @@
         const added = window.boorubotEditor.tagField.update(st);
         info.textContent = added ? `+${added} tags da IA. Revise antes de aprovar.` : "A IA já olhou esta arte.";
         document.getElementById("original_character").checked = st.original_character;
+        document.querySelectorAll(".rating-card").forEach((card) => {
+          const on = card.querySelector("input").value === st.rating_suggestion;
+          card.classList.toggle("suggested", on);
+          const badge = card.querySelector(".rating-ai");
+          badge.hidden = !on;
+          if (on && st.rating_confidence) badge.textContent = `sugestão da IA · ${Math.round(st.rating_confidence * 100)}%`;
+        });
         const note = document.getElementById("mochi-note");
         note.hidden = !st.mochi; note.querySelector("span").textContent = st.mochi;
       }
