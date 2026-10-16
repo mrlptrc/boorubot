@@ -124,10 +124,13 @@
                   {%- endif %}
                 </span>
                 {% if r.test %}
-                <span class="site-row-test {{ 'bad' if r.test.status == 'failed' else 'ok' }}">
-                  {%- if r.test.status == 'failed' %}teste falhou às {{ r.test.created_at[11:16] }}: {{ r.test.message|truncate(140) }}
-                  {%- elif r.test.status == 'skipped' %}teste às {{ r.test.created_at[11:16] }}: pulado ({{ r.test.message|truncate(100) }})
-                  {%- else %}teste ok às {{ r.test.created_at[11:16] }}{% endif -%}
+                {% set t = r.test %}
+                {% set at = ('às ' if t.created_at[:10] == today else t.created_at[8:10] ~ '/' ~ t.created_at[5:7] ~ ' às ') ~ t.created_at[11:16] %}
+                <span class="site-row-test {{ 'bad' if t.status == 'failed' else 'ok' }}">
+                  {%- if t.status == 'failed' %}teste falhou {{ at }}: {{ t.message|truncate(160) }}
+                  {%- elif t.status == 'skipped' %}<span class="muted">teste {{ at }}: pulado ({{ t.message|truncate(100) }})</span>
+                  {%- elif t.status == 'test_upload' %}teste ok {{ at }} (enviado ao testbooru)
+                  {%- else %}teste ok {{ at }}{% endif -%}
                 </span>
                 {% endif %}
               </div>

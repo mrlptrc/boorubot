@@ -489,3 +489,16 @@ def test_replace_image_keeps_fields_and_asks_ai_again(client, db):
     row = db.get_post(post_id)
     assert r.status_code == 303 and row["image"] != old and row["tags"] == "a b"
     assert not (app_mod.IMAGES_DIR / old).exists() and list(w.suggestions.queue) == [post_id]
+
+
+def test_latest_test_result_shows_on_each_site_row(client, db):
+    c, _ = client
+    post_id = upload(c)
+    db.add_test_run(post_id, "gelbooru", "failed", message="campo de tags não encontrado")
+    db.add_test_run(post_id, "danbooru", "failed", message="antigo")
+    db.add_test_run(post_id, "danbooru", "dry_run", message="simulado")
+    page = c.get(f"/posts/{post_id}").text
+    row = lambda site: page.split(f'data-site="{site}"')[1].split("</li>")[0]
+    assert "teste falhou às" in row("gelbooru") and "campo de tags não encontrado" in row("gelbooru")
+    assert "teste ok às" in row("danbooru") and "antigo" not in row("danbooru")  # só o mais recente
+    assert "teste" not in row("paheal").replace("site-row-text", "")
