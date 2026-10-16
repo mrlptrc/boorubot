@@ -79,7 +79,7 @@ def publish_post(db: DB, post_id: int) -> str:
     Conta como o post do dia nesses sites (a fila de cada um segue amanhã).
     Recusa rodar com o modo teste ligado: produção e teste nunca se misturam."""
     row = db.get_post(post_id)
-    if not row:
+    if not row or row["status"] == "deleted":
         return "missing"
     if db.test_mode:
         log.warning("post %s: produção bloqueada com o modo teste ligado", post_id)
@@ -103,7 +103,7 @@ def publish_site(db: DB, post_id: int, site: str) -> str:
     if db.test_mode:
         return "blocked"
     row = db.get_post(post_id)
-    if not row:
+    if not row or row["status"] == "deleted":  # apagada depois de entrar na fila de envio
         return "missing"
     if site in db.published_sites(post_id):
         refresh_post_status(db, post_id)
@@ -129,7 +129,7 @@ def run_post_test(db: DB, post_id: int) -> list[str]:
     posição na fila, published_at nem o ritmo. Danbooru só envia de verdade se houver conta
     de teste (testbooru); os sites de formulário apenas preenchem, sem enviar."""
     row = db.get_post(post_id)
-    if not row:
+    if not row or row["status"] == "deleted":
         return []
     post = to_post(row)
     has_test_account = bool(db.setting("danbooru_test_api_key"))
@@ -295,10 +295,24 @@ class Worker:
                 and self.db.publications_for_metrics("danbooru")):
             self.db.set_setting("metrics_last_attempt", today)
             self.submit("metrics", "danbooru", "atualizar métricas (diário)")
+        if self.db.setting("purge_last_run") != today:
+            self.db.set_setting("purge_last_run", today)
+            self.purge()
         if (self.db.setting("backup_dir") and self.db.setting("backup_last_attempt") != today
                 and not self._queued("backup")):
             self.db.set_setting("backup_last_attempt", today)
             self.submit("backup", "backup", "backup diário")
+
+    def purge(self, when: datetime | None = None) -> int:
+        """Limpeza diária: artes apagadas há mais de 24 h saem de vez (linha + imagem)."""
+        from boorubot.db import IMAGES_DIR
+
+        images = self.db.purge_deleted(when)
+        for name in images:
+            (IMAGES_DIR / name).unlink(missing_ok=True)
+        if images:
+            log.info("limpeza: %s artes apagadas removidas de vez", len(images))
+        return len(images)
 
     def _publishing(self) -> bool:
         """Só 1 envio de produção por vez."""

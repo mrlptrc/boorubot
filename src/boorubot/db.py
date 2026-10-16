@@ -29,7 +29,9 @@ MIN_GAP = timedelta(hours=12)
 # partir do 1º site em que a arte saiu.
 RHYTHMS = ("diario", "dia_sim_dia_nao", "desligado")
 MAX_DELAY_DAYS = 7
-POST_STATUSES = ("draft", "approved", "publishing", "done", "partial", "failed")
+POST_STATUSES = ("draft", "approved", "publishing", "done", "partial", "failed", "deleted")
+# apagada: some de todas as listas, pode ser desfeita; o worker remove de vez depois deste prazo
+PURGE_AFTER = timedelta(hours=24)
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS posts (
@@ -118,6 +120,8 @@ NEW_POST_COLUMNS = (
     # rating '' = ninguém escolheu ainda (posts novos); a IA só SUGERE, em colunas próprias
     ("rating_suggestion", "TEXT NOT NULL DEFAULT ''"),
     ("rating_confidence", "REAL"),
+    ("deleted_at", "TEXT"),                                  # quando foi apagada (status 'deleted')
+    ("status_before_delete", "TEXT NOT NULL DEFAULT ''"),    # para o "desfazer"
 )
 SUGGEST_STATES = ("pendente", "analisando", "pronta", "falhou")
 
@@ -235,7 +239,33 @@ class DB:
             "SELECT id FROM posts WHERE suggest_state IN ('pendente', 'analisando') ORDER BY id")]
 
     def delete_post(self, post_id: int) -> None:
-        self._exec("DELETE FROM posts WHERE id = ?", (post_id,))
+        """Apagar = esconder (dá para desfazer). A remoção de verdade é purge_deleted()."""
+        self._exec("UPDATE posts SET status_before_delete = status, status = 'deleted', deleted_at = ? "
+                   "WHERE id = ? AND status != 'deleted'", (now(), post_id))
+
+    def restore_post(self, post_id: int) -> bool:
+        row = self.get_post(post_id)
+        if not row or row["status"] != "deleted":
+            return False
+        self._exec("UPDATE posts SET status = ?, deleted_at = NULL, status_before_delete = '' WHERE id = ?",
+                   (row["status_before_delete"] or "draft", post_id))
+        return True
+
+    def purge_deleted(self, when: datetime | None = None) -> list[str]:
+        """Remove de vez o que foi apagado há mais de PURGE_AFTER. Devolve as imagens a apagar do disco.
+        Arte que já saiu em algum site fica com a linha (escondida): o ritmo de cada site e a proteção
+        contra post duplicado contam com esse histórico. Só a imagem vai embora."""
+        cutoff = ((when or datetime.now()) - PURGE_AFTER).isoformat(timespec="seconds")
+        rows = self._all("SELECT id, image FROM posts WHERE status = 'deleted' AND deleted_at <= ? AND image != ''",
+                         (cutoff,))
+        images = []
+        for r in rows:
+            if self._all("SELECT 1 FROM publications WHERE post_id = ? AND status = 'ok' LIMIT 1", (r["id"],)):
+                self._exec("UPDATE posts SET image = '' WHERE id = ?", (r["id"],))
+            else:
+                self._exec("DELETE FROM posts WHERE id = ?", (r["id"],))
+            images.append(r["image"])
+        return images
 
     def get_post(self, post_id: int) -> dict | None:
         rows = self._all("SELECT * FROM posts WHERE id = ?", (post_id,))
@@ -246,8 +276,8 @@ class DB:
             marks = ",".join("?" * len(statuses))
             rows = self._all(f"SELECT * FROM posts WHERE status IN ({marks}) "
                              "ORDER BY queue_pos IS NULL, queue_pos, created_at DESC", statuses)
-        else:
-            rows = self._all("SELECT * FROM posts ORDER BY created_at DESC")
+        else:  # sem filtro: tudo menos as apagadas
+            rows = self._all("SELECT * FROM posts WHERE status != 'deleted' ORDER BY created_at DESC")
         return [_decode(r) for r in rows]
 
     # --- fila + limitador de ritmo -----------------------------------------------
@@ -356,7 +386,7 @@ class DB:
     def publications(self, post_id: int | None = None, limit: int = 100) -> list[dict]:
         if post_id is not None:
             return self._all("SELECT * FROM publications WHERE post_id = ? ORDER BY id DESC", (post_id,))
-        return self._all("SELECT p.*, posts.title, posts.image FROM publications p "
+        return self._all("SELECT p.*, posts.title, posts.image, posts.status AS post_status FROM publications p "
                          "JOIN posts ON posts.id = p.post_id ORDER BY p.id DESC LIMIT ?", (limit,))
 
     def published_sites(self, post_id: int) -> set[str]:
@@ -395,16 +425,20 @@ class DB:
                    "fav_count) VALUES (?, ?, ?, ?, ?, ?)",
                    (publication_id, captured_at, score, up_score, down_score, fav_count))
 
+    _VISIBLE_SNAPSHOTS = ("SELECT m.* FROM metric_snapshots m JOIN publications p ON p.id = m.publication_id "
+                          "JOIN posts ON posts.id = p.post_id WHERE posts.status != 'deleted'")
+
     def metric_snapshots_since(self, since: datetime) -> list[dict]:
-        return self._all("SELECT * FROM metric_snapshots WHERE captured_at >= ? ORDER BY captured_at, id",
+        return self._all(self._VISIBLE_SNAPSHOTS + " AND m.captured_at >= ? ORDER BY m.captured_at, m.id",
                          (since.isoformat(timespec="seconds"),))
 
     def all_metric_snapshots(self) -> list[dict]:
-        return self._all("SELECT * FROM metric_snapshots ORDER BY captured_at, id")
+        return self._all(self._VISIBLE_SNAPSHOTS + " ORDER BY m.captured_at, m.id")
 
     def publications_with_posts(self) -> list[dict]:
+        """Para as métricas: arte apagada não conta."""
         return self._all("SELECT p.*, posts.title, posts.image FROM publications p "
-                         "JOIN posts ON posts.id = p.post_id ORDER BY p.id")
+                         "JOIN posts ON posts.id = p.post_id WHERE posts.status != 'deleted' ORDER BY p.id")
 
     def has_metrics(self) -> bool:
         return bool(self._all("SELECT 1 FROM metric_snapshots LIMIT 1"))
