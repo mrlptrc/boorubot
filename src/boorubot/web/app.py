@@ -30,6 +30,7 @@ BROWSER_MODE_LABELS = {
 }
 RATINGS_PT = {"general": "geral (SFW)", "sensitive": "sensível", "questionable": "questionável (nudez)",
               "explicit": "explícito"}
+RATING_SHORT = {"general": "geral", "sensitive": "sensível", "questionable": "questionável", "explicit": "explícito"}
 STATUS_LABELS = {
     "draft": "rascunho", "approved": "na fila", "publishing": "publicando",
     "done": "publicado", "partial": "parcial", "failed": "falhou",
@@ -183,18 +184,35 @@ def create_app(db: DB | None = None, worker: Worker | None = None, start_worker:
 
         return render(request, "index.html", d=dashboard.build(db), steps=setup_steps())
 
-    @app.post("/posts")
-    async def create_post(image: UploadFile = File(...)):
-        ext = Path(image.filename or "").suffix.lower()
+    def save_upload(name: str, data: bytes) -> dict:
+        """Uma arte nova: grava a imagem, cria o rascunho e põe na fila da IA."""
+        ext = Path(name).suffix.lower()
         if ext not in IMAGE_EXTS:
-            raise HTTPException(400, f"formato não suportado: {ext or '?'} (use {', '.join(IMAGE_EXTS)})")
+            raise ValueError(f"formato não suportado: {ext or '?'} (use {', '.join(IMAGE_EXTS)})")
         filename = f"{uuid.uuid4().hex}{ext}"
-        (IMAGES_DIR / filename).write_bytes(await image.read())
+        (IMAGES_DIR / filename).write_bytes(data)
         # rating vazio = "não escolhido": nunca sai um rating que ninguém conferiu
-        post_id = db.create_post(filename, title=Path(image.filename).stem, sites=default_sites(), rating="",
+        post_id = db.create_post(filename, title=Path(name).stem, sites=default_sites(), rating="",
                                  tags=" ".join(normalize_tags(db.setting("default_tags"))))
         worker.submit_suggest(post_id)  # fila própria da IA: não atrasa nenhum envio
-        return see_other(f"/posts/{post_id}")
+        return {"id": post_id, "title": Path(name).stem, "image": filename}
+
+    @app.post("/posts")
+    async def create_post(request: Request, image: list[UploadFile] = File(...)):
+        """Uma ou várias artes. A janela "Novas artes" pede JSON; o form sem JavaScript recebe um redirect."""
+        wants_json = "application/json" in request.headers.get("accept", "")
+        created, errors = [], []
+        for upload in image:
+            name = upload.filename or ""
+            try:
+                created.append(save_upload(name, await upload.read()))
+            except ValueError as exc:
+                errors.append({"name": name, "error": str(exc)})
+        if wants_json:
+            return JSONResponse({"posts": created, "errors": errors}, status_code=200 if created or not errors else 400)
+        if not created:
+            raise HTTPException(400, errors[0]["error"] if errors else "nenhum arquivo")
+        return see_other(f"/posts/{created[0]['id']}" if len(created) == 1 else "/#revisar")
 
     @app.post("/posts/{post_id}/imagem")
     async def replace_image(post_id: int, image: UploadFile = File(...)):
@@ -418,6 +436,7 @@ def create_app(db: DB | None = None, worker: Worker | None = None, start_worker:
             "tags": row["tag_list"], "scores": row["tag_scores"], "weak": row["weak_tags"],
             "original_character": row["original_character"], "mochi": mochi_note(row),
             "rating_suggestion": row["rating_suggestion"], "rating_confidence": row["rating_confidence"],
+            "rating_label": RATING_SHORT.get(row["rating_suggestion"], ""),
         }
 
     @app.post("/posts/{post_id}/suggest")
@@ -426,6 +445,15 @@ def create_app(db: DB | None = None, worker: Worker | None = None, start_worker:
         post_or_404(post_id)
         worker.submit_suggest(post_id)
         return suggest_status(db.get_post(post_id))
+
+    @app.get("/suggest/status.json")
+    def suggest_states(ids: str = ""):
+        """Janela "Novas artes": estado da IA para várias artes de uma vez."""
+        from boorubot.tagger import tagger
+
+        rows = [db.get_post(int(i)) for i in ids.split(",") if i.strip().isdigit()]
+        return {"model_ready": (worker.tagger or tagger).model_ready,
+                "posts": [suggest_status(r) for r in rows if r]}
 
     @app.get("/posts/{post_id}/suggest/status")
     def suggest_state(post_id: int):
