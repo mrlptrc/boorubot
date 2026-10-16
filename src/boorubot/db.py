@@ -111,6 +111,8 @@ NEW_POST_COLUMNS = (
     # sugestão da IA: '' (nunca pedida) | pendente | analisando | pronta | falhou
     ("suggest_state", "TEXT NOT NULL DEFAULT ''"),
     ("suggest_error", "TEXT NOT NULL DEFAULT ''"),
+    ("tag_scores", "TEXT NOT NULL DEFAULT '{}'"),  # {tag: confiança} das tags que a IA sugeriu
+    ("weak_tags", "TEXT NOT NULL DEFAULT '[]'"),   # [[tag, confiança]] entre 0,25 e 0,35: só sugestão
 )
 SUGGEST_STATES = ("pendente", "analisando", "pronta", "falhou")
 
@@ -211,8 +213,9 @@ class DB:
     def update_post(self, post_id: int, **fields) -> None:
         if "sites" in fields:
             fields["sites"] = json.dumps(list(fields["sites"]))
-        if "site_tags" in fields:
-            fields["site_tags"] = json.dumps(fields["site_tags"])
+        for key in ("site_tags", "tag_scores", "weak_tags"):
+            if key in fields:
+                fields[key] = json.dumps(fields[key])
         if "original_character" in fields:
             fields["original_character"] = int(bool(fields["original_character"]))
         cols = ", ".join(f"{k} = ?" for k in fields)
@@ -430,6 +433,8 @@ def _decode(row: dict) -> dict:
     row = dict(row)
     row["sites"] = json.loads(row["sites"])
     row["site_tags"] = json.loads(row["site_tags"])
+    row["tag_scores"] = json.loads(row.get("tag_scores") or "{}")
+    row["weak_tags"] = json.loads(row.get("weak_tags") or "[]")
     row["original_character"] = bool(row["original_character"])
     row["approved_in_test"] = bool(row.get("approved_in_test"))
     row["tag_list"] = row["tags"].split()

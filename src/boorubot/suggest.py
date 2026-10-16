@@ -24,7 +24,22 @@ def apply_suggestion(db: DB, post_id: int, s) -> None:
     row = db.get_post(post_id)
     if not row:
         return
-    db.update_post(post_id, tags=" ".join(merge_tags(row["tag_list"], s.tags)))
+    tags = merge_tags(row["tag_list"], s.tags)
+    db.update_post(
+        post_id, tags=" ".join(tags),
+        tag_scores={**row["tag_scores"], **s.scores},
+        weak_tags=[[t, round(float(v), 3)] for t, v in s.weak if t not in tags],
+    )
+
+
+def accept_weak(row: dict, tags: list[str]) -> dict:
+    """Ela adicionou uma tag de "a IA também viu": a tag passa a ter a confiança da IA e sai das fracas."""
+    weak = dict(row["weak_tags"])
+    taken = {t: v for t, v in weak.items() if t in tags}
+    if not taken:
+        return {}
+    return {"tag_scores": {**row["tag_scores"], **taken},
+            "weak_tags": [[t, v] for t, v in row["weak_tags"] if t not in taken]}
 
 
 def run_suggestion(db: DB, post_id: int, tagger=None) -> str:
