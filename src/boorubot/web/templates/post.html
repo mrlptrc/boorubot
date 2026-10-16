@@ -17,6 +17,12 @@
   </header>
 
   {% if error %}<div class="ed-alert" role="alert">{{ error }}</div>{% endif %}
+  {% if post.status == 'deleted' %}
+  <form method="post" action="/posts/{{ post.id }}/desfazer" class="ed-note warn ed-deleted">
+    <span><b>Esta arte foi apagada.</b> Ela some de vez 24 h depois de apagada.</span>
+    <button class="btn-main">Desfazer</button>
+  </form>
+  {% endif %}
   {% if post.status == 'approved' and post.approved_in_test %}
   <p class="ed-note warn">
     {% if test_mode %}<b>Aprovada no modo teste.</b> Quando o modo teste for desligado, ela <b>não vai ao ar</b>
@@ -177,7 +183,7 @@
               {{ 'Tentar de novo' if post.status in ('failed', 'partial') else 'Publicar agora' }}</button>
             {% endif %}
             <a href="#envios" data-open-envios>Ver testes e envios</a>
-            <button name="action" value="delete" class="danger" formnovalidate data-confirm="Apagar este post da fila?">Apagar arte</button>
+            {% if post.status != 'deleted' %}<button name="action" value="delete" class="danger" formnovalidate>Apagar arte</button>{% endif %}
           </div>
         </details>
       </div>
