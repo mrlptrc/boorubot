@@ -630,3 +630,6 @@ html.sl-loading .guide-tabs { visibility: hidden; }
   background: var(--v2-surface); color: var(--v2-ink); font: 700 14px var(--v2-text); cursor: pointer;
 }
 .tag-add:hover { border-color: var(--v2-accent); transform: none; }
+.mochi-note { display: flex; gap: 10px; align-items: flex-start; margin: 14px 0 0; font-size: 15px; color: var(--v2-ink); }
+.mochi-note img { width: 40px; height: 40px; flex: none; }
+.mochi-note[hidden] { display: none; }
