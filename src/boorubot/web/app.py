@@ -147,6 +147,7 @@ def create_app(db: DB | None = None, worker: Worker | None = None, start_worker:
         planned = [s["when"] for s in site_days if s["when"]]
         return render(
             request, "post.html", post=row, pubs=db.publications(post_id), tests=db.test_runs(post_id), error=erro,
+            default_tags=normalize_tags(db.setting("default_tags")),
             metrics=db.latest_metrics(),
             has_test_account=bool(db.setting("danbooru_test_api_key")),
             projected=min(planned) if planned else None, site_days=site_days, today=today.isoformat(),
@@ -239,9 +240,11 @@ def create_app(db: DB | None = None, worker: Worker | None = None, start_worker:
             return see_other("/")
 
         if row["status"] in ("draft", "approved", "failed", "partial"):
-            clean_tags = " ".join(normalize_tags(tags))
+            from boorubot.suggest import accept_weak
+
+            tag_list = normalize_tags(tags)
             db.update_post(
-                post_id, title=title.strip(), tags=clean_tags,
+                post_id, title=title.strip(), tags=" ".join(tag_list), **accept_weak(row, tag_list),
                 rating=rating if rating in RATINGS else "general", source=source.strip(),
                 commentary_title=commentary_title.strip(), commentary_description=commentary_description.strip(),
                 original_character=original_character, sites=[s for s in ALL_SITES if s in sites],
@@ -290,7 +293,7 @@ def create_app(db: DB | None = None, worker: Worker | None = None, start_worker:
             "id": row["id"], "state": row["suggest_state"], "error": row["suggest_error"],
             "waiting": worker.suggest_position(row["id"]),
             "model_ready": (worker.tagger or tagger).model_ready,
-            "tags": row["tag_list"],
+            "tags": row["tag_list"], "scores": row["tag_scores"], "weak": row["weak_tags"],
         }
 
     @app.post("/posts/{post_id}/suggest")
