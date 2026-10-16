@@ -239,7 +239,7 @@ def test_home_shows_queue_positions(client, db):
     c, _ = client
     ids = [upload(c) for _ in range(2)]
     for i in ids:
-        c.post(f"/posts/{i}", data={"action": "approve", "tags": "x", "sites": ["danbooru"]})
+        c.post(f"/posts/{i}", data={"action": "approve", "tags": "x", "rating": "general", "sites": ["danbooru"]})
     home = c.get("/").text
     assert "1º na fila" in home and "2º na fila" in home
     assert "1º de 2" in c.get(f"/posts/{ids[0]}").text
@@ -324,11 +324,11 @@ def test_production_always_uses_live_sites(db, recorder):
 def test_panel_test_button_and_publish_guard(client, db):
     c, w = client
     post_id = upload(c)
-    c.post(f"/posts/{post_id}", data={"action": "approve", "tags": "x", "sites": ["danbooru"]})
-    r = c.post(f"/posts/{post_id}", data={"action": "publish_now", "tags": "x", "sites": ["danbooru"]},
+    c.post(f"/posts/{post_id}", data={"action": "approve", "tags": "x", "rating": "general", "sites": ["danbooru"]})
+    r = c.post(f"/posts/{post_id}", data={"action": "publish_now", "tags": "x", "rating": "general", "sites": ["danbooru"]},
                follow_redirects=False)
     assert "erro=" in r.headers["location"] and w.jobs.empty()   # modo teste: produção bloqueada
-    c.post(f"/posts/{post_id}", data={"action": "test", "tags": "x", "sites": ["danbooru"]})
+    c.post(f"/posts/{post_id}", data={"action": "test", "tags": "x", "rating": "general", "sites": ["danbooru"]})
     assert [j.kind for j in w.jobs.queue] == ["test"]
     assert db.get_post(post_id)["status"] == "approved"
 
@@ -389,3 +389,51 @@ def test_dangerous_buttons_ask_for_confirmation(client, db):
     post_id = upload(c)
     page = c.get(f"/posts/{post_id}").text
     assert 'data-confirm="Apagar este post da fila?"' in page and "return confirm(" not in page
+
+
+def test_new_post_has_no_rating_and_cannot_be_approved_without_one(client, db):
+    c, _ = client
+    post_id = upload(c)
+    assert db.get_post(post_id)["rating"] == ""
+    for action in ("approve", "test"):
+        r = c.post(f"/posts/{post_id}", data={"action": action, "tags": "x", "sites": ["danbooru"]},
+                   follow_redirects=False)
+        assert "rating" in r.headers["location"]
+    assert db.get_post(post_id)["status"] == "draft" and c.app.state.worker.jobs.empty()
+    c.post(f"/posts/{post_id}", data={"action": "approve", "tags": "x", "rating": "sensitive", "sites": ["danbooru"]})
+    assert db.get_post(post_id)["status"] == "approved"
+
+
+def test_existing_posts_keep_their_rating(tmp_path):
+    import sqlite3
+
+    path = tmp_path / "old.db"
+    old = sqlite3.connect(path)  # banco de antes da v2: sem as colunas novas
+    old.executescript("""CREATE TABLE posts (id INTEGER PRIMARY KEY, created_at TEXT NOT NULL, image TEXT NOT NULL,
+        title TEXT NOT NULL DEFAULT '', tags TEXT NOT NULL DEFAULT '', rating TEXT NOT NULL DEFAULT 'general',
+        source TEXT NOT NULL DEFAULT '', commentary_title TEXT NOT NULL DEFAULT '',
+        commentary_description TEXT NOT NULL DEFAULT '', original_character INTEGER NOT NULL DEFAULT 0,
+        sites TEXT NOT NULL DEFAULT '[]', site_tags TEXT NOT NULL DEFAULT '{}', status TEXT NOT NULL DEFAULT 'draft',
+        scheduled_for TEXT);
+        INSERT INTO posts (created_at, image, tags, rating) VALUES ('2026-10-01T10:00:00', 'a.png', 'x', 'explicit');
+        INSERT INTO posts (created_at, image, tags) VALUES ('2026-10-01T11:00:00', 'b.png', 'x');""")
+    old.commit()
+    old.close()
+    db = DB(path)
+    DB(path)  # a migração roda de novo sem erro
+    assert [p["rating"] for p in sorted(db.list_posts(), key=lambda p: p["id"])] == ["explicit", "general"]
+    assert db.get_post(1)["rating_suggestion"] == "" and db.get_post(1)["tag_scores"] == {}
+
+
+def test_suggestion_only_suggests_the_rating(db):
+    from boorubot.suggest import run_suggestion
+    from boorubot.tagger import Suggestion
+
+    class T:
+        def suggest(self, path):
+            return Suggestion("questionable", {"questionable": 0.91, "general": 0.05}, [("smile", 0.8)], [])
+
+    post_id = db.create_post("x.png", rating="")
+    run_suggestion(db, post_id, T())
+    row = db.get_post(post_id)
+    assert row["rating"] == "" and row["rating_suggestion"] == "questionable" and row["rating_confidence"] == 0.91
