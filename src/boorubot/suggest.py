@@ -25,11 +25,35 @@ def apply_suggestion(db: DB, post_id: int, s) -> None:
     if not row:
         return
     tags = merge_tags(row["tag_list"], s.tags)
+    fields = {}
+    if not row["oc_touched"]:
+        # nenhum personagem conhecido acima do limite = personagem original (ela pode desmarcar)
+        oc = not s.characters
+        fields = {"original_character": oc, "oc_auto": int(oc)} if oc or row["oc_auto"] else {}
     db.update_post(
         post_id, tags=" ".join(tags),
         tag_scores={**row["tag_scores"], **s.scores},
         weak_tags=[[t, round(float(v), 3)] for t, v in s.weak if t not in tags],
+        **fields,
     )
+
+
+def oc_fields(row: dict, original_character: bool) -> dict:
+    """Ela mudou o OC na tela: a escolha dela vale daqui para frente."""
+    if bool(original_character) == row["original_character"]:
+        return {}
+    return {"oc_touched": 1, "oc_auto": 0}
+
+
+def mochi_note(row: dict) -> str:
+    """O recado da Mochi embaixo da arte (vazio quando não há o que dizer)."""
+    if not (row["oc_auto"] and row["original_character"]):
+        return ""
+    n = len(row["tag_scores"])
+    note = f"Achei {n} tag{'s' if n != 1 else ''} e nenhum personagem conhecido, então marquei como personagem original."
+    if "paheal" in row["sites"]:
+        note += " O paheal não aceita OC e vai ficar de fora."
+    return note
 
 
 def accept_weak(row: dict, tags: list[str]) -> dict:

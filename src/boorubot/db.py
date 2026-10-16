@@ -113,6 +113,8 @@ NEW_POST_COLUMNS = (
     ("suggest_error", "TEXT NOT NULL DEFAULT ''"),
     ("tag_scores", "TEXT NOT NULL DEFAULT '{}'"),  # {tag: confiança} das tags que a IA sugeriu
     ("weak_tags", "TEXT NOT NULL DEFAULT '[]'"),   # [[tag, confiança]] entre 0,25 e 0,35: só sugestão
+    ("oc_touched", "INTEGER NOT NULL DEFAULT 0"),  # ela mexeu no OC: a IA não marca nem desmarca mais
+    ("oc_auto", "INTEGER NOT NULL DEFAULT 0"),     # OC marcado pela IA (nenhum personagem conhecido)
 )
 SUGGEST_STATES = ("pendente", "analisando", "pronta", "falhou")
 
@@ -437,6 +439,8 @@ def _decode(row: dict) -> dict:
     row["weak_tags"] = json.loads(row.get("weak_tags") or "[]")
     row["original_character"] = bool(row["original_character"])
     row["approved_in_test"] = bool(row.get("approved_in_test"))
+    row["oc_touched"] = bool(row.get("oc_touched"))
+    row["oc_auto"] = bool(row.get("oc_auto"))
     row["tag_list"] = row["tags"].split()
     return row
 
