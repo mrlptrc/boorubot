@@ -2,7 +2,7 @@
 
 Roda numa fila própria do worker (nunca na fila de publicação): o primeiro uso baixa ~380 MB e
 uma publicação não pode esperar por isso. A sugestão só ACRESCENTA ao post: nunca apaga tag,
-nunca escolhe o rating e nunca desfaz o que ela já mexeu.
+nunca escolhe o rating (só sugere) e nunca desfaz o que ela já mexeu.
 """
 
 from __future__ import annotations
@@ -34,6 +34,7 @@ def apply_suggestion(db: DB, post_id: int, s) -> None:
         post_id, tags=" ".join(tags),
         tag_scores={**row["tag_scores"], **s.scores},
         weak_tags=[[t, round(float(v), 3)] for t, v in s.weak if t not in tags],
+        rating_suggestion=s.rating, rating_confidence=round(float(s.rating_scores.get(s.rating, 0)), 3),
         **fields,
     )
 

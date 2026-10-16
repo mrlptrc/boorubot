@@ -115,6 +115,9 @@ NEW_POST_COLUMNS = (
     ("weak_tags", "TEXT NOT NULL DEFAULT '[]'"),   # [[tag, confiança]] entre 0,25 e 0,35: só sugestão
     ("oc_touched", "INTEGER NOT NULL DEFAULT 0"),  # ela mexeu no OC: a IA não marca nem desmarca mais
     ("oc_auto", "INTEGER NOT NULL DEFAULT 0"),     # OC marcado pela IA (nenhum personagem conhecido)
+    # rating '' = ninguém escolheu ainda (posts novos); a IA só SUGERE, em colunas próprias
+    ("rating_suggestion", "TEXT NOT NULL DEFAULT ''"),
+    ("rating_confidence", "REAL"),
 )
 SUGGEST_STATES = ("pendente", "analisando", "pronta", "falhou")
 
