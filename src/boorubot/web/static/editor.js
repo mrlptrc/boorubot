@@ -148,5 +148,68 @@
     refreshApproval();
   }
 
-  window.boorubotEditor = { tagField, esc, pct, refreshApproval, approvalErrors };
+  // ------------------------------------------------- salvar sozinho
+  // Ao sair de um campo de texto, ou ~800 ms depois de mexer em tags/rating/sites/OC, manda só
+  // o que mudou (PATCH /posts/{id}). Falhou? Tenta de novo, cada vez esperando um pouco mais.
+  const statusEl = document.querySelector("[data-save-status]");
+  const postId = form && form.dataset.postId;
+  const editable = form && !form.querySelector("fieldset[disabled]");
+  const value = (name) => {
+    if (name === "sites") return [...form.querySelectorAll("input[name=sites]:checked")].map((i) => i.value);
+    if (name === "rating") { const r = form.querySelector("input[name=rating]:checked"); return r ? r.value : ""; }
+    if (name === "original_character") return form.querySelector("input[name=original_character]").checked;
+    return form.querySelector(`[name=${name}]`).value;
+  };
+  const FIELDS = ["title", "tags", "rating", "source", "commentary_title", "commentary_description", "original_character", "sites"];
+  const snapshot = () => Object.fromEntries(FIELDS.filter((f) => form.querySelector(`[name=${f}]`)).map((f) => [f, JSON.stringify(value(f))]));
+  let saved = form ? snapshot() : {};
+  let debounce = null, retry = null, retryWait = 2000, inflight = null;
+
+  function say(text, kind) {
+    if (!statusEl) return;
+    statusEl.textContent = text;
+    statusEl.dataset.kind = kind;
+  }
+  function changed() {
+    const now = snapshot();
+    return Object.fromEntries(Object.keys(now).filter((k) => now[k] !== saved[k]).map((k) => [k, JSON.parse(now[k])]));
+  }
+  async function save({ keepalive = false } = {}) {
+    clearTimeout(debounce); clearTimeout(retry);
+    if (inflight) { await inflight.catch(() => {}); }
+    const diff = changed();
+    if (!Object.keys(diff).length) return;
+    say("salvando…", "busy");
+    inflight = fetch(`/posts/${postId}`, {
+      method: "PATCH", keepalive, headers: { "Content-Type": "application/json" }, body: JSON.stringify(diff),
+    }).then(async (r) => {
+      const body = await r.json().catch(() => ({}));
+      if (r.status === 409) { say(body.error || "não dá mais para editar esta arte", "error"); return; }
+      if (!r.ok) throw new Error(body.error || r.status);
+      Object.keys(diff).forEach((k) => { saved[k] = JSON.stringify(diff[k]); });
+      retryWait = 2000;
+      say("salvo às " + body.saved_at, "ok");
+      if (Object.keys(changed()).length) schedule(); // ela mexeu de novo enquanto salvava
+    }).catch(() => {
+      say("não salvou, tentando de novo", "error");
+      retry = setTimeout(save, retryWait);
+      retryWait = Math.min(retryWait * 2, 30000);
+    }).finally(() => { inflight = null; });
+    return inflight;
+  }
+  function schedule() { clearTimeout(debounce); debounce = setTimeout(save, 800); }
+
+  if (form && postId && editable) {
+    form.addEventListener("focusout", (ev) => {
+      if (ev.target.matches("input[type=text], input:not([type]), textarea")) save();
+    });
+    form.addEventListener("change", (ev) => {
+      if (ev.target.matches("input[type=checkbox], input[type=radio], textarea[name=tags]")) schedule();
+    });
+    // clicar numa ação (Aprovar, Testar…) manda o form inteiro: o salvamento pendente não precisa correr
+    form.addEventListener("submit", () => { clearTimeout(debounce); clearTimeout(retry); saved = snapshot(); });
+    window.addEventListener("pagehide", () => { if (Object.keys(changed()).length) save({ keepalive: true }); });
+  }
+
+  window.boorubotEditor = { tagField, esc, pct, refreshApproval, approvalErrors, save };
 })();
