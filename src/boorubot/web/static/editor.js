@@ -211,5 +211,67 @@
     window.addEventListener("pagehide", () => { if (Object.keys(changed()).length) save({ keepalive: true }); });
   }
 
+  // ------------------------------------------- a IA olhando a arte
+  const suggestBtn = document.getElementById("suggest");
+  const suggestInfo = document.getElementById("suggest-info");
+  let suggestTimer = null;
+  function showSuggest(st) {
+    const busy = st.state === "pendente" || st.state === "analisando";
+    if (st.state === "pendente") suggestInfo.textContent = st.waiting ? `A Mochi olha esta arte em seguida (${st.waiting} na frente)` : "A Mochi vai olhar a arte agora";
+    else if (st.state === "analisando") suggestInfo.textContent = st.model_ready ? "A Mochi está olhando a arte…" : "Na primeira vez a Mochi baixa o modelo de tags (380 MB): pode levar alguns minutos";
+    else if (st.state === "falhou") suggestInfo.textContent = "A Mochi não conseguiu olhar: " + st.error;
+    else if (st.state === "pronta") {
+      const added = tagField ? tagField.update(st) : 0;
+      suggestInfo.textContent = added ? `A Mochi já olhou: +${added} tags` : "A Mochi já olhou";
+      const oc = document.getElementById("original_character");
+      if (oc && oc.checked !== st.original_character) { oc.checked = st.original_character; oc.dispatchEvent(new Event("change", { bubbles: true })); }
+      const note = document.getElementById("mochi-note");
+      if (note) { note.hidden = !st.mochi; note.querySelector("span").textContent = st.mochi; }
+      document.querySelectorAll(".rating-card").forEach((card) => {
+        const on = card.querySelector("input").value === st.rating_suggestion;
+        card.classList.toggle("suggested", on);
+        const badge = card.querySelector(".rating-ai");
+        badge.hidden = !on;
+        if (on) badge.textContent = "sugestão da IA" + (st.rating_confidence ? " · " + pct(st.rating_confidence) : "");
+      });
+    }
+    if (suggestBtn) suggestBtn.disabled = busy;
+    if (busy && !suggestTimer) suggestTimer = setInterval(pollSuggest, 2000);
+    if (!busy && suggestTimer) { clearInterval(suggestTimer); suggestTimer = null; }
+  }
+  async function pollSuggest() {
+    try { showSuggest(await (await fetch(`/posts/${postId}/suggest/status`)).json()); } catch (e) {}
+  }
+  if (suggestBtn) suggestBtn.addEventListener("click", async () => {
+    try { showSuggest(await (await fetch(`/posts/${postId}/suggest`, { method: "POST" })).json()); }
+    catch (e) { suggestInfo.textContent = "Não deu para pedir: " + e.message; }
+  });
+  if (form && ["pendente", "analisando"].includes(form.dataset.suggestState)) pollSuggest();
+
+  // ------------------------------------------------ publicar em
+  if (form) {
+    const oc = document.getElementById("original_character");
+    const ocOnly = document.querySelector("[data-oc-only]");
+    if (oc && ocOnly) oc.addEventListener("change", () => { ocOnly.hidden = !oc.checked; });
+    const count = document.querySelector("[data-sites-count]");
+    if (count) form.addEventListener("change", () => {
+      const n = value("sites").length;
+      count.textContent = n + (n === 1 ? " site" : " sites");
+    });
+  }
+  document.querySelectorAll("[data-open-envios]").forEach((a) => a.addEventListener("click", () => {
+    const box = document.getElementById("envios");
+    if (box) box.open = true;
+    a.closest("details").open = false;
+  }));
+  // menu "Mais ações": fecha com Esc e ao clicar fora
+  document.addEventListener("click", (ev) => {
+    document.querySelectorAll(".ed-menu[open]").forEach((m) => { if (!m.contains(ev.target)) m.open = false; });
+  });
+  document.addEventListener("keydown", (ev) => {
+    if (ev.key !== "Escape") return;
+    document.querySelectorAll(".ed-menu[open]").forEach((m) => { m.open = false; m.querySelector("summary").focus(); });
+  });
+
   window.boorubotEditor = { tagField, esc, pct, refreshApproval, approvalErrors, save };
 })();

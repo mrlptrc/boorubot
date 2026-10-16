@@ -207,7 +207,8 @@
   // ------------------------------------------------------- animações
   if (!reducedMotion) {
     // entrada em cascata do conteúdo da página
-    const items = document.querySelectorAll("main > *, .grid > .thumb, .site-list > .card");
+    // o editor fica de fora: transform no pai prenderia a barra de ações fixa dentro dele
+    const items = document.querySelectorAll("main > *:not(.editor), .grid > .thumb, .site-list > .card");
     items.forEach((el, i) => { el.classList.add("reveal"); el.style.setProperty("--i", Math.min(i, 14)); });
 
     // polaroids inclinam seguindo o mouse
