@@ -160,6 +160,14 @@ def create_app(db: DB | None = None, worker: Worker | None = None, start_worker:
             errors.append("nenhum site marcado")
         return errors
 
+    def after_approve_url() -> str:
+        """Aprovou: vai direto para o próximo rascunho (o mais antigo); sem rascunhos, volta ao Início."""
+        drafts = sorted(db.list_posts(("draft",)), key=lambda p: (p["created_at"], p["id"]))
+        if not drafts:
+            return "/?aviso=" + quote("Aprovada! Não falta nenhuma arte para revisar.")
+        left = len(drafts)
+        return f"/posts/{drafts[0]['id']}?aviso=" + quote(f"Aprovada! Falta{'m' if left > 1 else ''} {left} para revisar.")
+
     def post_or_404(post_id: int) -> dict:
         row = db.get_post(post_id)
         if not row:
@@ -350,6 +358,7 @@ def create_app(db: DB | None = None, worker: Worker | None = None, start_worker:
                 return see_other(f"/posts/{post_id}?erro=" + quote("não dá para aprovar: " + ", ".join(errors)))
         if action == "approve":
             db.approve(post_id)
+            return see_other(after_approve_url())
         elif action == "publish_now":  # clique explícito em produção vale como confirmação
             db.update_post(post_id, approved_in_test=0)
             worker.submit("publish", post_id, f"publicar #{post_id} (agora)")
