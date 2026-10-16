@@ -47,6 +47,29 @@ def normalize_tags(raw: str) -> list[str]:
     return list(dict.fromkeys(t for t in tags if t))
 
 
+EDITABLE = ("draft", "approved", "failed", "partial")
+TEXT_FIELDS = ("title", "source", "commentary_title", "commentary_description")
+
+
+def clean_post_fields(row: dict, data: dict) -> dict:
+    """Valida e normaliza só os campos presentes em `data` (form inteiro ou salvamento parcial)."""
+    from boorubot.suggest import accept_weak, oc_fields
+
+    out = {k: str(data[k]).strip() for k in TEXT_FIELDS if k in data}
+    if "tags" in data:
+        tag_list = normalize_tags(str(data["tags"]))
+        out.update(tags=" ".join(tag_list), **accept_weak(row, tag_list))
+    if "rating" in data:
+        out["rating"] = data["rating"] if data["rating"] in RATINGS else ""
+    if "original_character" in data:
+        oc = data["original_character"] in (True, "true", "1", 1, "on")
+        out.update(original_character=oc, **oc_fields(row, oc))
+    if "sites" in data:
+        sites = data["sites"] if isinstance(data["sites"], list) else [data["sites"]]
+        out["sites"] = [s for s in ALL_SITES if s in sites]
+    return out
+
+
 def see_other(url: str) -> RedirectResponse:
     return RedirectResponse(url, status_code=303)
 
@@ -253,17 +276,12 @@ def create_app(db: DB | None = None, worker: Worker | None = None, start_worker:
             (IMAGES_DIR / row["image"]).unlink(missing_ok=True)
             return see_other("/")
 
-        if row["status"] in ("draft", "approved", "failed", "partial"):
-            from boorubot.suggest import accept_weak, oc_fields
-
-            tag_list = normalize_tags(tags)
-            db.update_post(
-                post_id, title=title.strip(), tags=" ".join(tag_list), **accept_weak(row, tag_list),
-                **oc_fields(row, original_character),
-                rating=rating if rating in RATINGS else "", source=source.strip(),
-                commentary_title=commentary_title.strip(), commentary_description=commentary_description.strip(),
-                original_character=original_character, sites=[s for s in ALL_SITES if s in sites],
-            )
+        if row["status"] in EDITABLE:
+            db.update_post(post_id, **clean_post_fields(row, {
+                "title": title, "tags": tags, "rating": rating, "source": source,
+                "commentary_title": commentary_title, "commentary_description": commentary_description,
+                "original_character": original_character, "sites": sites,
+            }))
 
         if action == "publish_now" and db.test_mode:
             return see_other(f"/posts/{post_id}?erro=" + quote(
@@ -286,6 +304,25 @@ def create_app(db: DB | None = None, worker: Worker | None = None, start_worker:
         elif action in ("first", "last") and row["status"] == "approved":
             db.move_in_queue(post_id, action)
         return see_other(f"/posts/{post_id}")
+
+    @app.patch("/posts/{post_id}")
+    async def save_fields(post_id: int, request: Request):
+        """Salvamento parcial (o editor salva sozinho): recebe só os campos que mudaram, em JSON."""
+        row = post_or_404(post_id)
+        if row["status"] not in EDITABLE:
+            return JSONResponse({"ok": False, "error": "esta arte não pode mais ser editada"}, status_code=409)
+        try:
+            data = await request.json()
+        except ValueError:
+            data = None
+        if not isinstance(data, dict):
+            return JSONResponse({"ok": False, "error": "corpo inválido"}, status_code=400)
+        fields = clean_post_fields(row, data)
+        if fields:
+            db.update_post(post_id, **fields)
+        row = db.get_post(post_id)
+        return {"ok": True, "saved_at": datetime.now().strftime("%H:%M"), "approval_errors": approval_errors(row),
+                "post": {k: row[k] for k in ("title", "tags", "rating", "sites", "original_character", "source")}}
 
     @app.post("/fila/teste")
     def confirm_all(action: str = Form(...)):
