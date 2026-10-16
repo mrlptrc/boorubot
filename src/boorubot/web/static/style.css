@@ -802,3 +802,4 @@ button[disabled] { opacity: .55; cursor: not-allowed; transform: none; }
 .flash-x { display: grid; place-items: center; width: 44px; height: 44px; padding: 0; border: 0; box-shadow: none; background: none; color: #fff; border-radius: 10px; }
 .flash-x svg { width: 16px; height: 16px; }
 .flash-x:hover { background: rgba(255, 255, 255, .12); transform: none; }
+.ed-deleted { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; }
