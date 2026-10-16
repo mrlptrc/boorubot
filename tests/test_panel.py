@@ -437,3 +437,31 @@ def test_suggestion_only_suggests_the_rating(db):
     run_suggestion(db, post_id, T())
     row = db.get_post(post_id)
     assert row["rating"] == "" and row["rating_suggestion"] == "questionable" and row["rating_confidence"] == 0.91
+
+
+def test_partial_save_changes_only_the_sent_field(client, db):
+    c, _ = client
+    post_id = db.create_post("x.png", title="A", tags="a b", rating="general", sites=["danbooru"])
+    r = c.patch(f"/posts/{post_id}", json={"tags": "a b, long hair"})
+    assert r.status_code == 200 and r.json()["ok"] and r.json()["saved_at"]
+    row = db.get_post(post_id)
+    assert row["tags"] == "a_b long_hair"  # mesma normalização do form
+    assert (row["title"], row["rating"], row["sites"]) == ("A", "general", ["danbooru"])
+    c.patch(f"/posts/{post_id}", json={"sites": ["paheal", "nada"], "rating": "explicit"})
+    row = db.get_post(post_id)
+    assert row["sites"] == ["paheal"] and row["rating"] == "explicit" and row["tags"] == "a_b long_hair"
+    assert c.patch(f"/posts/{post_id}", json={"rating": "inventado"}).json()["post"]["rating"] == ""
+
+
+def test_published_post_cannot_be_edited(client, db):
+    c, _ = client
+    post_id = db.create_post("x.png", title="A", status="done")
+    r = c.patch(f"/posts/{post_id}", json={"title": "B"})
+    assert r.status_code == 409 and db.get_post(post_id)["title"] == "A"
+    assert c.patch("/posts/999", json={"title": "B"}).status_code == 404
+
+
+def test_editor_has_no_save_button(client, db):
+    c, _ = client
+    page = c.get(f"/posts/{upload(c)}").text
+    assert 'value="save"' not in page and "data-save-status" in page
