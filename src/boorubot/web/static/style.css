@@ -790,3 +790,15 @@ button[disabled] { opacity: .55; cursor: not-allowed; transform: none; }
   .ed-menu-list { left: 0; right: auto; }
 }
 .ed-title-row .save-status:empty { display: none; }
+
+/* aviso de uma ação ("Aprovada! Faltam 2", "Arte apagada · desfazer") */
+.flash {
+  position: fixed; top: 16px; left: 50%; transform: translateX(-50%); z-index: 30; display: flex; align-items: center; gap: 8px;
+  max-width: calc(100vw - 32px); padding: 4px 4px 4px 18px; border-radius: 14px; background: var(--v2-ink); color: #fff;
+  box-shadow: 0 8px 24px rgba(59, 34, 52, .25); font: 700 15px var(--v2-text);
+}
+.flash form { margin: 0; }
+.flash .link-btn { color: #FFC4DA; }
+.flash-x { display: grid; place-items: center; width: 44px; height: 44px; padding: 0; border: 0; box-shadow: none; background: none; color: #fff; border-radius: 10px; }
+.flash-x svg { width: 16px; height: 16px; }
+.flash-x:hover { background: rgba(255, 255, 255, .12); transform: none; }
