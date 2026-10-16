@@ -465,3 +465,27 @@ def test_editor_has_no_save_button(client, db):
     c, _ = client
     page = c.get(f"/posts/{upload(c)}").text
     assert 'value="save"' not in page and "data-save-status" in page
+
+
+def test_editor_layout_lists_every_site_with_its_state(client, db):
+    c, _ = client
+    post_id = upload(c)
+    db.set_session("gelbooru", False, "login caiu")
+    db.update_post(post_id, original_character=True)
+    page = c.get(f"/posts/{post_id}").text
+    assert page.count('class="site-row"') == 5 and 'role="switch"' in page
+    assert 'formaction="/sites/gelbooru/login"' in page and "pediu login de novo" in page
+    assert "fica de fora: não aceita personagem original" in page
+    assert "se aprovar agora, sai" in page and "Aprovar e agendar" in page and "Mais ações" in page
+
+
+def test_replace_image_keeps_fields_and_asks_ai_again(client, db):
+    c, w = client
+    post_id = upload(c)
+    w.suggestions.queue.clear()
+    db.update_post(post_id, tags="a b")
+    old = db.get_post(post_id)["image"]
+    r = c.post(f"/posts/{post_id}/imagem", files={"image": ("nova.png", PNG, "image/png")}, follow_redirects=False)
+    row = db.get_post(post_id)
+    assert r.status_code == 303 and row["image"] != old and row["tags"] == "a b"
+    assert not (app_mod.IMAGES_DIR / old).exists() and list(w.suggestions.queue) == [post_id]
