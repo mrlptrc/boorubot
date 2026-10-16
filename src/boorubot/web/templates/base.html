@@ -53,6 +53,15 @@
       {% if test_mode %}
       <div class="banner"><img src="/static/pets/chick.svg" alt=""><span>Modo teste ligado: a fila está <b>pausada</b> e nada é publicado. Use "Testar este post" à vontade. Desligue em <a href="/sites">Sites</a>.</span></div>
       {% endif %}
+      {% set aviso = request.query_params.get('aviso', '') %}
+      {% if aviso %}
+      <div class="flash v2" role="status" data-flash>
+        <span>{{ aviso }}</span>
+        {% set undo = request.query_params.get('desfazer', '') %}
+        {% if undo.isdigit() %}<form method="post" action="/posts/{{ undo }}/desfazer"><button class="link-btn">desfazer</button></form>{% endif %}
+        <button type="button" class="flash-x" data-flash-close aria-label="fechar aviso"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>
+      </div>
+      {% endif %}
       <main>{% block content %}{% endblock %}</main>
       <footer class="foot"><span>boorubot · feito com ♡</span></footer>
     </div>
