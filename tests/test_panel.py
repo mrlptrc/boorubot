@@ -502,3 +502,18 @@ def test_latest_test_result_shows_on_each_site_row(client, db):
     assert "teste falhou às" in row("gelbooru") and "campo de tags não encontrado" in row("gelbooru")
     assert "teste ok às" in row("danbooru") and "antigo" not in row("danbooru")  # só o mais recente
     assert "teste" not in row("paheal").replace("site-row-text", "")
+
+
+def test_approve_goes_to_the_oldest_remaining_draft(client, db):
+    c, _ = client
+    first, second, third = upload(c), upload(c), upload(c)
+    db.update_post(third, created_at="2026-01-01T00:00:00")  # o mais antigo vem primeiro
+    r = c.post(f"/posts/{second}", data={"action": "approve", "tags": "x", "rating": "general",
+                                          "sites": ["danbooru"]}, follow_redirects=False)
+    target, _, query = r.headers["location"].partition("?")
+    assert target == f"/posts/{third}" and "Faltam%202%20para%20revisar" in query
+    assert "Faltam 2 para revisar" in c.get(r.headers["location"]).text
+    for pid in (third, first):
+        r = c.post(f"/posts/{pid}", data={"action": "approve", "tags": "x", "rating": "general",
+                                           "sites": ["danbooru"]}, follow_redirects=False)
+    assert r.headers["location"].startswith("/?aviso=")  # sem rascunhos: volta para o Início
