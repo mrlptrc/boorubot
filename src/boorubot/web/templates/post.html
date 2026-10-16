@@ -15,6 +15,7 @@
       {% endif %}
       {% if post.published_at %}<span class="muted small">publicado em {{ post.published_at[8:10] }}/{{ post.published_at[5:7] }} {{ post.published_at[11:16] }}</span>{% endif %}
     </figcaption>
+    <p class="mochi-note" id="mochi-note" {{ 'hidden' if not mochi }}><img src="/static/pets/cat.svg" alt=""><span>{{ mochi }}</span></p>
   </figure>
 
   <form method="post" class="card fields" id="post-form">
@@ -40,7 +41,7 @@
       </div>
 
       <label class="check">
-        <input type="checkbox" name="original_character" value="true" {{ 'checked' if post.original_character }}>
+        <input type="checkbox" name="original_character" id="original_character" value="true" {{ 'checked' if post.original_character }}>
         Só personagem original (OC) <small>Danbooru ganha a tag <code>original</code>; o paheal não aceita e será pulado</small>
       </label>
 
@@ -189,6 +190,9 @@
       else if (st.state === "pronta") {
         const added = window.boorubotEditor.tagField.update(st);
         info.textContent = added ? `+${added} tags da IA. Revise antes de aprovar.` : "A IA já olhou esta arte.";
+        document.getElementById("original_character").checked = st.original_character;
+        const note = document.getElementById("mochi-note");
+        note.hidden = !st.mochi; note.querySelector("span").textContent = st.mochi;
       }
       const busy = st.state === "pendente" || st.state === "analisando";
       btn.disabled = busy;
