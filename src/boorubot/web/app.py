@@ -126,6 +126,7 @@ def create_app(db: DB | None = None, worker: Worker | None = None, start_worker:
         (IMAGES_DIR / filename).write_bytes(await image.read())
         post_id = db.create_post(filename, title=Path(image.filename).stem, sites=default_sites(),
                                  tags=" ".join(normalize_tags(db.setting("default_tags"))))
+        worker.submit_suggest(post_id)  # fila própria da IA: não atrasa nenhum envio
         return see_other(f"/posts/{post_id}")
 
     @app.get("/posts/{post_id}")
@@ -282,19 +283,26 @@ def create_app(db: DB | None = None, worker: Worker | None = None, start_worker:
                 db.update_post(post["id"], status="draft", queue_pos=None, approved_in_test=0)
         return see_other("/")
 
-    @app.post("/posts/{post_id}/suggest")
-    def suggest(post_id: int):
+    def suggest_status(row: dict) -> dict:
         from boorubot.tagger import tagger
 
-        row = post_or_404(post_id)
-        s = tagger.suggest(IMAGES_DIR / row["image"])
-        return JSONResponse({
-            "rating": s.rating,
-            "rating_scores": {k: round(v, 3) for k, v in s.rating_scores.items()},
-            "tags": s.tags,
-            "characters": [t for t, _ in s.characters],
-            "scores": {t: round(v, 2) for t, v in s.characters + s.general},
-        })
+        return {
+            "id": row["id"], "state": row["suggest_state"], "error": row["suggest_error"],
+            "waiting": worker.suggest_position(row["id"]),
+            "model_ready": (worker.tagger or tagger).model_ready,
+            "tags": row["tag_list"],
+        }
+
+    @app.post("/posts/{post_id}/suggest")
+    def suggest(post_id: int):
+        """Sugerir de novo: entra na fila da IA (a análise roda no worker, não na requisição)."""
+        post_or_404(post_id)
+        worker.submit_suggest(post_id)
+        return suggest_status(db.get_post(post_id))
+
+    @app.get("/posts/{post_id}/suggest/status")
+    def suggest_state(post_id: int):
+        return suggest_status(post_or_404(post_id))
 
     # --- sites -------------------------------------------------------------------
 
