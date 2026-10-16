@@ -388,7 +388,8 @@ def test_dangerous_buttons_ask_for_confirmation(client, db):
     c, _ = client
     post_id = upload(c)
     page = c.get(f"/posts/{post_id}").text
-    assert 'data-confirm="Apagar este post da fila?"' in page and "return confirm(" not in page
+    # apagar não pergunta mais: tem "desfazer" logo depois (etapa 9)
+    assert 'value="delete"' in page and "return confirm(" not in page
 
 
 def test_new_post_has_no_rating_and_cannot_be_approved_without_one(client, db):
@@ -517,3 +518,67 @@ def test_approve_goes_to_the_oldest_remaining_draft(client, db):
         r = c.post(f"/posts/{pid}", data={"action": "approve", "tags": "x", "rating": "general",
                                            "sites": ["danbooru"]}, follow_redirects=False)
     assert r.headers["location"].startswith("/?aviso=")  # sem rascunhos: volta para o Início
+
+
+def test_delete_hides_everywhere_and_undo_restores(client, db):
+    from datetime import timedelta
+
+    from boorubot import calendar_view, dashboard, insights
+
+    c, _ = client
+    post_id = upload(c)
+    db.update_post(post_id, tags="x", rating="general")
+    db.approve(post_id)
+    db.add_publication(post_id, "danbooru", "ok", "https://danbooru.donmai.us/posts/1")
+    pub_id = db.publications(post_id)[0]["id"]
+    db.add_metric_snapshot(pub_id, datetime.now().isoformat(timespec="seconds"), 5, 5, 0, 3)
+    r = c.post(f"/posts/{post_id}", data={"action": "delete"}, follow_redirects=False)
+    assert r.headers["location"] == f"/?aviso=Arte%20apagada&desfazer={post_id}"
+    home = c.get(r.headers["location"]).text
+    assert f'action="/posts/{post_id}/desfazer"' in home
+    assert post_id not in [p["id"] for p in db.list_posts()] and post_id not in [p["id"] for p in db.queue()]
+    assert post_id not in [p["id"] for p in c.get("/busca.json").json()["posts"]]
+    assert "danbooru.donmai.us/posts/1" not in c.get("/historico").text
+    assert insights.build(db, "tudo")["posts"] == 0 and not db.all_metric_snapshots()
+    assert dashboard.week_favorites(db, datetime.now())["total"] == 0
+    other = upload(c)
+    db.delete_post(other)
+    assert calendar_view.build(db)["suggestion"] is None  # rascunho apagado não é sugerido no calendário
+    assert all(p["id"] != other for p in dashboard.build(db)["review"])
+    # o ritmo do site continua vendo o envio de hoje (não deixa sair outro post no mesmo dia)
+    assert db.site_last_published("danbooru") is not None
+
+    c.post(f"/posts/{post_id}/desfazer")
+    row = db.get_post(post_id)
+    assert row["status"] == "approved" and row["deleted_at"] is None
+    assert post_id in [p["id"] for p in db.queue()]
+
+
+def test_purge_only_after_24h(client, db):
+    from datetime import timedelta
+
+    c, w = client
+    draft, published = upload(c), upload(c)
+    db.add_publication(published, "danbooru", "ok")
+    images = {pid: db.get_post(pid)["image"] for pid in (draft, published)}
+    for pid in (draft, published):
+        c.post(f"/posts/{pid}", data={"action": "delete"})
+    assert w.purge() == 0 and db.get_post(draft)  # antes do prazo nada some
+    assert (app_mod.IMAGES_DIR / images[draft]).exists()
+    assert w.purge(datetime.now() + timedelta(hours=25)) == 2
+    assert db.get_post(draft) is None and not (app_mod.IMAGES_DIR / images[draft]).exists()
+    # a que já saiu fica escondida (o ritmo do site conta com ela), sem a imagem
+    kept = db.get_post(published)
+    assert kept["status"] == "deleted" and kept["image"] == "" and db.publications(published)
+    assert not (app_mod.IMAGES_DIR / images[published]).exists()
+    assert c.post(f"/posts/{draft}/desfazer", follow_redirects=False).headers["location"].startswith("/?aviso=")
+
+
+def test_deleted_post_is_never_sent(db, monkeypatch):
+    post_id = db.create_post("x.png", tags="x", sites=["danbooru"], status="approved")
+    db.set_setting("test_mode", "0")
+    db.delete_post(post_id)
+    called = []
+    monkeypatch.setattr(worker_mod, "build_site", lambda *a, **k: called.append(a))
+    assert worker_mod.publish_site(db, post_id, "danbooru") == "missing"
+    assert publish_post(db, post_id) == "missing" and not called
