@@ -132,6 +132,7 @@ def create_app(db: DB | None = None, worker: Worker | None = None, start_worker:
     @app.get("/posts/{post_id}")
     def edit_post(request: Request, post_id: int, erro: str = ""):
         from boorubot.scheduler import plan
+        from boorubot.suggest import mochi_note
 
         row = post_or_404(post_id)
         queue_ids = [p["id"] for p in db.queue()]
@@ -147,7 +148,7 @@ def create_app(db: DB | None = None, worker: Worker | None = None, start_worker:
         planned = [s["when"] for s in site_days if s["when"]]
         return render(
             request, "post.html", post=row, pubs=db.publications(post_id), tests=db.test_runs(post_id), error=erro,
-            default_tags=normalize_tags(db.setting("default_tags")),
+            default_tags=normalize_tags(db.setting("default_tags")), mochi=mochi_note(row),
             metrics=db.latest_metrics(),
             has_test_account=bool(db.setting("danbooru_test_api_key")),
             projected=min(planned) if planned else None, site_days=site_days, today=today.isoformat(),
@@ -240,11 +241,12 @@ def create_app(db: DB | None = None, worker: Worker | None = None, start_worker:
             return see_other("/")
 
         if row["status"] in ("draft", "approved", "failed", "partial"):
-            from boorubot.suggest import accept_weak
+            from boorubot.suggest import accept_weak, oc_fields
 
             tag_list = normalize_tags(tags)
             db.update_post(
                 post_id, title=title.strip(), tags=" ".join(tag_list), **accept_weak(row, tag_list),
+                **oc_fields(row, original_character),
                 rating=rating if rating in RATINGS else "general", source=source.strip(),
                 commentary_title=commentary_title.strip(), commentary_description=commentary_description.strip(),
                 original_character=original_character, sites=[s for s in ALL_SITES if s in sites],
@@ -287,6 +289,7 @@ def create_app(db: DB | None = None, worker: Worker | None = None, start_worker:
         return see_other("/")
 
     def suggest_status(row: dict) -> dict:
+        from boorubot.suggest import mochi_note
         from boorubot.tagger import tagger
 
         return {
@@ -294,6 +297,7 @@ def create_app(db: DB | None = None, worker: Worker | None = None, start_worker:
             "waiting": worker.suggest_position(row["id"]),
             "model_ready": (worker.tagger or tagger).model_ready,
             "tags": row["tag_list"], "scores": row["tag_scores"], "weak": row["weak_tags"],
+            "original_character": row["original_character"], "mochi": mochi_note(row),
         }
 
     @app.post("/posts/{post_id}/suggest")
