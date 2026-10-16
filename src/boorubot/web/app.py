@@ -70,6 +70,28 @@ def clean_post_fields(row: dict, data: dict) -> dict:
     return out
 
 
+WEEKDAYS = ("seg", "ter", "qua", "qui", "sex", "sáb", "dom")
+
+
+def when_label(when: datetime | None) -> str:
+    """"seg 19/10 às 18:00"."""
+    return f"{WEEKDAYS[when.weekday()]} {when:%d/%m} às {when:%H:%M}" if when else ""
+
+
+def image_info(filename: str) -> str:
+    """"PNG · 1200 × 1600 · 840 KB" (vazio se a imagem sumiu do disco)."""
+    from PIL import Image
+
+    path = IMAGES_DIR / filename
+    try:
+        with Image.open(path) as im:
+            w, h = im.size
+            kind = im.format or path.suffix.lstrip(".").upper()
+        return f"{kind} · {w} × {h} · {max(1, round(path.stat().st_size / 1024))} KB"
+    except OSError:
+        return ""
+
+
 def see_other(url: str) -> RedirectResponse:
     return RedirectResponse(url, status_code=303)
 
@@ -90,6 +112,7 @@ def create_app(db: DB | None = None, worker: Worker | None = None, start_worker:
         SITE_LABELS=SITE_LABELS, STATUS_LABELS=STATUS_LABELS, RATINGS=RATINGS, RATINGS_PT=RATINGS_PT,
         ALL_SITES=ALL_SITES, BROWSER_MODE_LABELS=BROWSER_MODE_LABELS,
     )
+    templates.env.filters["quando"] = when_label
 
     def danbooru_mode() -> str:
         """Como o post entra no Danbooru, pelo nível REAL lido da conta (nunca presumido).
@@ -164,6 +187,22 @@ def create_app(db: DB | None = None, worker: Worker | None = None, start_worker:
         worker.submit_suggest(post_id)  # fila própria da IA: não atrasa nenhum envio
         return see_other(f"/posts/{post_id}")
 
+    @app.post("/posts/{post_id}/imagem")
+    async def replace_image(post_id: int, image: UploadFile = File(...)):
+        """Trocar imagem: mantém tudo que ela escreveu e pede para a IA olhar de novo."""
+        row = post_or_404(post_id)
+        ext = Path(image.filename or "").suffix.lower()
+        if row["status"] not in EDITABLE:
+            return see_other(f"/posts/{post_id}?erro=" + quote("esta arte não pode mais ser editada"))
+        if ext not in IMAGE_EXTS:
+            return see_other(f"/posts/{post_id}?erro=" + quote(f"formato não suportado: {ext or '?'}"))
+        filename = f"{uuid.uuid4().hex}{ext}"
+        (IMAGES_DIR / filename).write_bytes(await image.read())
+        db.update_post(post_id, image=filename)
+        (IMAGES_DIR / row["image"]).unlink(missing_ok=True)
+        worker.submit_suggest(post_id)
+        return see_other(f"/posts/{post_id}")
+
     @app.get("/posts/{post_id}")
     def edit_post(request: Request, post_id: int, erro: str = ""):
         from boorubot.scheduler import plan
@@ -181,8 +220,27 @@ def create_app(db: DB | None = None, worker: Worker | None = None, start_worker:
             site_days.append({"site": site, "label": SITE_LABELS[site], "when": when, "pinned": pins.get(site),
                               "done": site in done, "off": db.site_rhythm(site) == "desligado"})
         planned = [s["when"] for s in site_days if s["when"]]
+        sessions = db.sessions()
+        last_test = {}
+        for t in db.test_runs(post_id):  # do mais novo para o mais antigo: fica o último de cada site
+            last_test.setdefault(t["site"], t)
+        days_by_site = {s["site"]: s for s in site_days}
+        site_rows = [{
+            "site": s, "label": SITE_LABELS[s], "checked": s in row["sites"],
+            "off": db.site_rhythm(s) == "desligado", "done": s in done,
+            "when": days_by_site.get(s, {}).get("when"), "pinned": pins.get(s),
+            # None = nunca testado; False = sessão caiu (pediu login de novo)
+            "session_ok": bool(sessions[s]["ok"]) if s in sessions else None,
+            "test": last_test.get(s),
+        } for s in ALL_SITES]
+        approve_when = None
+        if row["status"] == "draft" and row["sites"]:
+            from boorubot.scheduler import next_free_day
+
+            approve_when = next_free_day(db, row["sites"])
         return render(
-            request, "post.html", post=row, pubs=db.publications(post_id), tests=db.test_runs(post_id), error=erro,
+            request, "post.html", post=row, site_rows=site_rows, approve_when=approve_when,
+            image_info=image_info(row["image"]), pubs=db.publications(post_id), tests=db.test_runs(post_id), error=erro,
             default_tags=normalize_tags(db.setting("default_tags")), mochi=mochi_note(row),
             approval_errors=approval_errors(row),
             metrics=db.latest_metrics(),
