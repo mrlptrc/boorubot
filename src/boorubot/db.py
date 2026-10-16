@@ -104,6 +104,16 @@ CREATE TABLE IF NOT EXISTS settings (
 );
 """
 
+# colunas que vieram depois da primeira versão (o DB.__init__ adiciona em bancos antigos)
+NEW_POST_COLUMNS = (
+    ("queue_pos", "REAL"),
+    ("published_at", "TEXT"),
+    # sugestão da IA: '' (nunca pedida) | pendente | analisando | pronta | falhou
+    ("suggest_state", "TEXT NOT NULL DEFAULT ''"),
+    ("suggest_error", "TEXT NOT NULL DEFAULT ''"),
+)
+SUGGEST_STATES = ("pendente", "analisando", "pronta", "falhou")
+
 DEFAULT_SETTINGS = {
     "test_mode": "1",       # 1 = nada é enviado de verdade (dry-run)
     "daily_time": "18:00",  # horário do post diário
@@ -142,7 +152,7 @@ class DB:
         with _lock, self.conn:
             self.conn.executescript(SCHEMA)
             cols = {r[1] for r in self.conn.execute("PRAGMA table_info(posts)")}
-            for col, kind in (("queue_pos", "REAL"), ("published_at", "TEXT")):
+            for col, kind in NEW_POST_COLUMNS:
                 if col not in cols:  # banco criado por versão anterior
                     self.conn.execute(f"ALTER TABLE posts ADD COLUMN {col} {kind}")
             if "approved_in_test" not in cols:
@@ -207,6 +217,14 @@ class DB:
             fields["original_character"] = int(bool(fields["original_character"]))
         cols = ", ".join(f"{k} = ?" for k in fields)
         self._exec(f"UPDATE posts SET {cols} WHERE id = ?", (*fields.values(), post_id))
+
+    def set_suggest_state(self, post_id: int, state: str, error: str = "") -> None:
+        self._exec("UPDATE posts SET suggest_state = ?, suggest_error = ? WHERE id = ?", (state, error, post_id))
+
+    def posts_suggesting(self) -> list[int]:
+        """Sugestões que não terminaram (o painel fechou no meio): o worker retoma ao iniciar."""
+        return [r["id"] for r in self._all(
+            "SELECT id FROM posts WHERE suggest_state IN ('pendente', 'analisando') ORDER BY id")]
 
     def delete_post(self, post_id: int) -> None:
         self._exec("DELETE FROM posts WHERE id = ?", (post_id,))

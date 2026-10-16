@@ -1,5 +1,6 @@
 """Uma thread executa as tarefas de navegador/API em fila (uma por vez, para não brigar
-pelo mesmo perfil de navegador) e outra agenda os posts aprovados no horário."""
+pelo mesmo perfil de navegador), outra agenda os posts aprovados no horário e uma terceira,
+separada, roda a sugestão da IA (um publish nunca espera uma análise)."""
 
 from __future__ import annotations
 
@@ -151,16 +152,52 @@ def run_post_test(db: DB, post_id: int) -> list[str]:
 
 
 class Worker:
-    def __init__(self, db: DB, scheduler_interval: float = 30):
+    def __init__(self, db: DB, scheduler_interval: float = 30, tagger=None):
         self.db = db
         self.jobs: queue.Queue[Job] = queue.Queue()
         self.current: Job | None = None
         self.scheduler_interval = scheduler_interval
+        self.tagger = tagger  # None = o WD Tagger de verdade (carregado só na 1ª análise)
+        # fila só da IA: fora de `jobs` e de pending() (a página não recarrega a cada análise)
+        self.suggestions: queue.Queue[int] = queue.Queue()
+        self.suggesting: int | None = None
         self._stop = threading.Event()
 
     def start(self) -> None:
+        for post_id in self.db.posts_suggesting():  # painel fechou no meio de uma análise
+            self.suggestions.put(post_id)
         threading.Thread(target=self._run_jobs, name="jobs", daemon=True).start()
         threading.Thread(target=self._run_scheduler, name="scheduler", daemon=True).start()
+        threading.Thread(target=self._run_suggestions, name="suggest", daemon=True).start()
+
+    def submit_suggest(self, post_id: int) -> None:
+        if post_id == self.suggesting or post_id in list(self.suggestions.queue):
+            return
+        self.db.set_suggest_state(post_id, "pendente")
+        self.suggestions.put(post_id)
+
+    def suggest_position(self, post_id: int) -> int | None:
+        """Quantas análises estão na frente desta (0 = é a próxima); None = não está esperando."""
+        waiting = list(self.suggestions.queue)
+        if post_id not in waiting:
+            return None
+        return waiting.index(post_id) + (1 if self.suggesting is not None else 0)
+
+    def _run_suggestions(self) -> None:
+        from boorubot.suggest import run_suggestion
+
+        while not self._stop.is_set():
+            try:
+                post_id = self.suggestions.get(timeout=1)
+            except queue.Empty:
+                continue
+            self.suggesting = post_id
+            try:
+                run_suggestion(self.db, post_id, self.tagger)
+            except Exception:
+                log.exception("sugestão %s falhou", post_id)
+            finally:
+                self.suggesting = None
 
     def stop(self) -> None:
         self._stop.set()

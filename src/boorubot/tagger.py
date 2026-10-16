@@ -40,6 +40,18 @@ class Tagger:
         self._labels: list[tuple[str, str]] = []
         self._lock = threading.Lock()
 
+    @property
+    def model_ready(self) -> bool:
+        """Modelo já está no PC (carregado ou no cache)? Se não, a próxima análise baixa ~380 MB."""
+        if self._session is not None:
+            return True
+        try:
+            from huggingface_hub import try_to_load_from_cache
+
+            return isinstance(try_to_load_from_cache(self.repo, "model.onnx"), str)
+        except Exception:
+            return False
+
     def _load(self) -> None:
         if self._session is not None:
             return
