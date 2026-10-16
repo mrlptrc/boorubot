@@ -657,3 +657,6 @@ html.sl-loading .guide-tabs { visibility: hidden; }
 .approve-why { margin: 0; align-self: center; font: 700 14px var(--v2-text); color: var(--v2-warn); }
 .approve-why[hidden] { display: none; }
 button[disabled] { opacity: .55; cursor: not-allowed; transform: none; }
+.save-status { margin: 0; min-height: 20px; font: 700 14px var(--v2-text); color: var(--v2-muted); }
+.save-status[data-kind="ok"] { color: var(--v2-ok); }
+.save-status[data-kind="error"] { color: var(--v2-bad); }
