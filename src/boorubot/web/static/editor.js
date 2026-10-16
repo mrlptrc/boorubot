@@ -120,5 +120,33 @@
   const tagRoot = document.querySelector("[data-tag-field]");
   const tagField = tagRoot ? TagField(tagRoot) : null;
 
-  window.boorubotEditor = { tagField, esc, pct };
+  // ------------------------------------------------- pode aprovar?
+  // Mesma lista do backend (approval_errors): sem tags, sem rating, sem site. O botão fica
+  // desligado com o motivo à vista; sem JavaScript o backend recusa com a mesma mensagem.
+  const form = document.getElementById("post-form");
+  function approvalErrors() {
+    if (!form) return [];
+    const errors = [];
+    if (!form.querySelector("textarea[name=tags]").value.trim()) errors.push("sem tags");
+    if (!form.querySelector("input[name=rating]:checked")) errors.push("escolha o rating");
+    if (!form.querySelector("input[name=sites]:checked")) errors.push("nenhum site marcado");
+    return errors;
+  }
+  function refreshApproval() {
+    const errors = approvalErrors();
+    document.querySelectorAll("[data-needs-ready]").forEach((b) => {
+      b.disabled = errors.length > 0;
+      if (errors.length) b.setAttribute("aria-describedby", "approve-why"); else b.removeAttribute("aria-describedby");
+    });
+    const why = document.getElementById("approve-why");
+    if (why) { why.hidden = !errors.length; why.textContent = errors.length ? "Falta: " + errors.join(", ") : ""; }
+    return errors;
+  }
+  if (form) {
+    form.addEventListener("input", refreshApproval);
+    form.addEventListener("change", refreshApproval);
+    refreshApproval();
+  }
+
+  window.boorubotEditor = { tagField, esc, pct, refreshApproval, approvalErrors };
 })();
