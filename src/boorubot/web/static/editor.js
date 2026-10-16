@@ -273,5 +273,14 @@
     document.querySelectorAll(".ed-menu[open]").forEach((m) => { m.open = false; m.querySelector("summary").focus(); });
   });
 
+  // Ctrl+Enter aprova (só com o botão habilitado; não é atalho de digitação, então vale em qualquer campo)
+  document.addEventListener("keydown", (ev) => {
+    if (ev.key !== "Enter" || !(ev.ctrlKey || ev.metaKey) || ev.altKey || ev.shiftKey) return;
+    const approve = document.querySelector("[data-approve]");
+    if (!approve || approve.disabled || !form) return;
+    ev.preventDefault();
+    form.requestSubmit(approve);
+  });
+
   window.boorubotEditor = { tagField, esc, pct, refreshApproval, approvalErrors, save };
 })();

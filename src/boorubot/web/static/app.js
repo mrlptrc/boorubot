@@ -45,6 +45,21 @@
     }
   } catch (e) {}
 
+  // ----------------------------------------- aviso (?aviso=...) por ~8 s
+  // Some sozinho e sai da URL (recarregar a página não repete o aviso nem o "desfazer").
+  const flash = document.querySelector("[data-flash]");
+  if (flash) {
+    const url = new URL(location.href);
+    url.searchParams.delete("aviso"); url.searchParams.delete("desfazer");
+    history.replaceState(null, "", url.pathname + url.search + url.hash);
+    let hideTimer = setTimeout(() => flash.remove(), 8000);
+    // com o foco ou o mouse no aviso (ex.: indo clicar em "desfazer"), ele espera
+    flash.addEventListener("pointerenter", () => clearTimeout(hideTimer));
+    flash.addEventListener("focusin", () => clearTimeout(hideTimer));
+    flash.addEventListener("pointerleave", () => { hideTimer = setTimeout(() => flash.remove(), 4000); });
+    flash.querySelector("[data-flash-close]").addEventListener("click", () => flash.remove());
+  }
+
   // ------------------------------------------------- tarefas em andamento
   // Igual a antes: consulta /status.json e recarrega quando tudo termina. Agora avisa com um toast.
   const jobsEl = document.getElementById("jobs");
