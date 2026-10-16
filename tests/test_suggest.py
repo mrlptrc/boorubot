@@ -121,3 +121,46 @@ def test_publish_never_waits_for_a_suggestion(db, monkeypatch):
     finally:
         release.set()
         w.stop()
+
+
+def test_scores_persist_and_weak_tags_stay_out(db, tmp_path):
+    tagger = FakeTagger(general=[("long_hair", 0.92), ("smile", 0.41)])
+    tagger.result.weak = [("blush", 0.3), ("long_hair", 0.28)]
+    post_id = db.create_post("x.png", tags="artist_name")
+    run_suggestion(db, post_id, tagger)
+    again = DB(tmp_path / "test.db").get_post(post_id)  # "recarregar": outra conexão com o mesmo banco
+    assert again["tag_scores"] == {"long_hair": 0.92, "smile": 0.41}
+    assert again["weak_tags"] == [["blush", 0.3]]  # o que já virou tag não aparece como fraca
+    assert "blush" not in again["tag_list"]
+
+
+def test_accepting_a_weak_tag_keeps_its_score(db):
+    w = Worker(db, tagger=FakeTagger())
+    c = TestClient(app_mod.create_app(db, w, start_worker=False))
+    post_id = db.create_post("x.png", tags="a", weak_tags=[["blush", 0.3], ["hat", 0.27]])
+    c.post(f"/posts/{post_id}", data={"action": "save", "tags": "a blush", "sites": ["danbooru"]})
+    row = db.get_post(post_id)
+    assert row["tag_scores"] == {"blush": 0.3} and row["weak_tags"] == [["hat", 0.27]]
+    page = c.get(f"/posts/{post_id}").text
+    assert "data-tag-field" in page and "hat" in page
+
+
+def test_tagger_splits_weak_suggestions():
+    from boorubot.tagger import Tagger
+
+    class Session:
+        def get_inputs(self):
+            return [type("I", (), {"name": "x", "shape": [1, 4, 4, 3]})()]
+
+        def run(self, _, inputs):
+            import numpy as np
+            return [np.array([[0.9, 0.5, 0.3, 0.2, 0.8, 0.95]])]
+
+    t = Tagger()
+    t._session = Session()
+    t._labels = [("general", "9"), ("smile", "0"), ("blush", "0"), ("hat", "0"), ("some_char", "4"),
+                 ("other_char", "4")]
+    t._prepare = lambda path: None
+    s = t.suggest(Path("x.png"))
+    assert [g for g, _ in s.general] == ["smile"] and [w for w, _ in s.weak] == ["blush"]
+    assert [c for c, _ in s.characters] == ["other_char"]  # personagem abaixo de 0,85 não entra
