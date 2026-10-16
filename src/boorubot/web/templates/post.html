@@ -18,7 +18,8 @@
     <p class="mochi-note" id="mochi-note" {{ 'hidden' if not mochi }}><img src="/static/pets/cat.svg" alt=""><span>{{ mochi }}</span></p>
   </figure>
 
-  <form method="post" class="card fields" id="post-form">
+  <form method="post" class="card fields" id="post-form" data-post-id="{{ post.id }}">
+    {% if editable %}<p class="save-status" data-save-status role="status" aria-live="polite"></p>{% endif %}
     <fieldset {{ 'disabled' if not editable }}>
       <label>Título <input name="title" value="{{ post.title }}"></label>
 
@@ -90,7 +91,6 @@
     </p>
     {% endif %}
     <div class="actions">
-      {% if editable %}<button name="action" value="save" class="ghost">Salvar</button>{% endif %}
       {% if post.status == 'draft' %}
         <button name="action" value="approve" class="primary" data-needs-ready>Aprovar e agendar</button>
         <p class="approve-why" id="approve-why" role="status" {{ 'hidden' if not approval_errors }}>{% if approval_errors %}Falta: {{ approval_errors|join(', ') }}{% endif %}</p>
