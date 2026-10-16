@@ -2,233 +2,279 @@
 {% block title %}{{ post.title or ('#' ~ post.id) }} · boorubot{% endblock %}
 {% block content %}
 {% set editable = post.status in ('draft', 'approved', 'failed', 'partial') %}
-<p><a href="/">&larr; Fila</a></p>
-{% if error %}<div class="alert">{{ error }}</div>{% endif %}
+{% set crumbs = {'draft': ('Rascunhos', '/#revisar'), 'approved': ('Na fila', '/'), 'done': ('Publicadas', '/historico'),
+                 'failed': ('Para revisar', '/#revisar'), 'partial': ('Para revisar', '/#revisar')} %}
+{% set crumb = crumbs.get(post.status, ('Artes', '/')) %}
+{% set ai_busy = post.suggest_state in ('pendente', 'analisando') %}
+<div class="editor v2" data-status="{{ post.status }}">
+  <header class="ed-top">
+    <nav class="ed-crumbs" aria-label="Caminho"><a href="/">Artes</a> <span aria-hidden="true">/</span> <a href="{{ crumb[1] }}">{{ crumb[0] }}</a></nav>
+    <div class="ed-title-row">
+      <h1>{{ post.title or ('Arte #' ~ post.id) }}</h1>
+      <span class="ed-status st-{{ post.status }}">{{ STATUS_LABELS[post.status] }}</span>
+      {% if editable %}<p class="save-status" data-save-status role="status" aria-live="polite"></p>{% endif %}
+    </div>
+  </header>
 
-<div class="post-layout v2">
-  <figure class="preview card">
-    <img src="/images/{{ post.image }}" alt="">
-    <figcaption>
-      <span class="pill s-{{ post.status }}">{{ STATUS_LABELS[post.status] }}</span>
-      {% if queue_pos %}
-        <b>{{ queue_pos }}º de {{ queue_len }}</b> na fila{% if projected %} · próxima saída: <b>{{ projected.strftime('%d/%m às %H:%M') }}</b>{% endif %}
-      {% endif %}
-      {% if post.published_at %}<span class="muted small">publicado em {{ post.published_at[8:10] }}/{{ post.published_at[5:7] }} {{ post.published_at[11:16] }}</span>{% endif %}
-    </figcaption>
-    <p class="mochi-note" id="mochi-note" {{ 'hidden' if not mochi }}><img src="/static/pets/cat.svg" alt=""><span>{{ mochi }}</span></p>
-  </figure>
+  {% if error %}<div class="ed-alert" role="alert">{{ error }}</div>{% endif %}
+  {% if post.status == 'approved' and post.approved_in_test %}
+  <p class="ed-note warn">
+    {% if test_mode %}<b>Aprovada no modo teste.</b> Quando o modo teste for desligado, ela <b>não vai ao ar</b>
+      sozinha: vai pedir confirmação.
+    {% else %}<b>Aprovada no modo teste:</b> não vai ao ar até você confirmar que vale de verdade.{% endif %}
+  </p>
+  {% endif %}
 
-  <form method="post" class="card fields" id="post-form" data-post-id="{{ post.id }}">
-    {% if editable %}<p class="save-status" data-save-status role="status" aria-live="polite"></p>{% endif %}
-    <fieldset {{ 'disabled' if not editable }}>
-      <label>Título <input name="title" value="{{ post.title }}"></label>
+  {# "Trocar imagem" usa um form próprio (form não pode ficar dentro de form); o input aponta para ele #}
+  <form id="replace-form" method="post" action="/posts/{{ post.id }}/imagem" enctype="multipart/form-data" hidden></form>
 
-      <div class="tags-head">
-        <span>Tags <small>separadas por espaço, padrão Danbooru (long_hair, 1girl...)</small></span>
-        <button type="button" class="ghost" id="suggest">✨ Sugerir de novo</button>
-      </div>
-      <div class="tag-field" data-tag-field='{{ {"scores": post.tag_scores, "weak": post.weak_tags, "defaults": default_tags}|tojson|forceescape }}'>
-        <textarea name="tags" id="tags" rows="6" placeholder="1girl long_hair commission ...">{{ post.tags }}</textarea>
-      </div>
-      <p class="muted small" id="suggest-info"></p>
-
-      {% set rating_cards = [
-        ('general', 'Geral', 'sem nudez nem insinuação'),
-        ('sensitive', 'Sensível', 'decote, roupa de banho, insinuação leve'),
-        ('questionable', 'Questionável', 'nudez sem ato sexual'),
-        ('explicit', 'Explícito', 'sexo ou genitais à mostra'),
-      ] %}
-      <fieldset class="rating-pick" id="rating" data-suggestion="{{ post.rating_suggestion }}">
-        <legend>Rating {% if not post.rating %}<span class="need">escolha um</span>{% endif %}</legend>
-        <div class="rating-cards">
-          {% for value, label, example in rating_cards %}
-          <label class="rating-card{{ ' suggested' if post.rating_suggestion == value }}">
-            <input type="radio" name="rating" value="{{ value }}" {{ 'checked' if post.rating == value }}>
-            <span class="rating-name">{{ label }}</span>
-            <span class="rating-example">{{ example }}</span>
-            <span class="rating-ai" {{ 'hidden' if post.rating_suggestion != value }}>sugestão da IA{% if post.rating_confidence %} · {{ (post.rating_confidence * 100)|round|int }}%{% endif %}</span>
-          </label>
-          {% endfor %}
-        </div>
-      </fieldset>
-
-      <div class="row">
-        <label>Link original (source) <input name="source" value="{{ post.source }}" placeholder="https://x.com/..."></label>
-      </div>
-
-      <label class="check">
-        <input type="checkbox" name="original_character" id="original_character" value="true" {{ 'checked' if post.original_character }}>
-        Só personagem original (OC) <small>Danbooru ganha a tag <code>original</code>; o paheal não aceita e será pulado</small>
-      </label>
-
-      <details {{ 'open' if post.commentary_title or post.commentary_description }}>
-        <summary>Comentário da artista (Danbooru)</summary>
-        <label>Título <input name="commentary_title" value="{{ post.commentary_title }}"></label>
-        <label>Texto <textarea name="commentary_description" rows="3">{{ post.commentary_description }}</textarea></label>
-      </details>
-
-      <div class="sites">
-        <span>Publicar em</span>
-        {% for s in ALL_SITES %}
-        <label class="chip"><input type="checkbox" name="sites" value="{{ s }}" {{ 'checked' if s in post.sites }}> {{ SITE_LABELS[s] }}</label>
-        {% endfor %}
-      </div>
-    </fieldset>
-
-    {% if post.status == 'approved' and post.approved_in_test %}
-    <p class="notice n-direct">
-      {% if test_mode %}<b>Aprovada no modo teste.</b> Quando o modo teste for desligado, ela <b>não vai ao ar</b>
-        sozinha: vai pedir confirmação.
-      {% else %}<b>Aprovada no modo teste:</b> não vai ao ar até você confirmar que vale de verdade.{% endif %}
-    </p>
-    {% endif %}
-    {% if editable and 'danbooru' in post.sites %}
-    <p class="notice n-{{ danbooru_mode }}">
-      {% if danbooru_mode == 'direct' %}<b>Danbooru:</b> sua conta tem aprovação automática, então este post <b>vai ao ar na hora</b>, sem moderação. Confira o <b>rating</b> e as <b>tags</b>.
-      {% elif danbooru_mode == 'forced' %}<b>Danbooru:</b> vai para a fila de moderação (você escolheu isso em Sites).
-      {% elif danbooru_mode == 'moderated' %}<b>Danbooru:</b> vai para a fila de moderação, com até 3 dias para ser aprovado.
-      {% else %}<b>Danbooru:</b> conecte a conta em <a href="/sites#danbooru">Sites</a> para saber se o post vai direto ao ar ou para moderação.{% endif %}
-    </p>
-    {% endif %}
-    <div class="actions">
-      {% if post.status == 'draft' %}
-        <button name="action" value="approve" class="primary" data-needs-ready>Aprovar e agendar</button>
-        <p class="approve-why" id="approve-why" role="status" {{ 'hidden' if not approval_errors }}>{% if approval_errors %}Falta: {{ approval_errors|join(', ') }}{% endif %}</p>
-      {% elif post.status == 'approved' %}
-        <button name="action" value="unapprove" class="ghost">Voltar para rascunho</button>
-        {% if post.approved_in_test and not test_mode %}<button name="action" value="confirm" class="primary"
-          data-confirm="Esta arte vai entrar na fila e sair DE VERDADE. Confirmar?">Confirmar para valer</button>{% endif %}
-        {% if queue_pos and queue_pos > 1 %}<button name="action" value="first" class="ghost">Passar para o início da fila</button>{% endif %}
-        {% if queue_pos and queue_pos < queue_len %}<button name="action" value="last" class="ghost">Mandar para o fim</button>{% endif %}
-      {% endif %}
-      {% if editable %}
-        <button name="action" value="test" class="{{ 'primary' if test_mode and post.status != 'draft' else 'ghost' }}"
-          title="Simula em cada site marcado. Não muda nada no post, na fila nem no histórico.">🧪 Testar este post</button>
-        {% if not test_mode %}
-        <button name="action" value="publish_now" class="{{ 'primary' if post.status != 'draft' else 'ghost' }}"
-          data-confirm="{{ 'Já saiu um post hoje. Publicar agora faz 2 no mesmo dia (pode parecer spam). Continuar?' if published_today and post.status not in ('failed', 'partial') else 'Publicar DE VERDADE agora nos sites marcados? Isso conta como o post de hoje.' }}">
-          {{ 'Tentar de novo' if post.status in ('failed', 'partial') else 'Publicar agora' }}
-        </button>
+  <form method="post" class="ed-grid" id="post-form" data-post-id="{{ post.id }}" data-suggest-state="{{ post.suggest_state }}">
+    <aside class="ed-art">
+      <img src="/images/{{ post.image }}" alt="A arte: {{ post.title or ('#' ~ post.id) }}">
+      <div class="ed-file">
+        <span>{{ image_info or post.image }}</span>
+        {% if editable %}
+        <label class="ed-replace">Trocar imagem
+          <input type="file" name="image" form="replace-form" accept=".png,.jpg,.jpeg,.gif,.webp" onchange="this.form.submit()">
+        </label>
         {% endif %}
+      </div>
+      {% if queue_pos %}
+      <p class="ed-queue"><b>{{ queue_pos }}º de {{ queue_len }}</b> na fila{% if projected %} · próxima saída: <b>{{ projected|quando }}</b>{% endif %}</p>
       {% endif %}
-      <button name="action" value="delete" class="danger" formnovalidate data-confirm="Apagar este post da fila?">Apagar</button>
+      {% if post.published_at %}<p class="ed-queue">publicada em {{ post.published_at[8:10] }}/{{ post.published_at[5:7] }} às {{ post.published_at[11:16] }}</p>{% endif %}
+      <p class="mochi-note" id="mochi-note" {{ 'hidden' if not mochi }}><img src="/static/pets/cat.svg" alt="A Mochi"><span>{{ mochi }}</span></p>
+    </aside>
+
+    <div class="ed-fields">
+      <fieldset class="ed-set" {{ 'disabled' if not editable }}>
+        <legend class="sr-only">Dados da arte</legend>
+        <div class="ed-field">
+          <label for="title" class="ed-label">Título</label>
+          <input id="title" name="title" value="{{ post.title }}" autocomplete="off">
+        </div>
+
+        <div class="ed-field">
+          <div class="ed-label-row">
+            <label for="tags" class="ed-label">Tags</label>
+            <span class="ed-ai" id="suggest-info" role="status" aria-live="polite">
+              {%- if ai_busy %}A Mochi está olhando a arte…
+              {%- elif post.suggest_state == 'pronta' %}A Mochi já olhou
+              {%- elif post.suggest_state == 'falhou' %}A Mochi não conseguiu olhar: {{ post.suggest_error }}{% endif -%}
+            </span>
+            {% if editable %}<button type="button" class="link-btn" id="suggest" {{ 'disabled' if ai_busy }}>sugerir de novo</button>{% endif %}
+          </div>
+          <div class="tag-field" data-tag-field='{{ {"scores": post.tag_scores, "weak": post.weak_tags, "defaults": default_tags}|tojson|forceescape }}'>
+            <textarea name="tags" id="tags" rows="5" placeholder="1girl long_hair commission ...">{{ post.tags }}</textarea>
+          </div>
+          <p class="ed-hint">Verde: a IA tem certeza. Amarelo: vale conferir. Lilás: tags padrão. Separe por espaço, no padrão Danbooru.</p>
+        </div>
+
+        {% set rating_cards = [
+          ('general', 'Geral', 'sem nudez nem insinuação'),
+          ('sensitive', 'Sensível', 'decote, roupa de banho, insinuação leve'),
+          ('questionable', 'Questionável', 'nudez sem ato sexual'),
+          ('explicit', 'Explícito', 'sexo ou genitais à mostra'),
+        ] %}
+        <fieldset class="rating-pick ed-field" id="rating" data-suggestion="{{ post.rating_suggestion }}">
+          <legend class="ed-label">Rating {% if not post.rating %}<span class="need">escolha um</span>{% endif %}</legend>
+          <div class="rating-cards">
+            {% for value, label, example in rating_cards %}
+            <label class="rating-card{{ ' suggested' if post.rating_suggestion == value }}">
+              <input type="radio" name="rating" value="{{ value }}" {{ 'checked' if post.rating == value }}>
+              <span class="rating-name">{{ label }}</span>
+              <span class="rating-example">{{ example }}</span>
+              <span class="rating-ai" {{ 'hidden' if post.rating_suggestion != value }}>sugestão da IA{% if post.rating_confidence %} · {{ (post.rating_confidence * 100)|round|int }}%{% endif %}</span>
+            </label>
+            {% endfor %}
+          </div>
+        </fieldset>
+
+        <div class="ed-field">
+          <label class="ed-check">
+            <input type="checkbox" name="original_character" id="original_character" value="true" {{ 'checked' if post.original_character }}>
+            <span><b>Personagem original (OC)</b><small>o Danbooru ganha a tag <code>original</code>; o paheal não aceita OC</small></span>
+          </label>
+        </div>
+
+        <fieldset class="ed-field ed-sites">
+          <legend class="ed-label">Publicar em</legend>
+          <ul class="site-rows">
+            {% for r in site_rows %}
+            <li class="site-row" data-site="{{ r.site }}">
+              <div class="site-row-text">
+                <span class="site-row-name" id="site-{{ r.site }}">{{ r.label }}</span>
+                <span class="site-row-state">
+                  {%- if r.done %}<span class="ok">já saiu</span>
+                  {%- elif r.off %}site desligado em <a href="/sites#ritmo">Sites</a>
+                  {%- else %}
+                    {%- if r.site == 'paheal' %}<span class="warn" data-oc-only {{ 'hidden' if not post.original_character }}>fica de fora: não aceita personagem original</span>{% endif %}
+                    {%- if r.site != 'danbooru' and r.session_ok == False %}
+                      <span class="bad">pediu login de novo ·</span>
+                      <button type="submit" class="link-btn" formaction="/sites/{{ r.site }}/login" formnovalidate>entrar</button>
+                    {%- elif r.site != 'danbooru' and r.session_ok is none %}
+                      ainda não conectado · <a href="/guia#{{ 'rule34xxx' if r.site == 'rule34xxx' else 'gelbooru' }}">como entrar</a>
+                    {%- elif r.site == 'danbooru' %}
+                      {%- if danbooru_mode == 'direct' %}<span class="warn">sua conta tem aprovação automática, então este post vai ao ar na hora</span>, sem moderação. Confira rating e tags.
+                      {%- elif danbooru_mode == 'forced' %}vai para a fila de moderação (você escolheu isso em Sites)
+                      {%- elif danbooru_mode == 'moderated' %}vai para a fila de moderação, com até 3 dias para ser aprovado
+                      {%- else %}conecte a conta em <a href="/sites#danbooru">Sites</a> para saber se o post vai direto ao ar ou para moderação{% endif %}
+                    {%- elif r.when %}sai {{ r.when|quando }}{% if r.pinned %} (dia fixado){% endif %}
+                    {%- else %}conectado{% endif %}
+                  {%- endif %}
+                </span>
+                {% if r.test %}
+                <span class="site-row-test {{ 'bad' if r.test.status == 'failed' else 'ok' }}">
+                  {%- if r.test.status == 'failed' %}teste falhou às {{ r.test.created_at[11:16] }}: {{ r.test.message|truncate(140) }}
+                  {%- elif r.test.status == 'skipped' %}teste às {{ r.test.created_at[11:16] }}: pulado ({{ r.test.message|truncate(100) }})
+                  {%- else %}teste ok às {{ r.test.created_at[11:16] }}{% endif -%}
+                </span>
+                {% endif %}
+              </div>
+              <span class="switch">
+                <input type="checkbox" role="switch" name="sites" value="{{ r.site }}" aria-labelledby="site-{{ r.site }}" {{ 'checked' if r.checked }} {{ 'disabled' if r.done }}>
+                <span class="switch-ui" aria-hidden="true"></span>
+              </span>
+              {% if r.done and r.checked %}<input type="hidden" name="sites" value="{{ r.site }}">{% endif %}
+            </li>
+            {% endfor %}
+          </ul>
+        </fieldset>
+
+        <details class="ed-more" {{ 'open' if post.source or post.commentary_title or post.commentary_description }}>
+          <summary>Mais detalhes <small>link original, comentário da artista no Danbooru</small></summary>
+          <div class="ed-field">
+            <label for="source" class="ed-label">Link original (source)</label>
+            <input id="source" name="source" value="{{ post.source }}" placeholder="https://x.com/...">
+          </div>
+          <div class="ed-field">
+            <label for="commentary_title" class="ed-label">Título do comentário</label>
+            <input id="commentary_title" name="commentary_title" value="{{ post.commentary_title }}">
+          </div>
+          <div class="ed-field">
+            <label for="commentary_description" class="ed-label">Texto do comentário</label>
+            <textarea id="commentary_description" name="commentary_description" rows="3">{{ post.commentary_description }}</textarea>
+          </div>
+        </details>
+      </fieldset>
+    </div>
+
+    <div class="ed-bar" role="region" aria-label="Ações">
+      <div class="ed-bar-left">
+        {% if editable %}
+        <button name="action" value="test" class="btn-quiet" data-needs-ready
+          title="Simula em cada site marcado. Não muda nada no post, na fila nem no histórico.">Testar sem publicar</button>
+        {% endif %}
+        <details class="ed-menu">
+          <summary class="btn-quiet">Mais ações</summary>
+          <div class="ed-menu-list">
+            {% if editable and not test_mode %}
+            <button name="action" value="publish_now" data-needs-ready
+              data-confirm="{{ 'Já saiu um post hoje. Publicar agora faz 2 no mesmo dia (pode parecer spam). Continuar?' if published_today and post.status not in ('failed', 'partial') else 'Publicar DE VERDADE agora nos sites marcados? Isso conta como o post de hoje.' }}">
+              {{ 'Tentar de novo' if post.status in ('failed', 'partial') else 'Publicar agora' }}</button>
+            {% endif %}
+            <a href="#envios" data-open-envios>Ver testes e envios</a>
+            <button name="action" value="delete" class="danger" formnovalidate data-confirm="Apagar este post da fila?">Apagar arte</button>
+          </div>
+        </details>
+      </div>
+      <div class="ed-bar-right">
+        {% if post.status == 'draft' %}
+          <p class="ed-when" id="approve-when">
+            {%- if approve_when %}se aprovar agora, sai <b>{{ approve_when|quando }}</b> · <span data-sites-count>{{ post.sites|length }} site{{ 's' if post.sites|length != 1 }}</span>{% endif -%}
+          </p>
+          <p class="approve-why" id="approve-why" role="status" {{ 'hidden' if not approval_errors }}>{% if approval_errors %}Falta: {{ approval_errors|join(', ') }}{% endif %}</p>
+          <button name="action" value="approve" class="btn-main" data-needs-ready data-approve>Aprovar e agendar</button>
+        {% elif post.status == 'approved' %}
+          <button name="action" value="unapprove" class="btn-quiet">Voltar para rascunho</button>
+          {% if queue_pos and queue_pos > 1 %}<button name="action" value="first" class="btn-quiet">Início da fila</button>{% endif %}
+          {% if queue_pos and queue_pos < queue_len %}<button name="action" value="last" class="btn-quiet">Fim da fila</button>{% endif %}
+          {% if post.approved_in_test and not test_mode %}<button name="action" value="confirm" class="btn-main"
+            data-confirm="Esta arte vai entrar na fila e sair DE VERDADE. Confirmar?">Confirmar para valer</button>{% endif %}
+        {% endif %}
+      </div>
     </div>
   </form>
+
+  {% if uncertain %}
+  <section class="ed-section" id="conferir" aria-labelledby="conferir-t">
+    <h2 id="conferir-t">Confira no site</h2>
+    <p>O robô clicou em enviar mas <b>não teve certeza se o post saiu</b>. Para não correr o risco de
+      postar duas vezes, ele <b>não reenvia sozinho</b>. Abra o site, procure a arte no seu perfil e diga o que aconteceu.</p>
+    {% for site, label in uncertain %}
+    <form method="post" action="/posts/{{ post.id }}/conferir" class="pin-form">
+      <input type="hidden" name="site" value="{{ site }}">
+      <b>{{ label }}</b>
+      <label class="sr-only" for="url-{{ site }}">Link do post no {{ label }}</label>
+      <input id="url-{{ site }}" name="url" placeholder="link do post (opcional)">
+      <button class="btn-main" name="action" value="saiu">Saiu sim</button>
+      <button class="btn-quiet" name="action" value="nao_saiu" data-confirm="Confirma que a arte NÃO apareceu no {{ label }}? Ela volta para a fila desse site.">Não saiu, tentar de novo</button>
+    </form>
+    {% endfor %}
+  </section>
+  {% endif %}
+
+  {% if post.status == 'approved' %}
+  <section class="ed-section" id="dias" aria-labelledby="dias-t">
+    <h2 id="dias-t">Dia por site <small>cada site tem a própria fila; fixe um dia se quiser</small></h2>
+    <table class="table">
+      <tr><th>Site</th><th>Previsão</th><th>Fixar num dia</th></tr>
+      {% for s in site_days %}
+      <tr>
+        <td><b>{{ s.label }}</b></td>
+        <td>{% if s.done %}já saiu
+          {% elif s.off %}<span class="muted">site desligado</span>
+          {% elif s.when %}{{ s.when|quando }}{% if s.pinned %} (fixado){% endif %}
+          {% else %}<span class="muted">depois dos próximos 60 dias</span>{% endif %}</td>
+        <td>{% if not s.done and not s.off %}
+          <form method="post" action="/posts/{{ post.id }}/dia" class="pin-form">
+            <input type="hidden" name="site" value="{{ s.site }}">
+            <label class="sr-only" for="dia-{{ s.site }}">Dia no {{ s.label }}</label>
+            <input type="date" id="dia-{{ s.site }}" name="day" min="{{ today }}" value="{{ s.pinned.isoformat() if s.pinned else '' }}">
+            <button class="btn-quiet" name="action" value="pin">Fixar</button>
+            {% if s.pinned %}<button class="btn-quiet" name="action" value="unpin">Desafixar</button>{% endif %}
+          </form>{% endif %}</td>
+      </tr>
+      {% endfor %}
+    </table>
+  </section>
+  {% endif %}
+
+  {% if tests or pubs %}
+  <details class="ed-section ed-envios" id="envios" {{ 'open' if pubs }}>
+    <summary><h2>Testes e envios</h2></summary>
+    {% if pubs %}
+    <h3>Envios reais</h3>
+    <table class="table">
+      <tr><th>Quando</th><th>Site</th><th>Status</th><th>Score · Favoritos</th><th>Detalhe</th></tr>
+      {% for p in pubs %}
+      <tr>
+        <td>{{ p.created_at[8:10] }}/{{ p.created_at[5:7] }} {{ p.created_at[11:16] }}</td>
+        <td>{{ SITE_LABELS[p.site] }}</td>
+        <td><span class="pill s-{{ p.status }}">{{ STATUS_LABELS[p.status] }}</span></td>
+        <td class="num">{% set m = metrics.get(p.id) %}{% if m %}<b>{{ m.score }}</b> · ♥ {{ m.fav_count }}{% elif p.site == 'danbooru' and p.status == 'ok' %}<span class="muted">—</span>{% endif %}</td>
+        <td class="msg">{% if p.url %}<a href="{{ p.url }}" target="_blank">{{ p.url }}</a>{% else %}{{ p.message }}{% endif %}</td>
+      </tr>
+      {% endfor %}
+    </table>
+    {% endif %}
+    {% if tests %}
+    <h3>Testes <small>simulações; não contam como publicação</small></h3>
+    <table class="table">
+      <tr><th>Quando</th><th>Site</th><th>Resultado</th><th>Detalhe</th></tr>
+      {% for p in tests %}
+      <tr>
+        <td>{{ p.created_at[8:10] }}/{{ p.created_at[5:7] }} {{ p.created_at[11:16] }}</td>
+        <td>{{ SITE_LABELS[p.site] }}</td>
+        <td><span class="pill s-{{ p.status }}">{{ STATUS_LABELS[p.status] }}</span></td>
+        <td class="msg">{% if p.url %}<a href="{{ p.url }}" target="_blank">{{ p.url }}</a>{% else %}{{ p.message }}{% endif %}</td>
+      </tr>
+      {% endfor %}
+    </table>
+    {% endif %}
+  </details>
+  {% endif %}
 </div>
 
-{% if uncertain %}
-<section class="card confirm-box" id="conferir" aria-labelledby="conferir-t">
-  <h2 id="conferir-t">Confira no site</h2>
-  <p class="small">O robô clicou em enviar mas <b>não teve certeza se o post saiu</b>. Para não correr o risco de
-    postar duas vezes, ele <b>não reenvia sozinho</b>. Abra o site, procure a arte no seu perfil e diga o que aconteceu.</p>
-  {% for site, label in uncertain %}
-  <form method="post" action="/posts/{{ post.id }}/conferir" class="pin-form">
-    <input type="hidden" name="site" value="{{ site }}">
-    <b>{{ label }}</b>
-    <label class="sr-only" for="url-{{ site }}">Link do post no {{ label }}</label>
-    <input id="url-{{ site }}" name="url" placeholder="link do post (opcional)">
-    <button class="primary" name="action" value="saiu">Saiu sim</button>
-    <button class="ghost" name="action" value="nao_saiu" data-confirm="Confirma que a arte NÃO apareceu no {{ label }}? Ela volta para a fila desse site.">Não saiu, tentar de novo</button>
-  </form>
-  {% endfor %}
-</section>
-{% endif %}
-
-{% if post.status == 'approved' %}
-<section class="card site-days" id="dias" aria-labelledby="dias-t">
-  <h2 id="dias-t">Dia por site <small>cada site tem a própria fila; fixe um dia se quiser</small></h2>
-  <table class="table">
-    <tr><th>Site</th><th>Previsão</th><th>Fixar num dia</th></tr>
-    {% for s in site_days %}
-    <tr>
-      <td><b>{{ s.label }}</b></td>
-      <td>{% if s.done %}<span class="pill s-ok">já saiu</span>
-        {% elif s.off %}<span class="muted">site desligado</span>
-        {% elif s.when %}{{ s.when.strftime('%d/%m às %H:%M') }}{% if s.pinned %} 📌{% endif %}
-        {% else %}<span class="muted">depois dos próximos 60 dias</span>{% endif %}</td>
-      <td>{% if not s.done and not s.off %}
-        <form method="post" action="/posts/{{ post.id }}/dia" class="pin-form">
-          <input type="hidden" name="site" value="{{ s.site }}">
-          <label class="sr-only" for="dia-{{ s.site }}">Dia no {{ s.label }}</label>
-          <input type="date" id="dia-{{ s.site }}" name="day" min="{{ today }}" value="{{ s.pinned.isoformat() if s.pinned else '' }}">
-          <button class="ghost" name="action" value="pin">Fixar</button>
-          {% if s.pinned %}<button class="ghost" name="action" value="unpin">Desafixar</button>{% endif %}
-        </form>{% endif %}</td>
-    </tr>
-    {% endfor %}
-  </table>
-</section>
-{% endif %}
-
-{% if tests %}
-<details class="tests" {{ 'open' if test_mode or not pubs }}>
-  <summary><h2>Testes <small>simulações; não contam como publicação</small></h2></summary>
-  <table class="table">
-    <tr><th>Quando</th><th>Site</th><th>Resultado</th><th>Detalhe</th></tr>
-    {% for p in tests %}
-    <tr>
-      <td>{{ p.created_at[8:10] }}/{{ p.created_at[5:7] }} {{ p.created_at[11:16] }}</td>
-      <td>{{ SITE_LABELS[p.site] }}</td>
-      <td><span class="pill s-{{ p.status }}">{{ STATUS_LABELS[p.status] }}</span></td>
-      <td class="msg">{% if p.url %}<a href="{{ p.url }}" target="_blank">{{ p.url }}</a>{% else %}{{ p.message }}{% endif %}</td>
-    </tr>
-    {% endfor %}
-  </table>
-</details>
-{% endif %}
-
-{% if pubs %}
-<h2>Publicações <small>envios reais</small></h2>
-<table class="table">
-  <tr><th>Quando</th><th>Site</th><th>Status</th><th>Score · Favoritos</th><th>Detalhe</th></tr>
-  {% for p in pubs %}
-  <tr>
-    <td>{{ p.created_at[8:10] }}/{{ p.created_at[5:7] }} {{ p.created_at[11:16] }}</td>
-    <td>{{ SITE_LABELS[p.site] }}</td>
-    <td><span class="pill s-{{ p.status }}">{{ STATUS_LABELS[p.status] }}</span></td>
-    <td class="num">{% set m = metrics.get(p.id) %}{% if m %}<b>{{ m.score }}</b> · ♥ {{ m.fav_count }}{% elif p.site == 'danbooru' and p.status == 'ok' %}<span class="muted">—</span>{% endif %}</td>
-    <td class="msg">{% if p.url %}<a href="{{ p.url }}" target="_blank">{{ p.url }}</a>{% else %}{{ p.message }}{% endif %}</td>
-  </tr>
-  {% endfor %}
-</table>
-{% endif %}
-
 <script src="/static/editor.js"></script>
-<script>
-  (() => {
-    const btn = document.getElementById("suggest"), info = document.getElementById("suggest-info");
-    const base = "/posts/{{ post.id }}/suggest";
-    let timer = null;
-    const show = (st) => {
-      if (st.state === "pendente") info.textContent = st.waiting ? `A IA vai olhar esta arte em seguida (${st.waiting} na frente).` : "A IA vai olhar esta arte agora.";
-      else if (st.state === "analisando") info.textContent = st.model_ready ? "A IA está olhando a arte…" : "Na primeira vez a IA baixa o modelo de tags (380 MB), pode levar alguns minutos.";
-      else if (st.state === "falhou") info.textContent = "A IA não conseguiu analisar: " + st.error;
-      else if (st.state === "pronta") {
-        const added = window.boorubotEditor.tagField.update(st);
-        info.textContent = added ? `+${added} tags da IA. Revise antes de aprovar.` : "A IA já olhou esta arte.";
-        document.getElementById("original_character").checked = st.original_character;
-        document.querySelectorAll(".rating-card").forEach((card) => {
-          const on = card.querySelector("input").value === st.rating_suggestion;
-          card.classList.toggle("suggested", on);
-          const badge = card.querySelector(".rating-ai");
-          badge.hidden = !on;
-          if (on && st.rating_confidence) badge.textContent = `sugestão da IA · ${Math.round(st.rating_confidence * 100)}%`;
-        });
-        const note = document.getElementById("mochi-note");
-        note.hidden = !st.mochi; note.querySelector("span").textContent = st.mochi;
-      }
-      const busy = st.state === "pendente" || st.state === "analisando";
-      btn.disabled = busy;
-      if (busy && !timer) timer = setInterval(poll, 2000);
-      if (!busy && timer) { clearInterval(timer); timer = null; }
-    };
-    async function poll() {
-      try { show(await (await fetch(base + "/status")).json()); } catch (e) {}
-    }
-    btn.addEventListener("click", async () => {
-      try { show(await (await fetch(base, { method: "POST" })).json()); } catch (e) { info.textContent = "Falhou: " + e.message; }
-    });
-    {% if post.suggest_state in ('pendente', 'analisando') %}poll();{% endif %}
-  })();
-</script>
 {% endblock %}
