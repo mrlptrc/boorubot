@@ -633,3 +633,27 @@ html.sl-loading .guide-tabs { visibility: hidden; }
 .mochi-note { display: flex; gap: 10px; align-items: flex-start; margin: 14px 0 0; font-size: 15px; color: var(--v2-ink); }
 .mochi-note img { width: 40px; height: 40px; flex: none; }
 .mochi-note[hidden] { display: none; }
+
+/* rating: 4 botões grandes; a sugestão da IA aparece destacada, nunca selecionada */
+.rating-pick { border: 0; padding: 0; margin: 0; min-width: 0; }
+.rating-pick legend { padding: 0; margin-bottom: 8px; font: 700 15px var(--v2-text); color: var(--v2-ink); }
+.rating-pick .need { margin-left: 6px; padding: 2px 8px; border-radius: 999px; background: var(--v2-warn-bg); color: var(--v2-warn); font-size: 13px; }
+.rating-cards { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.rating-card {
+  position: relative; display: flex; flex-direction: column; gap: 2px; min-height: 76px; padding: 12px; margin: 0;
+  border-radius: 14px; border: 1.5px solid var(--v2-line); background: var(--v2-surface); cursor: pointer; font-weight: 400;
+}
+.rating-card input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.rating-name { font: 700 15px var(--v2-title); color: var(--v2-ink); }
+.rating-example { font-size: 13px; line-height: 1.35; color: var(--v2-muted); }
+.rating-ai { margin-top: 4px; align-self: flex-start; padding: 2px 8px; border-radius: 999px; font: 700 13px var(--v2-text); background: var(--v2-info-bg); color: var(--v2-info); }
+.rating-ai[hidden] { display: none; }
+.rating-card.suggested { border-color: var(--v2-info); border-style: dashed; }
+.rating-card:hover { border-color: var(--v2-accent); }
+.rating-card:has(input:focus-visible) { outline: 3px solid var(--v2-accent); outline-offset: 2px; }
+.rating-card:has(input:checked) { border: 2px solid var(--v2-primary); background: var(--v2-pink-soft); }
+.rating-card:has(input:checked) .rating-name::before { content: "✓ "; color: var(--v2-primary); }
+@media (max-width: 700px) { .rating-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.approve-why { margin: 0; align-self: center; font: 700 14px var(--v2-text); color: var(--v2-warn); }
+.approve-why[hidden] { display: none; }
+button[disabled] { opacity: .55; cursor: not-allowed; transform: none; }
