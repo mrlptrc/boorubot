@@ -191,16 +191,4 @@
   </div>
 </section>
 
-<script>
-  const drop = document.getElementById("drop");
-  ["dragover", "dragenter"].forEach(e => drop.addEventListener(e, ev => { ev.preventDefault(); drop.classList.add("over"); }));
-  ["dragleave", "drop"].forEach(e => drop.addEventListener(e, () => drop.classList.remove("over")));
-  drop.addEventListener("drop", ev => {
-    ev.preventDefault();
-    const input = drop.querySelector("input");
-    input.files = ev.dataTransfer.files;
-    input.form.submit();
-  });
-  document.querySelectorAll("[data-new-art]").forEach(b => b.addEventListener("click", () => drop.querySelector("input").click()));
-</script>
 {% endblock %}

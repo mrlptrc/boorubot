@@ -31,6 +31,7 @@
       <button type="button" class="search-btn" data-open-search>
         <svg class="mag" viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5" fill="none" stroke="currentColor" stroke-width="2.6"/><path d="M15.5 15.5 L20.5 20.5" stroke="currentColor" stroke-width="2.8" stroke-linecap="round"/></svg><span>Buscar…</span><kbd>Ctrl</kbd><kbd>K</kbd>
       </button>
+      <button type="button" class="na-trigger" data-new-art>+ Nova arte</button>
       <nav class="side-nav">{{ nav_links() }}</nav>
       <div class="side-bottom">
         <div id="jobs" class="jobs" data-count="{{ jobs|length }}">
@@ -46,6 +47,7 @@
     <header class="mobile-top">
       <button type="button" class="icon-btn" data-open-menu aria-label="Abrir menu">☰</button>
       <a class="brand" href="/"><img src="/static/pets/cat.svg" alt="">boorubot</a>
+      <button type="button" class="icon-btn na-mobile" data-new-art aria-label="Nova arte">+</button>
       <button type="button" class="icon-btn" data-open-search aria-label="Buscar"><svg class="mag" viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5" fill="none" stroke="currentColor" stroke-width="2.6"/><path d="M15.5 15.5 L20.5 20.5" stroke="currentColor" stroke-width="2.8" stroke-linecap="round"/></svg></button>
     </header>
 
@@ -77,7 +79,28 @@
     <button slot="footer" type="button" class="primary" data-confirm-yes>Sim, pode</button>
   </sl-dialog>
 
+  <dialog id="new-art" class="na-dialog" aria-labelledby="na-title">
+    <div class="na-head">
+      <div><h2 id="na-title">Novas artes</h2><p>Escolha uma ou várias imagens. A Mochi analisa cada uma enquanto você acompanha.</p></div>
+      <button type="button" class="icon-btn" data-na-close aria-label="Fechar">×</button>
+    </div>
+    <div class="na-drop" data-na-drop>
+      <img src="/static/pets/puppy.svg" alt="">
+      <div><strong>Solte as imagens aqui</strong><span>PNG, JPG, GIF ou WEBP</span></div>
+      <input type="file" accept=".png,.jpg,.jpeg,.gif,.webp" multiple hidden>
+      <button type="button" class="primary" data-na-pick>Escolher imagens</button>
+    </div>
+    <p class="na-first" data-na-first hidden>Na primeira vez, a Mochi baixa o modelo de tags (380 MB) e pode levar alguns minutos. Pode fechar esta janela, as artes continuam sendo analisadas.</p>
+    <p class="na-summary" data-na-summary aria-live="polite"></p>
+    <ul class="na-list" data-na-list hidden aria-live="polite"></ul>
+    <div class="na-foot">
+      <a class="na-btn strong" data-na-review href="/" hidden>Revisar primeira arte</a>
+      <button type="button" class="ghost" data-na-close>Fechar</button>
+    </div>
+  </dialog>
+
   <ninja-keys noAutoLoadMdIcons hideBreadcrumbs placeholder="Buscar artes, páginas, tópicos do guia, ações…"></ninja-keys>
   <script src="/static/app.js" defer></script>
+  <script src="/static/new-art.js" defer></script>
 </body>
 </html>
