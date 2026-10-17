@@ -16,6 +16,11 @@
   const firstTime = dialog.querySelector("[data-na-first]");
   const summary = dialog.querySelector("[data-na-summary]");
   const reviewFirst = dialog.querySelector("[data-na-review]");
+  const pick = dialog.querySelector("[data-na-pick]");
+  const fallback = document.querySelector("[data-na-fallback]");
+
+  // O formulário tradicional continua disponível quando JavaScript ou <dialog> não existe.
+  if (fallback) fallback.hidden = true;
 
   let items = [];       // {key, file, url, state, progress, post, error, info, dup}
   let uploading = false;
@@ -119,6 +124,7 @@
       poll();
     }
     uploading = false;
+    if (changedSomething && !dialog.open && location.pathname === "/") location.reload();
   }
 
   // ------------------------------------------------------------ IA
@@ -161,6 +167,7 @@
     }
   });
   input.addEventListener("change", () => { add(input.files); input.value = ""; });
+  pick.addEventListener("click", () => input.click());
   ["dragenter", "dragover"].forEach((e) => drop.addEventListener(e, (ev) => { ev.preventDefault(); drop.classList.add("over"); }));
   ["dragleave", "drop"].forEach((e) => drop.addEventListener(e, () => drop.classList.remove("over")));
   drop.addEventListener("drop", (ev) => { ev.preventDefault(); add(ev.dataTransfer.files); });
