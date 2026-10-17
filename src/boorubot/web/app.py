@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import hashlib
 import uuid
 from datetime import datetime
 from urllib.parse import quote
@@ -191,25 +192,47 @@ def create_app(db: DB | None = None, worker: Worker | None = None, start_worker:
             raise ValueError(f"formato não suportado: {ext or '?'} (use {', '.join(IMAGE_EXTS)})")
         filename = f"{uuid.uuid4().hex}{ext}"
         (IMAGES_DIR / filename).write_bytes(data)
+        image_md5 = hashlib.md5(data, usedforsecurity=False).hexdigest()
         # rating vazio = "não escolhido": nunca sai um rating que ninguém conferiu
         post_id = db.create_post(filename, title=Path(name).stem, sites=default_sites(), rating="",
-                                 tags=" ".join(normalize_tags(db.setting("default_tags"))))
+                                 tags=" ".join(normalize_tags(db.setting("default_tags"))), image_md5=image_md5)
         worker.submit_suggest(post_id)  # fila própria da IA: não atrasa nenhum envio
         return {"id": post_id, "title": Path(name).stem, "image": filename}
 
     @app.post("/posts")
-    async def create_post(request: Request, image: list[UploadFile] = File(...)):
+    async def create_post(request: Request, image: list[UploadFile] = File(...), repetida: str = Form("")):
         """Uma ou várias artes. A janela "Novas artes" pede JSON; o form sem JavaScript recebe um redirect."""
         wants_json = "application/json" in request.headers.get("accept", "")
-        created, errors = [], []
+        created, errors, duplicates = [], [], []
         for upload in image:
             name = upload.filename or ""
             try:
-                created.append(save_upload(name, await upload.read()))
+                data = await upload.read()
+                ext = Path(name).suffix.lower()
+                if ext not in IMAGE_EXTS:
+                    raise ValueError(f"formato não suportado: {ext or '?'} (use {', '.join(IMAGE_EXTS)})")
+                image_md5 = hashlib.md5(data, usedforsecurity=False).hexdigest()
+                existing = db.find_image_duplicate(image_md5) if wants_json and repetida != "1" else None
+                if existing:
+                    published_at = existing["published_at"] or ""
+                    if published_at:
+                        published_label = datetime.fromisoformat(published_at).strftime("%d/%m")
+                        where = "publicada"
+                    else:
+                        published_label = ""
+                        where = {"draft": "em revisão", "approved": "na fila", "failed": "com falha",
+                                 "partial": "com falha"}.get(existing["status"], "já existe")
+                    duplicates.append({"name": name, "existing": {
+                        "id": existing["id"], "published_at": published_at,
+                        "published_label": published_label, "where": where,
+                    }})
+                else:
+                    created.append(save_upload(name, data))
             except ValueError as exc:
                 errors.append({"name": name, "error": str(exc)})
         if wants_json:
-            return JSONResponse({"posts": created, "errors": errors}, status_code=200 if created or not errors else 400)
+            return JSONResponse({"posts": created, "errors": errors, "duplicates": duplicates},
+                                status_code=200 if created or duplicates or not errors else 400)
         if not created:
             raise HTTPException(400, errors[0]["error"] if errors else "nenhum arquivo")
         return see_other(f"/posts/{created[0]['id']}" if len(created) == 1 else "/#revisar")

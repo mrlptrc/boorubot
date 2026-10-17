@@ -1,4 +1,5 @@
 from datetime import datetime
+import hashlib
 from pathlib import Path
 
 import pytest
@@ -60,6 +61,35 @@ def test_upload_multiple_images_returns_json_and_adds_each_to_suggestion_queue(c
     states = c.get("/suggest/status.json", params={"ids": ",".join(str(post["id"]) for post in posts)}).json()
     assert [post["id"] for post in states["posts"]] == [post["id"] for post in posts]
     assert [post["state"] for post in states["posts"]] == ["pendente", "pendente"]
+
+
+def test_repeated_image_warns_but_can_be_uploaded_as_new(client, db):
+    c, _ = client
+    first = c.post("/posts", files={"image": ("one.png", PNG, "image/png")},
+                   headers={"accept": "application/json"}).json()["posts"][0]
+
+    repeated = c.post("/posts", files={"image": ("copy.png", PNG, "image/png")},
+                      headers={"accept": "application/json"}).json()
+    assert repeated["posts"] == []
+    assert repeated["duplicates"] == [{"name": "copy.png", "existing": {
+        "id": first["id"], "published_at": "", "published_label": "", "where": "em revisão",
+    }}]
+
+    uploaded_again = c.post("/posts", data={"repetida": "1"},
+                            files={"image": ("copy.png", PNG, "image/png")},
+                            headers={"accept": "application/json"}).json()
+    assert len(uploaded_again["posts"]) == 1
+    assert uploaded_again["posts"][0]["id"] != first["id"]
+
+
+def test_repeated_published_image_shows_publication_date(client, db):
+    c, _ = client
+    post_id = c.post("/posts", files={"image": ("one.png", PNG, "image/png")},
+                     headers={"accept": "application/json"}).json()["posts"][0]["id"]
+    db.mark_post_published_at(post_id, datetime(2026, 10, 12, 18, 0))
+    response = c.post("/posts", files={"image": ("copy.png", PNG, "image/png")},
+                      headers={"accept": "application/json"}).json()
+    assert response["duplicates"][0]["existing"]["published_label"] == "12/10"
 
 
 def test_new_art_window_is_available_on_every_page(client):
@@ -432,10 +462,14 @@ def test_new_post_has_no_rating_and_cannot_be_approved_without_one(client, db):
     assert db.get_post(post_id)["status"] == "approved"
 
 
-def test_existing_posts_keep_their_rating(tmp_path):
+def test_existing_posts_keep_their_rating_and_receive_image_hash(tmp_path, monkeypatch):
     import sqlite3
 
     path = tmp_path / "old.db"
+    images = tmp_path / "images"
+    images.mkdir()
+    (images / "a.png").write_bytes(PNG)
+    monkeypatch.setattr("boorubot.db.IMAGES_DIR", images)
     old = sqlite3.connect(path)  # banco de antes da v2: sem as colunas novas
     old.executescript("""CREATE TABLE posts (id INTEGER PRIMARY KEY, created_at TEXT NOT NULL, image TEXT NOT NULL,
         title TEXT NOT NULL DEFAULT '', tags TEXT NOT NULL DEFAULT '', rating TEXT NOT NULL DEFAULT 'general',
@@ -451,6 +485,7 @@ def test_existing_posts_keep_their_rating(tmp_path):
     DB(path)  # a migração roda de novo sem erro
     assert [p["rating"] for p in sorted(db.list_posts(), key=lambda p: p["id"])] == ["explicit", "general"]
     assert db.get_post(1)["rating_suggestion"] == "" and db.get_post(1)["tag_scores"] == {}
+    assert db.get_post(1)["image_md5"] == hashlib.md5(PNG, usedforsecurity=False).hexdigest()
 
 
 def test_suggestion_only_suggests_the_rating(db):

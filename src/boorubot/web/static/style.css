@@ -695,6 +695,7 @@ button[disabled] { opacity: .55; cursor: not-allowed; transform: none; }
 .na-list { display: flex; flex-direction: column; gap: 8px; max-height: 42vh; overflow: auto; margin: 0; padding: 0; list-style: none; }
 .na-item { display: grid; grid-template-columns: 64px minmax(0, 1fr) auto; align-items: center; gap: 12px; padding: 10px; border-bottom: 1px solid var(--v2-line); }
 .na-item > img { width: 64px; height: 64px; object-fit: contain; border-radius: 10px; background: var(--v2-surface); }
+.na-dup { border-radius: 12px; background: var(--v2-warn-bg); }
 .na-text { display: flex; min-width: 0; flex-direction: column; gap: 2px; }
 .na-name { overflow: hidden; color: var(--v2-ink); font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
 .na-state { color: var(--v2-muted); font-size: 14px; overflow-wrap: anywhere; }

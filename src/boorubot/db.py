@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import hashlib
 import sqlite3
 import threading
 from datetime import date, datetime, timedelta
@@ -122,6 +123,7 @@ NEW_POST_COLUMNS = (
     ("rating_confidence", "REAL"),
     ("deleted_at", "TEXT"),                                  # quando foi apagada (status 'deleted')
     ("status_before_delete", "TEXT NOT NULL DEFAULT ''"),    # para o "desfazer"
+    ("image_md5", "TEXT NOT NULL DEFAULT ''"),             # identifica upload repetido sem bloquear repost
 )
 SUGGEST_STATES = ("pendente", "analisando", "pronta", "falhou")
 
@@ -166,6 +168,18 @@ class DB:
             for col, kind in NEW_POST_COLUMNS:
                 if col not in cols:  # banco criado por versão anterior
                     self.conn.execute(f"ALTER TABLE posts ADD COLUMN {col} {kind}")
+            # Backfill preguiçoso e idempotente: hash só das imagens antigas que ainda existem.
+            rows = self.conn.execute("SELECT id, image FROM posts WHERE image_md5 = '' AND image != ''").fetchall()
+            image_root = IMAGES_DIR.resolve()
+            for row in rows:
+                path = (IMAGES_DIR / row["image"]).resolve()
+                if path.parent != image_root:
+                    continue
+                try:
+                    digest = hashlib.md5(path.read_bytes(), usedforsecurity=False).hexdigest()
+                except OSError:
+                    continue
+                self.conn.execute("UPDATE posts SET image_md5 = ? WHERE id = ?", (digest, row["id"]))
             if "approved_in_test" not in cols:
                 self.conn.execute("ALTER TABLE posts ADD COLUMN approved_in_test INTEGER NOT NULL DEFAULT 0")
                 # banco de antes da trava: com o modo teste ligado, o que está na fila foi aprovado
@@ -269,6 +283,13 @@ class DB:
 
     def get_post(self, post_id: int) -> dict | None:
         rows = self._all("SELECT * FROM posts WHERE id = ?", (post_id,))
+        return _decode(rows[0]) if rows else None
+
+    def find_image_duplicate(self, image_md5: str) -> dict | None:
+        """Encontra uma arte igual ainda ativa ou que já foi publicada, sem impedir novo upload."""
+        rows = self._all(
+            "SELECT * FROM posts WHERE image_md5 = ? AND (status != 'deleted' OR published_at IS NOT NULL) "
+            "ORDER BY published_at IS NULL, created_at DESC, id DESC LIMIT 1", (image_md5,))
         return _decode(rows[0]) if rows else None
 
     def list_posts(self, statuses: tuple[str, ...] | None = None) -> list[dict]:
