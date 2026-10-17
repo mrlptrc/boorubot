@@ -44,6 +44,33 @@ def test_upload_creates_draft_with_all_sites(client, db):
     assert c.get("/").status_code == 200
 
 
+def test_upload_multiple_images_returns_json_and_adds_each_to_suggestion_queue(client, db):
+    c, worker = client
+    response = c.post("/posts", files=[
+        ("image", ("one.png", PNG, "image/png")),
+        ("image", ("two.jpg", PNG, "image/jpeg")),
+    ], headers={"accept": "application/json"})
+
+    assert response.status_code == 200
+    posts = response.json()["posts"]
+    assert [post["title"] for post in posts] == ["one", "two"]
+    assert [db.get_post(post["id"])["status"] for post in posts] == ["draft", "draft"]
+    assert worker.suggest_position(posts[0]["id"]) == 0
+    assert worker.suggest_position(posts[1]["id"]) == 1
+    states = c.get("/suggest/status.json", params={"ids": ",".join(str(post["id"]) for post in posts)}).json()
+    assert [post["id"] for post in states["posts"]] == [post["id"] for post in posts]
+    assert [post["state"] for post in states["posts"]] == ["pendente", "pendente"]
+
+
+def test_new_art_window_is_available_on_every_page(client):
+    c, _ = client
+    for path in ("/", "/historico"):
+        page = c.get(path).text
+        assert 'id="new-art"' in page
+        assert 'src="/static/new-art.js"' in page
+        assert 'data-new-art' in page
+
+
 def test_rejects_non_image(client):
     c, _ = client
     r = c.post("/posts", files={"image": ("x.txt", b"oi", "text/plain")})
