@@ -630,6 +630,13 @@ html.sl-loading .guide-tabs { visibility: hidden; }
   margin-top: 10px; width: 100%; min-height: 44px; padding: 8px 14px; border-radius: 12px;
   border: 1.5px solid var(--v2-line); background: var(--v2-surface); font: 400 15px var(--v2-text); color: var(--v2-ink);
 }
+.tag-suggestions { max-height: 240px; overflow: auto; margin: 4px 0 0; padding: 0; list-style: none; border: 1px solid var(--v2-line); border-radius: 12px; background: var(--v2-surface); }
+.tag-suggestions[hidden] { display: none; }
+.tag-suggestions button {
+  display: block; width: 100%; min-height: 44px; padding: 8px 14px; border: 0; border-radius: 0; box-shadow: none;
+  background: transparent; color: var(--v2-ink); text-align: left; font: 600 15px var(--v2-text); cursor: pointer;
+}
+.tag-suggestions button:hover, .tag-suggestions button:focus-visible { background: var(--v2-info-bg); color: var(--v2-info); transform: none; }
 .tag-weak { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 10px; }
 .tag-weak-label { color: var(--v2-muted); font-size: 14px; font-weight: 700; margin-right: 2px; }
 .tag-add {
