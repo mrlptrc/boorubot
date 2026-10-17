@@ -1,5 +1,5 @@
-from datetime import datetime
 import hashlib
+from datetime import datetime
 from pathlib import Path
 
 import pytest
@@ -49,7 +49,7 @@ def test_upload_multiple_images_returns_json_and_adds_each_to_suggestion_queue(c
     c, worker = client
     response = c.post("/posts", files=[
         ("image", ("one.png", PNG, "image/png")),
-        ("image", ("two.jpg", PNG, "image/jpeg")),
+        ("image", ("two.jpg", PNG + b"different", "image/jpeg")),
     ], headers={"accept": "application/json"})
 
     assert response.status_code == 200
