@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
-import json
 import hashlib
+import json
 import uuid
 from datetime import datetime
-from urllib.parse import quote
 from pathlib import Path
+from urllib.parse import quote
 
+import httpx
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
@@ -20,6 +21,7 @@ from boorubot.sites.forms import FORM_SITES
 from boorubot.db import DB, IMAGES_DIR
 from boorubot.models import IMAGE_EXTS, RATINGS
 from boorubot.sites.danbooru import CONTRIBUTOR_LEVEL
+from boorubot.tag_api import DanbooruTagAPI
 from boorubot.worker import Worker
 
 HERE = Path(__file__).parent
@@ -99,14 +101,16 @@ def see_other(url: str) -> RedirectResponse:
     return RedirectResponse(url, status_code=303)
 
 
-def create_app(db: DB | None = None, worker: Worker | None = None, start_worker: bool = True) -> FastAPI:
+def create_app(db: DB | None = None, worker: Worker | None = None, start_worker: bool = True,
+               tag_api: DanbooruTagAPI | None = None) -> FastAPI:
     db = db or DB()
     worker = worker or Worker(db)
+    tag_api = tag_api or DanbooruTagAPI()
     if start_worker:
         worker.start()
 
     app = FastAPI(title="boorubot")
-    app.state.db, app.state.worker = db, worker
+    app.state.db, app.state.worker, app.state.tag_api = db, worker, tag_api
     IMAGES_DIR.mkdir(parents=True, exist_ok=True)
     app.mount("/images", StaticFiles(directory=IMAGES_DIR), name="images")
     app.mount("/static", StaticFiles(directory=HERE / "static"), name="static")
@@ -185,14 +189,14 @@ def create_app(db: DB | None = None, worker: Worker | None = None, start_worker:
 
         return render(request, "index.html", d=dashboard.build(db), steps=setup_steps())
 
-    def save_upload(name: str, data: bytes) -> dict:
+    def save_upload(name: str, data: bytes, image_md5: str = "") -> dict:
         """Uma arte nova: grava a imagem, cria o rascunho e põe na fila da IA."""
         ext = Path(name).suffix.lower()
         if ext not in IMAGE_EXTS:
             raise ValueError(f"formato não suportado: {ext or '?'} (use {', '.join(IMAGE_EXTS)})")
         filename = f"{uuid.uuid4().hex}{ext}"
         (IMAGES_DIR / filename).write_bytes(data)
-        image_md5 = hashlib.md5(data, usedforsecurity=False).hexdigest()
+        image_md5 = image_md5 or hashlib.md5(data, usedforsecurity=False).hexdigest()
         # rating vazio = "não escolhido": nunca sai um rating que ninguém conferiu
         post_id = db.create_post(filename, title=Path(name).stem, sites=default_sites(), rating="",
                                  tags=" ".join(normalize_tags(db.setting("default_tags"))), image_md5=image_md5)
@@ -227,7 +231,7 @@ def create_app(db: DB | None = None, worker: Worker | None = None, start_worker:
                         "published_label": published_label, "where": where,
                     }})
                 else:
-                    created.append(save_upload(name, data))
+                    created.append(save_upload(name, data, image_md5))
             except ValueError as exc:
                 errors.append({"name": name, "error": str(exc)})
         if wants_json:
@@ -653,5 +657,33 @@ def create_app(db: DB | None = None, worker: Worker | None = None, start_worker:
             "id": p["id"], "title": p["title"] or f"#{p['id']}", "image": p["image"], "tags": p["tags"],
             "status": p["status"], "status_label": STATUS_LABELS.get(p["status"], p["status"]),
         } for p in db.list_posts()]}
+
+    @app.get("/danbooru/autocomplete.json")
+    def danbooru_autocomplete(q: str = ""):
+        """Proxy pequeno para o autocomplete público; sem credenciais também funciona."""
+        q = q.strip()[:80]
+        if len(q) < 2:
+            return {"available": True, "suggestions": []}
+        try:
+            suggestions = tag_api.autocomplete(q, db.setting("danbooru_login"), db.setting("danbooru_api_key"))
+        except (httpx.HTTPError, ValueError, KeyError, TypeError):
+            return {"available": False, "suggestions": []}
+        return {"available": True, "suggestions": suggestions}
+
+    @app.post("/danbooru/tags/check")
+    async def check_danbooru_tags(request: Request):
+        """Confere grafia em lote. Erro de rede é informativo e nunca bloqueia o editor."""
+        try:
+            body = await request.json()
+        except ValueError:
+            return JSONResponse({"available": False, "unknown": []}, status_code=400)
+        tags = body.get("tags") if isinstance(body, dict) else None
+        if not isinstance(tags, list) or any(not isinstance(tag, str) for tag in tags):
+            return JSONResponse({"available": False, "unknown": []}, status_code=400)
+        try:
+            unknown = tag_api.unknown(tags[:200], db.setting("danbooru_login"), db.setting("danbooru_api_key"))
+        except (httpx.HTTPError, ValueError, KeyError, TypeError):
+            return {"available": False, "unknown": []}
+        return {"available": True, "unknown": unknown}
 
     return app
