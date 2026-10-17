@@ -31,17 +31,93 @@
     input.setAttribute("aria-label", "Adicionar tag");
     input.id = box.id + "-new";
     const weakBox = Object.assign(document.createElement("div"), { className: "tag-weak" });
-    box.after(list, input, weakBox);
+    const autocomplete = Object.assign(document.createElement("ul"), {
+      className: "tag-suggestions", role: "listbox", hidden: true,
+    });
+    box.after(list, input, autocomplete, weakBox);
     const disabled = box.disabled || box.closest("fieldset[disabled]");
     if (disabled) input.hidden = true;
 
     const tags = () => box.value.split(/\s+/).filter(Boolean);
+    let tagCheckTimer = null;
+    let tagCheckSerial = 0;
     function setTags(next) {
       box.value = [...new Set(next)].join(" ");
       box.dispatchEvent(new Event("input", { bubbles: true }));
       box.dispatchEvent(new Event("change", { bubbles: true }));
       render();
     }
+
+    async function checkUnknown() {
+      clearTimeout(tagCheckTimer);
+      const requested = tags();
+      const serial = ++tagCheckSerial;
+      if (!requested.length) { unknown = new Set(); render(); return true; }
+      try {
+        const response = await fetch("/danbooru/tags/check", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ tags: requested }), signal: AbortSignal.timeout(2500),
+        });
+        const result = await response.json();
+        if (serial === tagCheckSerial && result.available && JSON.stringify(tags()) === JSON.stringify(requested)) {
+          unknown = new Set(result.unknown || []);
+          render();
+        }
+        return Boolean(result.available);
+      } catch (e) { return false; }
+    }
+    function scheduleTagCheck() {
+      clearTimeout(tagCheckTimer);
+      tagCheckTimer = setTimeout(checkUnknown, 450);
+    }
+    box.addEventListener("input", scheduleTagCheck);
+    box.addEventListener("change", scheduleTagCheck);
+
+    function closeAutocomplete() {
+      autocomplete.hidden = true;
+      autocomplete.replaceChildren();
+    }
+    function chooseSuggestion(tag) {
+      const raw = input.value;
+      const split = Math.max(raw.lastIndexOf(" "), raw.lastIndexOf(","));
+      input.value = (split >= 0 ? raw.slice(0, split + 1) : "") + tag;
+      addTyped();
+      closeAutocomplete();
+      input.focus();
+    }
+    let autocompleteTimer = null;
+    let autocompleteRequest = null;
+    input.addEventListener("input", () => {
+      clearTimeout(autocompleteTimer);
+      if (autocompleteRequest) autocompleteRequest.abort();
+      const token = input.value.trim().split(/[\s,]+/).pop().toLowerCase();
+      if (token.length < 2 || disabled) { closeAutocomplete(); return; }
+      autocompleteTimer = setTimeout(async () => {
+        const query = token;
+        autocompleteRequest = new AbortController();
+        try {
+          const response = await fetch("/danbooru/autocomplete.json?q=" + encodeURIComponent(query),
+                                       { signal: autocompleteRequest.signal });
+          const body = await response.json();
+          if (!body.available || input.value.trim().split(/[\s,]+/).pop().toLowerCase() !== query) return;
+          const matches = (body.suggestions || []).map((item) => typeof item === "string" ? item : item.value)
+            .filter(Boolean).slice(0, 10);
+          autocomplete.innerHTML = matches.map((tag) => `<li role="option"><button type="button" data-complete="${esc(tag)}">${esc(tag)}</button></li>`).join("");
+          autocomplete.hidden = !matches.length;
+        } catch (e) { closeAutocomplete(); }
+      }, 300);
+    });
+    autocomplete.addEventListener("mousedown", (ev) => ev.preventDefault());
+    autocomplete.addEventListener("click", (ev) => {
+      const option = ev.target.closest("[data-complete]");
+      if (option) chooseSuggestion(option.dataset.complete);
+    });
+    input.addEventListener("keydown", (ev) => {
+      if (ev.key === "ArrowDown" && !autocomplete.hidden) {
+        ev.preventDefault();
+        autocomplete.querySelector("button")?.focus();
+      }
+    });
 
     function kind(tag) {
       if (unknown.has(tag)) return ["new", "tag nova: confira a grafia"];
@@ -98,13 +174,16 @@
         input.value = last;
       }
     });
-    input.addEventListener("blur", addTyped);
+    input.addEventListener("blur", () => setTimeout(() => {
+      if (!autocomplete.contains(document.activeElement)) { addTyped(); closeAutocomplete(); }
+    }, 120));
     // colar "1girl, long hair" vira várias tags
     input.addEventListener("paste", () => setTimeout(() => { if (/[\s,]/.test(input.value.trim())) addTyped(); }));
 
     render();
+    scheduleTagCheck();
     return {
-      root, input, tags, setTags, render,
+      root, input, tags, setTags, render, checkUnknown,
       update(next) { // sugestão da IA chegou: junta sem apagar o que ela tem
         scores = { ...scores, ...(next.scores || {}) };
         weak = next.weak || weak;
@@ -124,6 +203,17 @@
   // Mesma lista do backend (approval_errors): sem tags, sem rating, sem site. O botão fica
   // desligado com o motivo à vista; sem JavaScript o backend recusa com a mesma mensagem.
   const form = document.getElementById("post-form");
+  if (form && tagField) {
+    let checkingForApprove = false;
+    form.addEventListener("submit", async (ev) => {
+      if (checkingForApprove || !ev.submitter?.matches("[data-approve]")) return;
+      ev.preventDefault();
+      await tagField.checkUnknown();
+      checkingForApprove = true;
+      form.requestSubmit(ev.submitter);
+      checkingForApprove = false;
+    });
+  }
   function approvalErrors() {
     if (!form) return [];
     const errors = [];
