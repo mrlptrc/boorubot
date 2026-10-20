@@ -553,24 +553,117 @@ def create_app(db: DB | None = None, worker: Worker | None = None, start_worker:
 
     # --- sites -------------------------------------------------------------------
 
+    def session_rows() -> list[dict]:
+        """Uma linha por site em Sites: estado da sessão em palavras, para a tela e para /sites/status.json."""
+        sessions, logins = db.sessions(), worker.logins()
+        rows = []
+        for site in ALL_SITES:
+            sess = sessions.get(site)
+            checked = short_when(datetime.fromisoformat(sess["checked_at"])) if sess else ""
+            if site in logins:
+                state, text = "login", "esperando você entrar na janela que abriu"
+            elif not sess:
+                state, text = "none", ("conecte com a chave de API" if site == "danbooru" else "ainda não conectado")
+            elif sess["ok"]:
+                state, text = "ok", f"conectado · checado {checked}"
+            else:
+                state, text = "down", f"pediu login de novo · checado {checked}"
+            rows.append({"site": site, "label": SITE_LABELS[site], "state": state, "text": text,
+                         "detail": sess["message"] if sess else ""})
+        return rows
+
     @app.get("/sites")
-    def sites_page(request: Request, erro: str = ""):
+    def sites_page(request: Request, erro: str = "", painel: str = ""):
         key, test_key = db.setting("danbooru_api_key"), db.setting("danbooru_test_api_key")
         return render(
-            request, "sites.html", sessions=db.sessions(), daily_time=db.setting("daily_time"),
+            request, "sites.html", rows=session_rows(), sessions=db.sessions(), painel=painel, error=erro,
             danbooru_login=db.setting("danbooru_login"),
             danbooru_key_hint=f"••••{key[-4:]}" if key else "",
             danbooru_test_login=db.setting("danbooru_test_login"),
             danbooru_test_key_hint=f"••••{test_key[-4:]}" if test_key else "",
-            default_tags=db.setting("default_tags"), default_sites=default_sites(),
             force_pending=db.setting("danbooru_force_pending") == "1",
-            startup=startup.status(), error=erro,
-            rhythms={s: db.site_rhythm(s) for s in ALL_SITES}, delays={s: db.site_delay(s) for s in ALL_SITES},
-            backup_dir=db.setting("backup_dir"), last_backup_at=db.setting("last_backup_at"),
-            last_backup_ok=db.setting("last_backup_ok"), last_backup_msg=db.setting("last_backup_msg"),
             send_modes={s: build_site(s, db).browser_mode("send") for s in FORM_SITES},
             default_modes={s: build_site(s).browser_mode("send") for s in FORM_SITES},
         )
+
+    @app.get("/sites/status.json")
+    def sites_status():
+        """A tela de Sites acompanha o login (fecha o "esperando login" sozinha quando a sessão fica ok)."""
+        return {"rows": session_rows()}
+
+    @app.post("/sites/{name}/cancelar")
+    def cancel_login(name: str):
+        if name not in ALL_SITES:
+            raise HTTPException(404)
+        worker.cancel_login(name)
+        return see_other("/sites")
+
+    # --- ajustes -----------------------------------------------------------------
+    # Tudo salva sozinho (PATCH /ajustes). Sem JavaScript, os forms abaixo mandam para as rotas /settings*.
+
+    def settings_state() -> dict:
+        last = db.setting("last_backup_at")
+        return {
+            "daily_time": db.setting("daily_time"), "default_tags": normalize_tags(db.setting("default_tags")),
+            "default_sites": default_sites(), "test_mode": db.test_mode, "startup": startup.status(),
+            "backup_dir": db.setting("backup_dir") or db.setting("backup_dir_last"),
+            "backup_on": bool(db.setting("backup_dir")),
+            "last_backup": short_when(datetime.fromisoformat(last)) if last else "",
+            "last_backup_ok": db.setting("last_backup_ok"), "last_backup_msg": db.setting("last_backup_msg"),
+        }
+
+    @app.get("/ajustes")
+    def settings_page(request: Request, erro: str = ""):
+        return render(request, "ajustes.html", s=settings_state(), error=erro)
+
+    @app.patch("/ajustes")
+    async def save_settings_partial(request: Request):
+        """Salvamento parcial: só os campos que mudaram. Responde o estado para a tela se atualizar."""
+        from boorubot.backup import BackupError, validate_dest
+
+        data = await request.json()
+        if not isinstance(data, dict):
+            raise HTTPException(400, "envie um objeto JSON")
+        try:
+            if "daily_time" in data:
+                hh, _, mm = str(data["daily_time"]).partition(":")
+                if not (hh.isdigit() and mm.isdigit() and int(hh) < 24 and int(mm) < 60):
+                    raise ValueError("horário inválido: use HH:MM")
+                db.set_setting("daily_time", f"{int(hh):02d}:{int(mm):02d}")
+            if "default_tags" in data:
+                raw = data["default_tags"]
+                # lista = uma tag por item ("Nome Artista" vira nome_artista); texto = separado por espaço
+                db.set_setting("default_tags", " ".join(normalize_tags(",".join(raw) if isinstance(raw, list) else str(raw))))
+            if "default_sites" in data:
+                db.set_setting("default_sites", json.dumps([x for x in ALL_SITES if x in data["default_sites"]]))
+            if "test_mode" in data:
+                db.set_setting("test_mode", "1" if data["test_mode"] else "0")
+            if "startup" in data:
+                (startup.install if data["startup"] else startup.remove)()
+            if "backup_dir" in data or "backup_on" in data:
+                folder = str(data.get("backup_dir", db.setting("backup_dir") or db.setting("backup_dir_last")))
+                if data.get("backup_on", bool(db.setting("backup_dir"))) and folder.strip():
+                    dest = str(validate_dest(folder))
+                    db.set_setting("backup_dir", dest)
+                    db.set_setting("backup_dir_last", dest)
+                else:
+                    if db.setting("backup_dir"):
+                        db.set_setting("backup_dir_last", db.setting("backup_dir"))
+                    db.set_setting("backup_dir", "")
+        except (ValueError, BackupError, startup.StartupError) as exc:
+            return JSONResponse({"error": str(exc), "state": jsonable_state()}, status_code=422)
+        return {"saved_at": datetime.now().strftime("%H:%M"), "state": jsonable_state()}
+
+    def jsonable_state() -> dict:
+        st = settings_state()
+        st["startup"] = {"supported": st["startup"].supported, "installed": st["startup"].installed}
+        return st
+
+    @app.post("/ajustes/backup-agora")
+    def backup_now_route():
+        if db.setting("backup_dir"):
+            worker.submit("backup", "backup", "backup agora")
+        return see_other("/ajustes#backup")
 
     @app.post("/settings/backup")
     def save_backup(backup_dir: str = Form(""), action: str = Form("save")):
@@ -578,22 +671,23 @@ def create_app(db: DB | None = None, worker: Worker | None = None, start_worker:
 
         if action == "off" or not backup_dir.strip():
             db.set_setting("backup_dir", "")
-            return see_other("/sites#backup")
+            return see_other("/ajustes#backup")
         try:
             dest = validate_dest(backup_dir)
         except BackupError as exc:
-            return see_other("/sites?erro=" + quote(str(exc)) + "#backup")
+            return see_other("/ajustes?erro=" + quote(str(exc)) + "#backup")
         db.set_setting("backup_dir", str(dest))
+        db.set_setting("backup_dir_last", str(dest))
         if action == "now":
             worker.submit("backup", "backup", "backup agora")
-        return see_other("/sites#backup")
+        return see_other("/ajustes#backup")
 
     @app.post("/settings/browser/{name}")
     def save_browser_mode(name: str, mode: str = Form(...)):
         if name not in FORM_SITES or mode not in BROWSER_MODE_LABELS:
             raise HTTPException(404)
         db.set_setting(f"browser_mode_{name}", mode)
-        return see_other(f"/sites#{name}")
+        return see_other(f"/sites?painel={name}")
 
     @app.post("/settings/startup")
     def toggle_startup(action: str = Form(...)):
@@ -603,8 +697,8 @@ def create_app(db: DB | None = None, worker: Worker | None = None, start_worker:
             elif action == "remove":
                 startup.remove()
         except startup.StartupError as exc:
-            return see_other("/sites?erro=" + quote(str(exc)) + "#inicio")
-        return see_other("/sites#inicio")
+            return see_other("/ajustes?erro=" + quote(str(exc)) + "#inicio")
+        return see_other("/ajustes#inicio")
 
     @app.post("/settings/danbooru")
     def save_danbooru(login: str = Form(""), api_key: str = Form(""), force_pending: bool = Form(False)):
@@ -617,7 +711,7 @@ def create_app(db: DB | None = None, worker: Worker | None = None, start_worker:
         if api_key.strip():  # vazio = mantém a chave salva
             db.set_setting("danbooru_api_key", api_key.strip())
         worker.submit("session", "danbooru", "testar sessão Danbooru")
-        return see_other("/sites#danbooru")
+        return see_other("/sites?painel=danbooru")
 
     @app.post("/settings/danbooru-test")
     def save_danbooru_test(login: str = Form(""), api_key: str = Form(""), remove: bool = Form(False)):
@@ -625,12 +719,12 @@ def create_app(db: DB | None = None, worker: Worker | None = None, start_worker:
         if remove:
             db.set_setting("danbooru_test_api_key", "")
             db.set_session("danbooru_test", False, "conta de teste removida")
-            return see_other("/sites#danbooru-test")
+            return see_other("/sites?painel=danbooru")
         db.set_setting("danbooru_test_login", login.strip())
         if api_key.strip():
             db.set_setting("danbooru_test_api_key", api_key.strip())
         worker.submit("session_test", "danbooru", "testar conta de teste (testbooru)")
-        return see_other("/sites#danbooru-test")
+        return see_other("/sites?painel=danbooru")
 
     @app.post("/settings/danbooru/remove")
     def remove_danbooru():
@@ -638,7 +732,7 @@ def create_app(db: DB | None = None, worker: Worker | None = None, start_worker:
         db.set_setting("danbooru_level", "")
         db.set_setting("danbooru_level_string", "")
         db.set_session("danbooru", False, "chave removida do painel")
-        return see_other("/sites#danbooru")
+        return see_other("/sites?painel=danbooru")
 
     @app.get("/_ui")
     def ui_catalog(request: Request):
@@ -655,7 +749,7 @@ def create_app(db: DB | None = None, worker: Worker | None = None, start_worker:
     def site_action(name: str, kind: str):
         if name == "danbooru-test" and kind == "session":
             worker.submit("session_test", "danbooru", "testar conta de teste (testbooru)")
-            return see_other("/sites#danbooru-test")
+            return see_other("/sites?painel=danbooru")
         if name not in ALL_SITES or kind not in ("login", "session"):
             raise HTTPException(404)
         if kind == "login" and name == "danbooru":
@@ -678,7 +772,7 @@ def create_app(db: DB | None = None, worker: Worker | None = None, start_worker:
         hh, _, mm = daily_time.partition(":")
         if hh.isdigit() and mm.isdigit() and int(hh) < 24 and int(mm) < 60:
             db.set_setting("daily_time", f"{int(hh):02d}:{int(mm):02d}")
-        return see_other("/sites")
+        return see_other("/ajustes")
 
     # --- histórico ---------------------------------------------------------------
 
@@ -688,11 +782,6 @@ def create_app(db: DB | None = None, worker: Worker | None = None, start_worker:
 
         limit = max(arts.PAGE, min(limite or arts.PAGE, 1000))
         return render(request, "artes.html", a=arts.build(db, filtro, q, limit))
-
-    # Ajustes ganha tela própria na etapa 14 do editor v2; até lá o menu leva ao lugar de hoje
-    @app.get("/ajustes")
-    def settings_page():
-        return see_other("/sites#config")
 
     @app.get("/historico")
     def history():
