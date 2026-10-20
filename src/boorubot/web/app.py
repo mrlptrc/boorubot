@@ -682,20 +682,22 @@ def create_app(db: DB | None = None, worker: Worker | None = None, start_worker:
 
     # --- histórico ---------------------------------------------------------------
 
-    # Artes e Ajustes ganham tela própria nas etapas 13 e 14 do editor v2; até lá o menu leva ao lugar de hoje
     @app.get("/artes")
-    def arts_page():
-        return see_other("/historico")
+    def arts_page(request: Request, filtro: str = "todas", q: str = "", limite: int = 0):
+        from boorubot import arts
 
+        limit = max(arts.PAGE, min(limite or arts.PAGE, 1000))
+        return render(request, "artes.html", a=arts.build(db, filtro, q, limit))
+
+    # Ajustes ganha tela própria na etapa 14 do editor v2; até lá o menu leva ao lugar de hoje
     @app.get("/ajustes")
     def settings_page():
         return see_other("/sites#config")
 
     @app.get("/historico")
-    def history(request: Request):
-        pubs = [p for p in db.publications(limit=200) if p["post_status"] != "deleted"]
-        return render(request, "history.html", pubs=pubs, metrics=db.latest_metrics(),
-                      metrics_last_run=db.setting("metrics_last_run"))
+    def history():
+        """O Histórico virou a tela Artes (filtro Publicadas)."""
+        return see_other("/artes?filtro=publicadas")
 
     @app.get("/calendario")
     def calendar_page(request: Request, semana: int = 0, erro: str = ""):
