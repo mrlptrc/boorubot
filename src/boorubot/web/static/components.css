@@ -146,6 +146,8 @@
 
 /* ---- extensões do código (não estão no pacote do Figma) -----------------------------------------
    Os controles usam inputs nativos para funcionar sem JavaScript; o estado vem de :checked. */
+.bb-btn { text-decoration: none; }
+.bb-btn--link { text-decoration: underline; text-underline-offset: 3px; }
 .bb-pet { display: block; flex: none; height: auto; }
 .bb-tag--own .bb-tag__dot { display: none; }
 .bb-tag--new { background: var(--warn-bg); border: 1px dashed var(--warn); color: var(--warn); }
