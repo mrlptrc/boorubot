@@ -47,14 +47,20 @@ def oc_fields(row: dict, original_character: bool) -> dict:
 
 
 def mochi_note(row: dict) -> str:
-    """O recado da Mochi embaixo da arte (vazio quando não há o que dizer)."""
-    if not (row["oc_auto"] and row["original_character"]):
-        return ""
+    """O recado da Mochi embaixo da arte, depois que ela olhou (vazio antes disso)."""
     n = len(row["tag_scores"])
-    note = f"Achei {n} tag{'s' if n != 1 else ''} e nenhum personagem conhecido, então marquei como personagem original."
-    if "paheal" in row["sites"]:
-        note += " O paheal não aceita OC e vai ficar de fora."
-    return note
+    found = f"Achei {n} tag{'s' if n != 1 else ''}"
+    if row["oc_auto"] and row["original_character"]:
+        note = f"{found} e nenhum personagem conhecido, então marquei como personagem original."
+        if "paheal" in row["sites"]:
+            note += " O paheal não aceita OC e vai ficar de fora."
+        return note
+    if row.get("suggest_state") != "pronta" or not n:
+        return ""
+    check = sum(1 for v in row["tag_scores"].values() if v < 0.7)
+    if check:
+        return f"{found}. {'Uma está' if check == 1 else f'{check} estão'} em amarelo: vale dar uma conferida."
+    return f"{found} e tenho certeza de todas. Confira o rating antes de aprovar."
 
 
 def accept_weak(row: dict, tags: list[str]) -> dict:
