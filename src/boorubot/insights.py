@@ -97,7 +97,7 @@ def build(db: DB, period: str = "30", now: datetime | None = None) -> dict:
                                                 "favs": 0, "score": 0, "site": SITE_LABELS[p["site"]]})
         entry["favs"] += snap["fav_count"] or 0
         entry["score"] += snap["score"] or 0
-    top = sorted(loved.values(), key=lambda e: (-e["favs"], -e["score"], e["post_id"]))[:3]
+    top = sorted(loved.values(), key=lambda e: (-e["favs"], -e["score"], e["post_id"]))[:5]
 
     by_site = []
     for site in ALL_SITES:

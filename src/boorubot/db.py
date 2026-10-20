@@ -329,6 +329,17 @@ class DB:
         edge = self._all(f"SELECT {agg}(queue_pos) AS v FROM posts WHERE status = 'approved'")[0]["v"] or 0
         self.update_post(post_id, queue_pos=edge - 1 if where == "first" else edge + 1)
 
+    def move_to_position(self, post_id: int, position: int) -> None:
+        """Põe a arte na posição `position` (1 = a próxima) e renumera a fila 1..N, sem buracos nem repetição.
+        O pacer não muda: ele só lê a ordem."""
+        ids = [r["id"] for r in self._all("SELECT id FROM posts WHERE status = 'approved' ORDER BY queue_pos, id")]
+        if post_id not in ids:
+            return
+        ids.remove(post_id)
+        ids.insert(max(0, min(position - 1, len(ids))), post_id)
+        for pos, pid in enumerate(ids, start=1):
+            self._exec("UPDATE posts SET queue_pos = ? WHERE id = ?", (float(pos), pid))
+
     def mark_post_published_at(self, post_id: int, when: datetime | None = None) -> None:
         """Primeira vez que a arte saiu em algum site (referência do atraso por site)."""
         when = when or datetime.now()
