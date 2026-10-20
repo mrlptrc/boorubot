@@ -156,3 +156,45 @@ def test_desktop_editor_keeps_the_site_list_in_place(panel, browser):
     assert not page.is_visible("#sites-sheet .bb-sheet__head") and not page.is_visible(".ed-tag-more")
     assert page.locator(".ed-test .ed-bar__label").bounding_box()["width"] > 40
     page.close()
+
+
+def test_every_control_reached_by_tab_shows_focus(panel, browser):
+    base, pid = panel
+    for path in ROUTES + [f"/posts/{pid}"]:
+        page = open_page(browser, base + path, {"width": 1440, "height": 1024})
+        page.add_style_tag(content="*, *::before, *::after { transition: none !important; }")   # lê o anel já pronto
+        for _ in range(25):
+            page.keyboard.press("Tab")
+            ring = page.evaluate("""() => {
+                const a = document.activeElement;
+                if (!a || a === document.body) return "body";
+                const st = getComputedStyle(a);
+                const own = st.boxShadow !== "none" || (st.outlineStyle !== "none" && st.outlineWidth !== "0px");
+                // input escondido (toggle, rating, segmentado) ou campo de tag: o anel fica no vizinho ou na caixa
+                const near = a.closest(".bb-switch, .bb-rating__opt, .bb-seg__opt, .settings-pill, .ed-tagbox, .settings-folder");
+                const drawn = near && [...near.querySelectorAll("*")].concat(near).some((el) => getComputedStyle(el).boxShadow !== "none");
+                return own || drawn ? "ok" : a.outerHTML.slice(0, 120);
+            }""")
+            assert ring in ("ok", "body"), f"{path}: sem foco visível em {ring}"
+        page.close()
+
+
+def test_reduced_motion_only_fades(panel, browser):
+    base, _ = panel
+    page = browser.new_page(viewport=PHONE, reduced_motion="reduce")
+    page.route("https://fonts.googleapis.com/**", lambda r: r.abort())
+    page.goto(base + "/")
+    page.click(".bottom-nav [data-dialog-open=more-sheet]")
+    assert page.eval_on_selector("#more-sheet", "el => getComputedStyle(el).animationName") == "fade-only"
+    page.close()
+
+
+def test_site_panel_from_the_url_opens_as_a_modal(panel, browser):
+    base, _ = panel
+    for viewport in (PHONE, {"width": 1440, "height": 1024}):
+        page = open_page(browser, base + "/sites?painel=danbooru", viewport)
+        page.wait_for_function("document.getElementById('painel-danbooru').matches(':modal')")
+        focus_stays_in(page, "#painel-danbooru")
+        page.keyboard.press("Escape")
+        assert not page.is_visible("#painel-danbooru")
+        page.close()
