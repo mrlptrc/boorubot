@@ -232,7 +232,7 @@ def test_guide_and_checklist(client, db):
     c, _ = client
     assert "api_keys/new" in c.get("/guia").text
     home = c.get("/").text
-    assert "Configuração inicial" in home and "Conectar Danbooru" in home
+    assert "Configuração inicial" in home and "de 7 passos prontos" in home and "Antes de começar" in home
     for site in ("danbooru", "gelbooru", "paheal", "rule34us", "rule34xxx"):
         db.set_session(site, True, "ok")
     db.set_setting("test_mode", "0")
@@ -646,3 +646,33 @@ def test_deleted_post_is_never_sent(db, monkeypatch):
     monkeypatch.setattr(worker_mod, "build_site", lambda *a, **k: called.append(a))
     assert worker_mod.publish_site(db, post_id, "danbooru") == "missing"
     assert publish_post(db, post_id) == "missing" and not called
+
+
+# --- etapa 16: guia em passos marcados pelo estado real ----------------------------------------------
+
+def test_guide_marks_steps_from_the_real_state(client, db):
+    c, _ = client
+    page = c.get("/guia").text
+    assert "de 7 passos prontos" in page and 'id="antes"' in page and "Para consultar" in page
+    assert 'class="guide-link is-active" href="/guia?passo=antes#antes"' in page   # abre no primeiro que falta
+    db.set_session("danbooru", True, "ok")
+    db.set_session("gelbooru", True, "ok")
+    db.set_session("paheal", False, "pediu login")
+    page = c.get("/guia?passo=danbooru").text
+    assert "Feito!</b> Sua conta está conectada" in page
+    assert 'guide-mark--warn' in page and "pediu login</small>" in page        # paheal caiu: passo 4 fica amarelo
+    assert "Abrir o Danbooru em Sites" in page and "Próximo passo" in page
+
+
+def test_guide_text_is_up_to_date_with_v2(client):
+    page = client[0].get("/guia").text
+    for old in ("Sugerir com IA", "Testar este post", "Sites → Configurações", "Histórico"):
+        assert old not in page, old
+    assert "Testar sem publicar" in page and "/ajustes" in page and "Artes" in page
+
+
+def test_old_guide_anchors_still_work(client):
+    page = client[0].get("/guia").text
+    for anchor in ("pc-acordado", "danbooru", "gelbooru", "rule34xxx", "teste", "valendo", "problemas"):
+        assert f'id="{anchor}"' in page
+    assert ".guide-step:target" in (Path(app_mod.__file__).parent / "static" / "style.css").read_text()
