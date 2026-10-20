@@ -88,6 +88,13 @@
           <div class="tag-field" data-tag-field='{{ {"scores": post.tag_scores, "weak": post.weak_tags, "defaults": default_tags}|tojson|forceescape }}'>
             <textarea name="tags" id="tags" rows="5" placeholder="1girl long_hair commission ...">{{ post.tags }}</textarea>
           </div>
+          {# celular: o campo mostra 6 tags e o "+ N" traz o campo inteiro para esta folha (fica dentro do form) #}
+          <dialog class="bb-sheet" id="tags-sheet" aria-labelledby="tags-sheet-t">
+            <div class="bb-sheet__grip" aria-hidden="true"></div>
+            <div class="bb-sheet__head"><h2 id="tags-sheet-t" class="title-2">Tags</h2>
+              {{ ui.button("Pronto", tipo="suave", size="sm", attrs={"data-dialog-cancel": ""}) }}</div>
+            <div data-tags-sheet-body></div>
+          </dialog>
           {% if editable %}<p class="ed-hint">Separe por espaço, no padrão do Danbooru. <button type="button" class="bb-btn bb-btn--link" id="suggest" {{ 'disabled' if ai_busy }}>Pedir para a Mochi olhar de novo</button></p>{% endif %}
         </div>
 
@@ -109,6 +116,14 @@
 
         <fieldset class="ed-field ed-sites">
           <legend class="ed-label">Publicar em</legend>
+          {% set n_on = site_rows|selectattr("checked")|list|length %}
+          <button type="button" class="ed-sites-open" data-dialog-open="sites-sheet" aria-haspopup="dialog">
+            <span>Publicar em <b data-sites-summary>{{ n_on }} de {{ site_rows|length }} site{{ 's' if site_rows|length != 1 }}</b></span><span aria-hidden="true">›</span></button>
+          {# no computador a folha aparece no lugar, como a lista; no celular abre por cima #}
+          <dialog class="bb-sheet bb-sheet--inline" id="sites-sheet" aria-labelledby="sites-sheet-t">
+          <div class="bb-sheet__grip" aria-hidden="true"></div>
+          <div class="bb-sheet__head"><h2 id="sites-sheet-t" class="title-2">Publicar em</h2>
+            {{ ui.button("Pronto", tipo="suave", size="sm", attrs={"data-dialog-cancel": ""}) }}</div>
           <ul class="bb-sites">
             {% for r in site_rows %}
             {% set down = r.site != 'danbooru' and r.session_ok == False and not r.done %}
@@ -149,6 +164,7 @@
             </li>
             {% endfor %}
           </ul>
+          </dialog>
         </fieldset>
 
         <details class="ed-more" {{ 'open' if post.source or post.commentary_title or post.commentary_description }}>
@@ -172,11 +188,11 @@
     <div class="ed-bar" role="region" aria-label="Ações">
       <div class="ed-bar-left">
         {% if editable %}
-        {{ ui.button("Testar sem publicar", tipo="secundario", icon="teste", type="submit",
-             attrs={"name": "action", "value": "test", "data-needs-ready": "", "title": "Simula em cada site marcado. Não muda nada no post, na fila nem no histórico."}) }}
+        <button type="submit" class="bb-btn bb-btn--secondary ed-test" name="action" value="test" data-needs-ready aria-label="Testar sem publicar"
+                title="Simula em cada site marcado. Não muda nada no post, na fila nem no histórico.">{{ icon_svg("teste", 18) }}<span class="ed-bar__label">Testar sem publicar</span></button>
         {% endif %}
         <details class="ed-menu">
-          <summary class="bb-btn bb-btn--soft">Mais ações</summary>
+          <summary class="bb-btn bb-btn--soft" aria-label="Mais ações">{{ icon_svg("mais", 18) }}<span class="ed-bar__label">Mais ações</span></summary>
           <div class="bb-card bb-card--float bb-menu ed-menu-list">
             {% if editable and not test_mode %}
             <button name="action" value="publish_now" class="bb-menu__item" data-needs-ready data-confirm-dialog="publicar-dialog">

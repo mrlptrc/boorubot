@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="pt-br" class="sl-loading">
+<html lang="pt-br">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -8,9 +8,6 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Quicksand:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap">
-  {# Shoelace (gaveta do menu no celular) por CDN, versão fixa. Se não carregar, o menu vira gaveta simples (static/app.js). #}
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.20.1/cdn/themes/light.css">
-  <script type="module" src="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.20.1/cdn/shoelace-autoloader.js" onerror="document.documentElement.classList.remove('sl-loading')"></script>
   <link rel="stylesheet" href="/static/tokens.css">
   <link rel="stylesheet" href="/static/components.css">
   <link rel="stylesheet" href="/static/style.css">
@@ -44,9 +41,7 @@
     </aside>
 
     <header class="mobile-top">
-      <button type="button" class="icon-btn" data-open-menu aria-label="Abrir menu">☰</button>
       <a class="brand" href="/">{{ ui.pet("mochi-feliz", 28) }}<span>boorubot</span></a>
-      <button type="button" class="icon-btn na-mobile" data-new-art aria-label="Nova arte">+</button>
       <a class="icon-btn" href="/artes" data-open-search aria-label="Buscar">{{ ui.icon("buscar") }}</a>
     </header>
 
@@ -62,9 +57,27 @@
     </div>
   </div>
 
-  <sl-drawer id="menu-drawer" placement="start" label="boorubot" class="menu-drawer">
-    <nav class="side-nav" aria-label="Páginas">{{ nav_links() }}</nav>
-  </sl-drawer>
+  {# celular: barra fixa embaixo; "Mais" abre a folha com as outras páginas (sem JavaScript, abre por #more-sheet) #}
+  {% set more_current = path in ("/metricas", "/sites", "/ajustes", "/guia") %}
+  <nav class="bottom-nav" aria-label="Páginas">
+    {{ ui.nav_item("Início", "/", "inicio", path == "/") }}
+    {{ ui.nav_item("Artes", "/artes", "artes", path in ("/artes", "/historico") or path.startswith("/posts"), count=shell.review) }}
+    <a class="bottom-nav__add" href="/#nova-arte" data-new-art aria-label="Nova arte">{{ ui.icon("nova-arte") }}</a>
+    {{ ui.nav_item("Calendário", "/calendario", "calendario", path == "/calendario") }}
+    <a class="bb-nav__item" href="#more-sheet" data-dialog-open="more-sheet" aria-haspopup="dialog"{% if more_current %} aria-current="page"{% endif %}>
+      {{ ui.icon("mais") }}<span>Mais</span>{% if shell.login_down %}<span class="bb-nav__dot" role="img" aria-label="algum site pediu login"></span>{% endif %}</a>
+  </nav>
+  <dialog id="more-sheet" class="bb-sheet" aria-labelledby="more-sheet-t">
+    <div class="bb-sheet__grip" aria-hidden="true"></div>
+    <div class="bb-sheet__head"><h2 id="more-sheet-t" class="title-2">Mais</h2>
+      <a class="bb-sheet__close" href="#" data-dialog-cancel aria-label="Fechar">{{ ui.icon("fechar") }}</a></div>
+    <nav class="side-nav" aria-label="Mais páginas">
+      {{ ui.nav_item("Métricas", "/metricas", "metricas", path == "/metricas") }}
+      {{ ui.nav_item("Sites", "/sites", "sites", path == "/sites", dot=shell.login_down) }}
+      {{ ui.nav_item("Ajustes", "/ajustes", "ajustes", path == "/ajustes") }}
+      {{ ui.nav_item("Guia", "/guia", "guia", path == "/guia") }}
+    </nav>
+  </dialog>
 
   {{ ui.confirm_dialog("confirm-dialog", "Tem certeza?", "", "Confirmar", perigo=False, thumb="", cancelar="Cancelar") }}
 
