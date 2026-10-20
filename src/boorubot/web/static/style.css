@@ -185,22 +185,6 @@ button.danger:hover { background: var(--danger-bg); }
 .mini { width: 44px; height: 44px; object-fit: cover; border-radius: 12px; display: block; border: 2px solid var(--line); }
 @media (max-width: 640px) { .table { display: block; overflow-x: auto; } }
 
-/* --- guia ---------------------------------------------------------------- */
-.guide h1 { font-size: 30px; font-weight: 600; margin: 8px 0; }
-.guide .lead { font-size: 16px; }
-.guide section { scroll-margin-top: 80px; padding-top: 4px; }
-.guide li { margin: 6px 0; }
-.guide h3 { font-size: 16px; font-weight: 600; margin: 16px 0 4px; }
-.guide dt { font-weight: 700; margin-top: 12px; }
-.guide dd { margin: 4px 0 0 0; color: var(--ink-soft); }
-.toc ol { margin: 8px 0 0; padding-left: 22px; }
-.toc li { margin: 4px 0; }
-.steps li::marker, .guide ol li::marker { color: var(--primary-strong); font-weight: 700; }
-.guide ul li::marker { color: var(--primary); }
-.tip { background: var(--surface); border: 2px solid var(--line); border-left: 6px solid var(--primary); padding: 10px 14px; border-radius: 6px 16px 16px 6px; font-size: 14px; }
-code { background: var(--blush); color: var(--primary-deep); padding: 1px 6px; border-radius: 6px; font-size: 0.9em; }
-
-
 /* --- componentes Shoelace no tema kawaii --------------------------------- */
 /* Shoelace com a nossa cara: diálogo, abas e gaveta usam os tokens, nada de azul */
 :root {
@@ -230,39 +214,6 @@ ninja-keys {
   --ninja-placeholder-color: var(--ink-faint); --ninja-icon-size: 28px; --ninja-actions-height: 380px; --ninja-top: 14%; --ninja-z-index: 30;
 }
 html.no-search .search-btn, html.no-search [data-open-search] { display: none; }
-
-/* --- guia em abas --------------------------------------------------------- */
-.guide { max-width: 1000px; }
-.guide-tabs { margin-top: 18px; }
-.guide-tabs:not(:defined) sl-tab { display: none; }
-.guide-tabs:not(:defined) sl-tab-panel { display: block; margin-bottom: 18px; }
-html.sl-loading .guide-tabs { visibility: hidden; }
-.guide-tabs::part(base) { gap: 18px; }
-.guide-tabs::part(nav) { background: var(--surface); border: 2px solid var(--line); border-radius: 20px; padding: 8px; align-self: flex-start; position: sticky; top: 16px; }
-.guide-tabs::part(tabs) { border: 0; }
-.guide-tabs::part(active-tab-indicator) { display: none; }
-.guide-tabs::part(body) { background: var(--surface); border: 2px solid var(--line); border-radius: 22px; padding: 4px 22px 18px; }
-.guide-tabs sl-tab::part(base) {
-  gap: 8px; padding: 6px 12px 6px 6px; border-radius: 14px; font-family: var(--font-display); font-size: 14px; color: var(--ink-soft);
-  transition: background .2s, color .2s;
-}
-.guide-tabs sl-tab::part(base):hover { background: var(--blush); color: var(--ink); }
-.guide-tabs sl-tab[active]::part(base) { background: var(--blush); color: var(--ink); }
-.guide-tabs sl-tab img { width: 26px; height: 26px; }
-.guide-tabs sl-tab .tab-n { font-size: 11px; color: var(--ink-soft); min-width: 14px; }
-.guide-tabs[placement="top"]::part(nav) { position: static; align-self: stretch; min-width: 0; }
-.guide-tabs[placement="top"] sl-tab::part(base) { padding: 6px 10px; }
-.guide-tabs[placement="top"] sl-tab .tab-n { display: none; }
-.guide-tabs sl-tab-panel::part(base) { padding: 0; }
-.pager { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 22px; padding-top: 14px; border-top: 2px dashed var(--line); flex-wrap: wrap; }
-.pager a {
-  text-decoration: none; font-family: var(--font-display); font-weight: 500; padding: 6px 14px; border-radius: 999px;
-  border: 2px solid var(--pink-200); color: var(--ink); background: var(--surface); transition: transform .15s;
-}
-.pager a:hover { transform: translateY(-2px); background: var(--blush); }
-.pager-next { background: var(--primary) !important; border-color: var(--ink) !important; box-shadow: 0 3px 0 var(--ink) !important; }
-.pager-dots { font-size: 13px; color: var(--ink-soft); }
-.guide-tabs:not(:defined) .pager { display: none; }
 
 /* --- animações ------------------------------------------------------------ */
 @view-transition { navigation: auto; }
@@ -858,4 +809,52 @@ td.arts-col-favs.is-top { color: var(--primary-deep); }
   .metrics-big { font-size: 44px; line-height: 52px; }
   .metrics-bars { min-height: 160px; gap: var(--space-2); }
   .metrics-bar__label { font-size: 12px; }
+}
+
+/* --- guia (frame "Guia · desktop") ----------------------------------------------------------------- */
+.guide { display: grid; grid-template-columns: 320px minmax(0, 1fr); gap: var(--space-8); align-items: start; }
+.guide-nav { position: sticky; top: var(--space-4); display: flex; flex-direction: column; gap: var(--space-4); }
+.guide-nav__head { display: flex; align-items: center; gap: var(--space-4); }
+.guide-nav__head h1, .guide-nav__head p { margin: 0; }
+.guide-nav__head .body-lg { color: var(--ink-soft); }
+.guide-nav .eyebrow { margin: var(--space-4) 0 var(--space-2) var(--space-3); color: var(--ink-soft); }
+.guide-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.guide-link { display: flex; align-items: center; gap: var(--space-3); min-height: var(--touch-min); padding: var(--space-2) var(--space-3); border-radius: var(--radius-md); color: var(--ink); text-decoration: none; }
+.guide-link:hover { background: var(--paper); }
+.guide-link.is-active { background: var(--blush); font-weight: 800; }
+.guide-link small { margin-left: auto; color: var(--warn); font-weight: 800; font-size: 13px; }
+.guide-mark { width: 26px; height: 26px; flex: none; display: inline-grid; place-items: center; border-radius: var(--radius-full); border: 1.5px solid var(--pink-200); font-size: 13px; font-weight: 800; color: var(--ink-soft); }
+.guide-mark--ok { background: var(--ok); border-color: var(--ok); color: var(--on-primary); }
+.guide-mark--warn { background: var(--warn-bg); border-color: var(--sparkle); color: var(--warn); }
+.guide-mark--pet { border: 0; width: 26px; height: 20px; object-fit: contain; }
+.guide-content { padding: var(--space-8) var(--space-10); min-height: 60vh; }
+.guide-step { display: none; flex-direction: column; gap: var(--space-5); }
+.guide-step.is-active { display: flex; }
+/* sem JavaScript, a âncora (/guia#danbooru) também escolhe o passo */
+.guide-content:has(.guide-step:target) .guide-step { display: none; }
+.guide-content:has(.guide-step:target) .guide-step:target { display: flex; }
+.guide-step > h2, .guide-step p { margin: 0; }
+.guide-eyebrow { color: var(--primary-deep); }
+.guide-lead { font-size: 17px; line-height: 28px; color: var(--ink-soft); max-width: 65ch; }
+.guide-state { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-4) var(--space-5); border-radius: var(--radius-md); background: var(--paper); }
+.guide-state.is-ok { background: var(--ok-bg); color: var(--ok); }
+.guide-state.is-warn { background: var(--warn-bg); color: var(--warn); }
+.guide-steps { list-style: none; counter-reset: passo; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-4); max-width: 70ch; }
+.guide-steps li { counter-increment: passo; position: relative; min-height: 32px; padding: 3px 0 0 48px; line-height: 26px; }
+.guide-steps li::before { content: counter(passo); position: absolute; left: 0; top: 0; display: grid; place-items: center; width: 32px; height: 32px; border-radius: var(--radius-full); background: var(--blush); color: var(--primary-deep); font-weight: 800; font-size: 14px; }
+.guide-tip { padding: var(--space-5) var(--space-6); border-radius: var(--radius-md); background: var(--lilac-100); color: var(--lilac-700); display: flex; flex-direction: column; gap: var(--space-2); }
+.guide-tip .title-3 { color: var(--ink); }
+.guide-faq dt { font-weight: 800; margin-top: var(--space-4); }
+.guide-faq dd { margin: var(--space-1) 0 0; color: var(--ink-soft); }
+.guide-pager { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; margin-top: var(--space-4); padding-top: var(--space-5); border-top: 1px solid var(--line); }
+.guide-pager__prev { font-weight: 800; color: var(--ink-soft); text-decoration: none; }
+.guide-pager__prev:hover { color: var(--primary-deep); }
+.guide-pager__spacer { flex: 1; }
+.bb-btn.guide-next { background: var(--ink); }
+.bb-btn.guide-next:hover { background: var(--primary-pressed); }
+code { background: var(--blush); color: var(--primary-deep); padding: 1px 6px; border-radius: var(--radius-xs); font-size: .9em; }
+@media (max-width: 960px) {
+  .guide { grid-template-columns: minmax(0, 1fr); }
+  .guide-nav { position: static; }
+  .guide-content { padding: var(--space-6); }
 }
