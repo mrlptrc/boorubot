@@ -410,6 +410,10 @@ class DB:
         return self._all("SELECT p.*, posts.title, posts.image, posts.status AS post_status FROM publications p "
                          "JOIN posts ON posts.id = p.post_id ORDER BY p.id DESC LIMIT ?", (limit,))
 
+    def all_publications(self) -> list[dict]:
+        """Todas as publicações, da mais antiga para a mais nova (tela Artes: uma consulta só)."""
+        return self._all("SELECT * FROM publications ORDER BY id")
+
     def published_sites(self, post_id: int) -> set[str]:
         """Sites que NÃO recebem mais esta arte automaticamente: já saiu, foi pulada pela regra,
         ou o último envio ficou incerto (pode ter saído: só uma pessoa decide, para não duplicar)."""
