@@ -179,13 +179,13 @@
           <summary class="bb-btn bb-btn--soft">Mais ações</summary>
           <div class="bb-card bb-card--float bb-menu ed-menu-list">
             {% if editable and not test_mode %}
-            <button name="action" value="publish_now" class="bb-menu__item" data-needs-ready data-confirm-title="Publicar agora?"
-              data-confirm="{{ 'Já saiu um post hoje. Publicar agora faz 2 no mesmo dia e pode parecer spam.' if published_today and post.status not in ('failed', 'partial') else 'Sai DE VERDADE agora nos sites marcados e conta como o post de hoje.' }}"
-              data-confirm-ok="{{ 'Tentar de novo' if post.status in ('failed', 'partial') else 'Publicar agora' }}">
+            <button name="action" value="publish_now" class="bb-menu__item" data-needs-ready data-confirm-dialog="publicar-dialog">
               <span>{{ 'Tentar de novo' if post.status in ('failed', 'partial') else 'Publicar agora' }}</span><small>pula a fila e conta como o post de hoje</small></button>
             {% endif %}
             <a href="#envios" class="bb-menu__item" data-open-envios><span>Ver testes e envios</span><small>{{ tests_count }} teste{{ 's' if tests_count != 1 }} nesta arte</small></a>
-            {% if post.status != 'deleted' %}<button name="action" value="delete" class="bb-menu__item bb-menu__item--danger" formnovalidate><span>Apagar arte</span></button>{% endif %}
+            {% if post.status != 'deleted' %}<button name="action" value="delete" class="bb-menu__item bb-menu__item--danger" formnovalidate
+              data-confirm-title="Apagar &quot;{{ post.title or ('#' ~ post.id) }}&quot;?" data-confirm="Ela sai da lista de artes. Você ainda pode desfazer por alguns segundos."
+              data-confirm-ok="Apagar arte" data-confirm-danger data-confirm-thumb="/images/{{ post.image }}"><span>Apagar arte</span></button>{% endif %}
           </div>
         </details>
       </div>
@@ -207,6 +207,20 @@
       </div>
     </div>
   </form>
+
+  {# Publicar agora: diz para onde vai (com moderação e login) e avisa se já saiu um post hoje #}
+  {% set spam = published_today and post.status not in ('failed', 'partial') %}
+  {% call ui.confirm_dialog("publicar-dialog", ("Tentar de novo" if post.status in ('failed', 'partial') else "Publicar \"" ~ (post.title or ('#' ~ post.id)) ~ "\" agora?"),
+       "Ela pula a fila e vai de verdade para estes sites:", "Publicar mesmo assim" if spam else "Publicar agora", perigo=False, cancelar="Deixar na fila") %}
+    <ul class="home-chips publish-sites">
+      {% for r in site_rows if r.checked and not r.done and not r.off and not (r.site == 'paheal' and post.original_character) %}
+      <li class="home-chip{{ ' home-chip--warn' if r.site != 'danbooru' and r.session_ok == False }}">{{ r.label }}
+        {%- if r.site == 'danbooru' and danbooru_mode in ('moderated', 'forced') %} · moderação{% endif %}
+        {%- if r.site != 'danbooru' and r.session_ok == False %} · ◷ espera o login{% endif %}</li>
+      {% endfor %}
+    </ul>
+    {% if spam %}<p class="publish-warn"><span aria-hidden="true">⚠</span> Já saiu um post hoje. Dois no mesmo dia podem parecer spam para os sites.</p>{% endif %}
+  {% endcall %}
 
   {% if uncertain %}
   <section class="ed-section" id="conferir" aria-labelledby="conferir-t">

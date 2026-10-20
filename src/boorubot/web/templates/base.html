@@ -8,11 +8,9 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Quicksand:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap">
-  {# Shoelace (componentes) e ninja-keys (busca Ctrl+K) por CDN, versão fixa. Se não carregarem, o painel
-     continua funcionando: gaveta, diálogos e abas têm plano B em static/app.js. #}
+  {# Shoelace (gaveta do menu no celular) por CDN, versão fixa. Se não carregar, o menu vira gaveta simples (static/app.js). #}
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.20.1/cdn/themes/light.css">
   <script type="module" src="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.20.1/cdn/shoelace-autoloader.js" onerror="document.documentElement.classList.remove('sl-loading')"></script>
-  <script type="module" src="https://unpkg.com/ninja-keys@1.2.2?module"></script>
   <link rel="stylesheet" href="/static/tokens.css">
   <link rel="stylesheet" href="/static/components.css">
   <link rel="stylesheet" href="/static/style.css">
@@ -32,7 +30,7 @@
   <div class="app">
     <aside class="side" aria-label="Menu">
       <a class="brand" href="/">{{ ui.pet("mochi-feliz", 36) }}<span>boorubot</span></a>
-      <button type="button" class="side-search" data-open-search>{{ ui.icon("buscar") }}<span>Buscar</span>{{ ui.kbd("Ctrl K") }}</button>
+      <a class="side-search" href="/artes" data-open-search>{{ ui.icon("buscar") }}<span>Buscar</span>{{ ui.kbd("Ctrl K") }}</a>
       <nav class="side-nav" aria-label="Páginas">{{ nav_links() }}</nav>
       <div class="side-bottom">
         <div id="jobs" class="jobs" data-count="{{ jobs|length }}">
@@ -49,12 +47,16 @@
       <button type="button" class="icon-btn" data-open-menu aria-label="Abrir menu">☰</button>
       <a class="brand" href="/">{{ ui.pet("mochi-feliz", 28) }}<span>boorubot</span></a>
       <button type="button" class="icon-btn na-mobile" data-new-art aria-label="Nova arte">+</button>
-      <button type="button" class="icon-btn" data-open-search aria-label="Buscar">{{ ui.icon("buscar") }}</button>
+      <a class="icon-btn" href="/artes" data-open-search aria-label="Buscar">{{ ui.icon("buscar") }}</a>
     </header>
 
     <div class="page">
       {% if test_mode %}
-      <div class="banner">{{ ui.pet("chick", 28) }}<span>Modo teste ligado: a fila está <b>pausada</b> e nada é publicado. Use "Testar sem publicar" à vontade. Desligue em <a href="/ajustes">Ajustes</a>.</span></div>
+      <form class="banner" method="post" action="/ajustes/desligar-teste">
+        {{ ui.pet("chick", 24) }}<span>Modo teste ligado: nada é publicado e a fila está pausada.</span>
+        <input type="hidden" name="volta" value="{{ request.url.path }}">
+        {{ ui.button("Desligar", tipo="secundario", size="sm", type="submit", attrs={"data-confirm-title": "Desligar o modo teste?", "data-confirm": "A fila volta a andar e as artes aprovadas saem de verdade, 1 por dia.", "data-confirm-ok": "Desligar"}) }}
+      </form>
       {% endif %}
       <main>{% block content %}{% endblock %}</main>
     </div>
@@ -64,7 +66,18 @@
     <nav class="side-nav" aria-label="Páginas">{{ nav_links() }}</nav>
   </sl-drawer>
 
-  {{ ui.confirm_dialog("confirm-dialog", "Tem certeza?", "", "Confirmar", perigo=False, cancelar="Cancelar") }}
+  {{ ui.confirm_dialog("confirm-dialog", "Tem certeza?", "", "Confirmar", perigo=False, thumb="", cancelar="Cancelar") }}
+
+  <dialog id="search" class="bb-search" aria-label="Buscar">
+    <div class="bb-search__head">
+      {{ ui.icon("buscar") }}
+      <input type="search" role="combobox" aria-expanded="true" aria-controls="search-results" aria-autocomplete="list"
+             aria-label="Buscar artes, páginas e ações" placeholder="Buscar artes, páginas, ações…" autocomplete="off">
+      {{ ui.kbd("Esc") }}
+    </div>
+    <div class="bb-search__results" id="search-results" role="listbox" aria-label="Resultados" data-search-results></div>
+    <footer class="bb-search__foot"><span>↑ ↓ navegar</span><span>Enter abrir</span><span>Esc fechar</span><span class="bb-search__hint">busca títulos, tags e páginas</span></footer>
+  </dialog>
 
   <dialog id="new-art" class="na-dialog" aria-labelledby="na-title" aria-describedby="na-desc">
     <div class="na-head">
@@ -96,8 +109,8 @@
     {%- if aviso %}{{ ui.toast(aviso, request.query_params.get('tipo', 'neutro'), action="desfazer" if undo.isdigit() else None, action_form="/posts/" ~ undo ~ "/desfazer" if undo.isdigit() else None) }}{% endif -%}
   </div>
 
-  <ninja-keys noAutoLoadMdIcons hideBreadcrumbs placeholder="Buscar artes, páginas, tópicos do guia, ações…"></ninja-keys>
   <script src="/static/app.js" defer></script>
+  <script src="/static/search.js" defer></script>
   <script src="/static/new-art.js" defer></script>
 </body>
 </html>

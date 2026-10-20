@@ -149,7 +149,7 @@
 {% macro confirm_dialog(id, titulo, texto, acao, perigo=True, thumb=None, cancelar="Manter") -%}
 <dialog class="bb-dialog" id="{{ id }}" aria-labelledby="{{ id }}-t" aria-describedby="{{ id }}-d">
   <div class="bb-dialog__head">
-    {%- if thumb %}<img class="bb-dialog__thumb" src="{{ thumb }}" alt="">{% endif %}
+    {%- if thumb is not none %}<img class="bb-dialog__thumb" src="{{ thumb }}" alt="" data-dialog-thumb{{ ' hidden' if not thumb }}>{% endif %}
     <h2 class="bb-dialog__title" id="{{ id }}-t" data-dialog-title>{{ titulo }}</h2>
   </div>
   <p class="bb-dialog__text" id="{{ id }}-d" data-dialog-text>{{ texto }}</p>
