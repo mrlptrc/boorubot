@@ -115,3 +115,38 @@ def test_pets_are_decorative(client):
     page = client[0].get("/_ui").text
     assert '<img class="bb-pet" src="/static/pets/bear.svg" alt=""' in page
     assert "side-pets" not in page   # o trio decorativo do rodapé da sidebar saiu
+
+
+# --- DS-4: navegação -----------------------------------------------------------------------------------
+
+def test_sidebar_has_the_v2_items_in_order_with_icons(client):
+    page = client[0].get("/calendario").text
+    side = page[page.index('<aside class="side"'):page.index("</aside>")]
+    labels = ["Início", "Artes", "Calendário", "Métricas", "Sites", "Ajustes", "Guia"]
+    positions = [side.index(f"<span>{label}</span>") for label in labels]
+    assert positions == sorted(positions)
+    nav = side[side.index('<nav class="side-nav"'):side.index("</nav>")]
+    assert nav.count('class="bb-nav__item"') == 7 and "/static/pets/" not in nav and nav.count("<svg") == 7
+    current = side[side.index('aria-current="page"') - 60:side.index('aria-current="page"')]
+    assert 'href="/calendario"' in current
+
+
+def test_sidebar_counts_reviews_and_flags_login(client):
+    c, db = client
+    db.create_post("a.png", title="a")
+    assert 'bb-nav__dot' not in c.get("/").text
+    db.set_session("gelbooru", False, "pediu login")
+    page = c.get("/").text
+    assert 'class="bb-nav__count" aria-label="1 para revisar">1<' in page
+    assert 'class="bb-nav__dot"' in page
+
+
+def test_robot_card_shows_test_mode_and_links_to_settings(client):
+    page = client[0].get("/").text
+    assert "side-robot--warn" in page and "Modo teste ligado" in page and 'href="/ajustes"' in page
+
+
+def test_artes_and_ajustes_links_lead_somewhere(client):
+    c, _ = client
+    assert c.get("/artes", follow_redirects=False).status_code == 303
+    assert c.get("/ajustes", follow_redirects=False).status_code == 303
