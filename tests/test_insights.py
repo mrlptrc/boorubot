@@ -135,3 +135,12 @@ def test_refresh_button_lives_on_metrics_page(seeded):
     assert "/metricas/atualizar" not in c.get("/historico").text
     c.post("/metricas/atualizar")
     assert [j.kind for j in w.jobs.queue] == ["metrics"]
+
+
+def test_compares_with_the_previous_period_of_the_same_size(seeded):
+    _, a = seeded.publications(1)[0]["post_id"], seeded.publications(1)[0]["id"]
+    snap(seeded, a, NOW - timedelta(days=12), 12, 10)     # semana anterior (1 a 7/10): 10 -> 15 = +5
+    m7 = insights.build(seeded, "7", NOW)
+    assert m7["previous_favorites"] == 5
+    assert insights.build(seeded, "30", NOW)["previous_favorites"] == 0   # nada antes de 15/09
+    assert insights.build(seeded, "tudo", NOW)["previous_favorites"] is None

@@ -179,7 +179,7 @@ def test_home_empty_state(db):
     page = client(db).get("/").text
     assert "Nada agendado para hoje." in page and "Fila vazia" in page
     assert "As métricas aparecem depois do primeiro post no Danbooru." in page
-    assert page.count("vazio</span>") == 7
+    assert page.count("folga</span>") == 5                # Próximos dias: 5 dias, folga com a Mochi deitada
 
 
 def test_home_with_queue_and_session_alert(db):
@@ -189,7 +189,7 @@ def test_home_with_queue_and_session_alert(db):
     failed = db.create_post("f.png", title="falhou-x", status="failed")
     db.add_publication(failed, "paheal", "failed", message="caiu")
     page = client(db).get("/").text
-    assert "Próximos 7 dias" in page and "1º na fila" in page and "2º na fila" in page
+    assert "Próximos dias" in page and "1º na fila" in page and "2º na fila" in page
     assert "pediu login de novo" in page and "/sites#gelbooru" in page
     assert "rascunho-x" in page and "3 tags" in page
     assert "falhou no rule34.paheal" in page and "falhou-x" in page
