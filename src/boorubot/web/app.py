@@ -167,6 +167,7 @@ def create_app(db: DB | None = None, worker: Worker | None = None, start_worker:
     templates.env.globals["icon_svg"] = icon_svg
     templates.env.filters["quando"] = when_label
     templates.env.filters["dict_without"] = dict_without
+    templates.env.filters["curto"] = lambda iso: short_when(datetime.fromisoformat(iso)) if iso else ""
 
     def danbooru_mode() -> str:
         """Como o post entra no Danbooru, pelo nível REAL lido da conta (nunca presumido).
@@ -434,6 +435,31 @@ def create_app(db: DB | None = None, worker: Worker | None = None, start_worker:
                      add_site: bool = Form(False)):
         error = pin_post(post_id, site, day, add_site)
         return JSONResponse({"ok": error is None, "error": error}, status_code=200 if error is None else 400)
+
+    @app.post("/calendario/mover")
+    def calendar_move(request: Request, post_id: int = Form(...), posicao: int = Form(...), semana: int = Form(0)):
+        """Arrastar uma arte para outro dia no calendário = mudar a posição dela na fila."""
+        row = db.get_post(post_id)
+        if not row or row["status"] != "approved":
+            error = "só dá para mover uma arte que está na fila"
+            if "application/json" in request.headers.get("accept", ""):
+                return JSONResponse({"ok": False, "error": error}, status_code=400)
+            return see_other(f"/calendario?semana={semana}&erro=" + quote(error))
+        db.move_to_position(post_id, posicao)
+        if "application/json" in request.headers.get("accept", ""):
+            return {"ok": True}
+        return see_other(f"/calendario?semana={semana}")
+
+    @app.post("/calendario/ritmo")
+    def calendar_rhythm(site: str = Form(...), rhythm: str = Form(...), delay: int = Form(0), semana: int = Form(0)):
+        """Ritmo de um site, pelo menu do próprio calendário (mesmas regras de /settings/ritmo)."""
+        from boorubot.db import MAX_DELAY_DAYS, RHYTHMS
+
+        if site not in ALL_SITES:
+            raise HTTPException(404)
+        db.set_setting(f"rhythm_{site}", rhythm if rhythm in RHYTHMS else "diario")
+        db.set_setting(f"delay_{site}", str(delay) if 0 <= delay <= MAX_DELAY_DAYS else "0")
+        return see_other(f"/calendario?semana={semana}")
 
     @app.post("/calendario/desafixar")
     def calendar_unpin(post_id: int = Form(...), site: str = Form(...), semana: int = Form(0)):
@@ -805,7 +831,7 @@ def create_app(db: DB | None = None, worker: Worker | None = None, start_worker:
             delay = str(form.get(f"delay_{site}", "0"))
             db.set_setting(f"rhythm_{site}", rhythm if rhythm in RHYTHMS else "diario")
             db.set_setting(f"delay_{site}", delay if delay.isdigit() and int(delay) <= MAX_DELAY_DAYS else "0")
-        return see_other("/sites#ritmo")
+        return see_other("/calendario")
 
     @app.get("/metricas")
     def metrics_page(request: Request, periodo: str = "30"):
