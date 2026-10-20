@@ -86,6 +86,19 @@ def when_label(when: datetime | None) -> str:
     return f"{WEEKDAYS[when.weekday()]} {when:%d/%m} às {when:%H:%M}" if when else ""
 
 
+def short_when(when: datetime | None, now: datetime | None = None) -> str:
+    """"hoje 18:02", "ontem 18:02" ou "seg 12/10"."""
+    if not when:
+        return ""
+    now = now or datetime.now()
+    days = (now.date() - when.date()).days
+    if days == 0:
+        return f"hoje {when:%H:%M}"
+    if days == 1:
+        return f"ontem {when:%H:%M}"
+    return f"{WEEKDAYS[when.weekday()]} {when:%d/%m}"
+
+
 def image_info(filename: str) -> str:
     """"PNG · 1200 × 1600 · 840 KB" (vazio se a imagem sumiu do disco)."""
     from PIL import Image
@@ -153,8 +166,23 @@ def create_app(db: DB | None = None, worker: Worker | None = None, start_worker:
             return "forced" if db.setting("danbooru_force_pending") == "1" else "direct"
         return "moderated"
 
+    def shell_state() -> dict:
+        """Dados da casca (menu): contagem "para revisar", ponto de login em Sites e o card de estado do robô."""
+        review = len(db.list_posts(("draft", "failed", "partial")))
+        login_down = any(not s.get("ok") for s in db.sessions().values())
+        last = db.setting("last_published_at")
+        last_label = short_when(datetime.fromisoformat(last)) if last else ""
+        if db.test_mode:
+            robot = {"tone": "warn", "title": "Modo teste ligado", "text": "a fila está pausada", "href": "/ajustes"}
+        elif login_down:
+            robot = {"tone": "warn", "title": "Um site pediu login", "text": "os outros continuam na fila", "href": "/sites"}
+        else:
+            robot = {"tone": "ok", "title": "Ligado e na fila",
+                     "text": f"último post {last_label}" if last_label else "nenhum post ainda", "href": "/calendario"}
+        return {"review": review, "login_down": login_down, "robot": robot}
+
     def render(request: Request, name: str, **ctx):
-        ctx.update(test_mode=db.test_mode, jobs=worker.pending(),
+        ctx.update(test_mode=db.test_mode, jobs=worker.pending(), shell=shell_state(),
                    danbooru_mode=danbooru_mode(), danbooru_level=db.setting("danbooru_level_string"))
         return templates.TemplateResponse(request, name, ctx)
 
@@ -638,6 +666,15 @@ def create_app(db: DB | None = None, worker: Worker | None = None, start_worker:
         return see_other("/sites")
 
     # --- histórico ---------------------------------------------------------------
+
+    # Artes e Ajustes ganham tela própria nas etapas 13 e 14 do editor v2; até lá o menu leva ao lugar de hoje
+    @app.get("/artes")
+    def arts_page():
+        return see_other("/historico")
+
+    @app.get("/ajustes")
+    def settings_page():
+        return see_other("/sites#config")
 
     @app.get("/historico")
     def history(request: Request):
