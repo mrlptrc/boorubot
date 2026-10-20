@@ -14,8 +14,10 @@
   <script type="module" src="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.20.1/cdn/shoelace-autoloader.js" onerror="document.documentElement.classList.remove('sl-loading')"></script>
   <script type="module" src="https://unpkg.com/ninja-keys@1.2.2?module"></script>
   <link rel="stylesheet" href="/static/tokens.css">
+  <link rel="stylesheet" href="/static/components.css">
   <link rel="stylesheet" href="/static/style.css">
 </head>
+{% import "_ui.html" as ui %}
 {% set path = request.url.path %}
 {% macro nav_links() %}
   <a href="/" class="{{ 'on' if path == '/' or path.startswith('/posts') }}"><img src="/static/pets/cat.svg" alt=""><span>Início</span></a>
@@ -53,15 +55,6 @@
       {% if test_mode %}
       <div class="banner"><img src="/static/pets/chick.svg" alt=""><span>Modo teste ligado: a fila está <b>pausada</b> e nada é publicado. Use "Testar este post" à vontade. Desligue em <a href="/sites">Sites</a>.</span></div>
       {% endif %}
-      {% set aviso = request.query_params.get('aviso', '') %}
-      {% if aviso %}
-      <div class="flash v2" role="status" data-flash>
-        <span>{{ aviso }}</span>
-        {% set undo = request.query_params.get('desfazer', '') %}
-        {% if undo.isdigit() %}<form method="post" action="/posts/{{ undo }}/desfazer"><button class="link-btn">desfazer</button></form>{% endif %}
-        <button type="button" class="flash-x" data-flash-close aria-label="fechar aviso"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>
-      </div>
-      {% endif %}
       <main>{% block content %}{% endblock %}</main>
       <footer class="foot"><span>boorubot · feito com ♡</span></footer>
     </div>
@@ -71,11 +64,7 @@
     <nav class="side-nav">{{ nav_links() }}</nav>
   </sl-drawer>
 
-  <sl-dialog id="confirm-dialog" label="Tem certeza?" class="cute-dialog">
-    <div class="confirm-body"><img src="/static/pets/bunny.svg" alt=""><p data-confirm-text></p></div>
-    <button slot="footer" type="button" class="ghost" data-confirm-no>Cancelar</button>
-    <button slot="footer" type="button" class="primary" data-confirm-yes>Sim, pode</button>
-  </sl-dialog>
+  {{ ui.confirm_dialog("confirm-dialog", "Tem certeza?", "", "Confirmar", perigo=False, cancelar="Cancelar") }}
 
   <dialog id="new-art" class="na-dialog" aria-labelledby="na-title">
     <div class="na-head">
@@ -96,6 +85,13 @@
       <button type="button" class="ghost" data-na-close>Fechar</button>
     </div>
   </dialog>
+
+  {# aviso de uma ação ("Aprovada! Faltam 2", "Arte apagada · desfazer"): ?aviso=…&desfazer=<id>&tipo=sucesso|erro #}
+  {% set aviso = request.query_params.get('aviso', '') %}
+  {% set undo = request.query_params.get('desfazer', '') %}
+  <div id="toasts" class="bb-toasts" aria-live="polite">
+    {%- if aviso %}{{ ui.toast(aviso, request.query_params.get('tipo', 'neutro'), action="desfazer" if undo.isdigit() else None, action_form="/posts/" ~ undo ~ "/desfazer" if undo.isdigit() else None) }}{% endif -%}
+  </div>
 
   <ninja-keys noAutoLoadMdIcons hideBreadcrumbs placeholder="Buscar artes, páginas, tópicos do guia, ações…"></ninja-keys>
   <script src="/static/app.js" defer></script>

@@ -1,0 +1,184 @@
+{#- boorubot · componentes do design system v2 (Figma: página Componentes).
+    Cada macro gera exatamente o HTML que static/components.css espera. Uso:
+      {% import "_ui.html" as ui %}  …  {{ ui.button("Aprovar e agendar", type="submit") }}
+    Controles de formulário usam elementos nativos (input radio/checkbox) para funcionar sem JavaScript;
+    o estado marcado vem do próprio input (role="switch"/radio nativo), não de aria-checked escrito à mão. -#}
+
+{%- set BTN = {"principal": "primary", "secundario": "secondary", "suave": "soft", "perigo": "danger", "link": "link"} -%}
+{%- set TAG = {"certeza": "", "conferir": " bb-tag--check", "padrao": " bb-tag--mine", "sugestao": " bb-tag--suggest", "propria": " bb-tag--own", "nova": " bb-tag--new"} -%}
+{%- set STATUS = {"rascunho": "draft", "agendado": "scheduled", "publicado": "published", "alerta": "warn", "falhou": "failed"} -%}
+
+{% macro icon(name, size=20) -%}{{ icon_svg(name, size) }}{%- endmacro %}
+
+{% macro pet(nome, size=48, cls="") -%}
+<img class="bb-pet{{ ' ' ~ cls if cls }}" src="/static/pets/{{ nome }}.svg" alt="" width="{{ size }}" height="{{ size }}">
+{%- endmacro %}
+
+{% macro button(label, tipo="principal", estado="padrao", icon=None, href=None, type="button", attrs={}, size=None) -%}
+{%- set cls = "bb-btn bb-btn--" ~ BTN.get(tipo, "primary") ~ (" bb-btn--sm" if size == "sm" else "") ~ (" " ~ attrs.class if attrs.class) -%}
+{%- set extra = attrs | dict_without("class") -%}
+{%- if href and estado != "desligado" -%}
+<a class="{{ cls }}" href="{{ href }}"{{ extra | xmlattr }}>{% if icon %}{{ icon_svg(icon, 18) }}{% endif %}{{ label }}</a>
+{%- else -%}
+<button class="{{ cls }}" type="{{ type }}"{% if estado == "desligado" %} disabled{% endif %}{{ extra | xmlattr }}>{% if icon %}{{ icon_svg(icon, 18) }}{% endif %}{{ label }}</button>
+{%- endif -%}
+{%- endmacro %}
+
+{% macro field(name, label, value="", placeholder="", hint="", error="", type="text", attrs={}) -%}
+{%- set fid = attrs.id or "f-" ~ name -%}
+<div class="bb-field{{ ' bb-field--error' if error }}">
+  <label class="bb-field__label" for="{{ fid }}">{{ label }}</label>
+  <input class="bb-input" id="{{ fid }}" name="{{ name }}" type="{{ type }}" value="{{ value }}"
+         {%- if placeholder %} placeholder="{{ placeholder }}"{% endif %}
+         {%- if error or hint %} aria-describedby="{{ fid }}-hint"{% endif %}
+         {%- if error %} aria-invalid="true"{% endif %}{{ attrs | dict_without("id") | xmlattr }}>
+  {%- if error or hint %}
+  <span class="bb-field__hint" id="{{ fid }}-hint">{{ error or hint }}</span>
+  {%- endif %}
+</div>
+{%- endmacro %}
+
+{% macro tag(nome, origem="certeza", score=None, removable=True) -%}
+{%- if origem == "sugestao" -%}
+<button type="button" class="bb-tag bb-tag--suggest" data-tag-add="{{ nome }}">+ {{ nome }}{% if score is not none %} <span class="bb-tag__score">{{ (score * 100) | round | int }}%</span>{% endif %}</button>
+{%- else -%}
+<span class="bb-tag{{ TAG.get(origem, '') }}" data-tag="{{ nome }}">
+  {%- if origem not in ("propria",) %}<span class="bb-tag__dot" aria-hidden="true"></span>{% endif -%}
+  {{ nome }}
+  {%- if score is not none and origem == "conferir" %} <span class="bb-tag__score">{{ (score * 100) | round | int }}%</span>{% endif -%}
+  {%- if removable %}<button type="button" class="bb-tag__x" data-tag-remove="{{ nome }}" aria-label="Remover {{ nome }}">{{ icon_svg("fechar", 14) }}</button>{% endif -%}
+</span>
+{%- endif -%}
+{%- endmacro %}
+
+{% macro status(texto, estado) -%}
+<span class="bb-status bb-status--{{ STATUS.get(estado, estado) }}">{{ texto }}</span>
+{%- endmacro %}
+
+{% macro rating_group(value, suggestion=None, suggestion_conf=None, name="rating", options=None, disabled=False) -%}
+{#- options: [(valor, nome, exemplo)]. A sugestão da IA fica tracejada e nunca vem marcada. -#}
+<div class="bb-rating" role="radiogroup" aria-label="Rating">
+  {%- for key, label, desc in options %}
+  {%- set suggested = suggestion == key and value != key %}
+  <label class="bb-rating__opt{{ ' bb-rating__opt--suggested' if suggestion == key }}" data-rating="{{ key }}">
+    <input class="sr-only" type="radio" name="{{ name }}" value="{{ key }}"{% if value == key %} checked{% endif %}{% if disabled %} disabled{% endif %}>
+    <span class="bb-rating__name">{{ label }}</span>
+    <span class="bb-rating__desc">{{ desc }}</span>
+    <span class="bb-rating__ai"{% if suggestion != key %} hidden{% endif %}>sugestão da IA{% if suggestion_conf %} · {{ (suggestion_conf * 100) | round | int }}%{% endif %}</span>
+  </label>
+  {%- endfor %}
+</div>
+{%- endmacro %}
+
+{% macro toggle(name, checked, label, value="1", attrs={}, hide_label=False) -%}
+<label class="bb-switch">
+  <input class="bb-switch__input" type="checkbox" role="switch" name="{{ name }}" value="{{ value }}"{% if checked %} checked{% endif %}{{ attrs | xmlattr }}>
+  <span class="bb-toggle" aria-hidden="true"></span>
+  <span class="{{ 'sr-only' if hide_label else 'bb-switch__label' }}">{{ label }}</span>
+</label>
+{%- endmacro %}
+
+{% macro site_row(site, situacao, checked, estado="ativo", name="sites", disabled=False) -%}
+{#- estado: ativo | fora (não recebe) | login (sessão caída). O conteúdo extra vem do caller(). -#}
+<li class="bb-site{{ ' bb-site--off' if estado == 'fora' }}{{ ' bb-site--warn' if estado == 'login' }}" data-site="{{ site }}">
+  <span class="bb-site__name">{{ SITE_LABELS.get(site, site) }}</span>
+  <span class="bb-site__note">{{ situacao }}{% if caller %}{{ caller() }}{% endif %}</span>
+  {{ toggle(name, checked, "Publicar no " ~ SITE_LABELS.get(site, site), value=site, attrs={"disabled": disabled} if disabled else {}, hide_label=True) }}
+</li>
+{%- endmacro %}
+
+{% macro nav_item(label, href, icon, current, count=None, dot=False) -%}
+<a class="bb-nav__item" href="{{ href }}"{% if current %} aria-current="page"{% endif %}>
+  {{ icon_svg(icon, 20) }}<span>{{ label }}</span>
+  {%- if count %}<span class="bb-nav__count" aria-label="{{ count }} para revisar">{{ count }}</span>{% endif %}
+  {%- if dot %}<span class="bb-nav__dot" role="img" aria-label="algum site pediu login"></span>{% endif %}
+</a>
+{%- endmacro %}
+
+{% macro segmented(name, options, value, label=None) -%}
+{#- options: [(valor, rótulo, href ou None)]. Com href vira navegação (filtros); sem href, rádios. -#}
+{%- if options and options[0][2] %}
+<nav class="bb-seg" aria-label="{{ label or name }}">
+  {%- for key, text, href in options %}
+  <a class="bb-seg__opt" href="{{ href }}"{% if key == value %} aria-current="page"{% endif %}>{{ text }}</a>
+  {%- endfor %}
+</nav>
+{%- else %}
+<div class="bb-seg" role="radiogroup" aria-label="{{ label or name }}">
+  {%- for key, text, _ in options %}
+  <label class="bb-seg__opt"><input class="sr-only" type="radio" name="{{ name }}" value="{{ key }}"{% if key == value %} checked{% endif %}>{{ text }}</label>
+  {%- endfor %}
+</div>
+{%- endif %}
+{%- endmacro %}
+
+{% macro toast(msg, kind="neutro", action=None, action_href=None, action_form=None) -%}
+{#- kind: sucesso | neutro | erro. action_form: URL para POST (ex.: desfazer). -#}
+<div class="bb-toast" role="status" data-toast>
+  {%- if kind == "sucesso" %}<span class="bb-toast__icon bb-toast__icon--ok" aria-hidden="true">✓</span>
+  {%- elif kind == "erro" %}<span class="bb-toast__icon bb-toast__icon--err" aria-hidden="true">×</span>{% endif %}
+  <span class="bb-toast__msg">{{ msg }}</span>
+  {%- if action and action_form %}
+  <form method="post" action="{{ action_form }}"><button class="bb-toast__action">{{ action }}</button></form>
+  {%- elif action and action_href %}
+  <a class="bb-toast__action" href="{{ action_href }}">{{ action }}</a>
+  {%- endif %}
+  <button type="button" class="bb-toast__close" data-toast-close aria-label="Fechar aviso">{{ icon_svg("fechar", 16) }}</button>
+</div>
+{%- endmacro %}
+
+{% macro mochi_note(titulo, fala, expressao="feliz", attrs={}) -%}
+<div class="bb-mochi"{{ attrs | xmlattr }}>
+  <img src="/static/pets/mochi-{{ expressao }}.svg" alt="" width="52" height="45">
+  <div>
+    {%- if titulo %}<div class="bb-mochi__title">{{ titulo }}</div>{% endif %}
+    <div class="bb-mochi__text">{{ fala }}{% if caller %}{{ caller() }}{% endif %}</div>
+  </div>
+</div>
+{%- endmacro %}
+
+{% macro empty(titulo, texto, pet="mochi-dormindo", action=None, action_href=None) -%}
+<div class="bb-empty">
+  <img src="/static/pets/{{ pet }}.svg" alt="" width="120" height="104">
+  <div class="bb-empty__title">{{ titulo }}</div>
+  <p class="bb-empty__text">{{ texto }}</p>
+  {%- if action %}{{ button(action, tipo="secundario", href=action_href, attrs={"data-new-art": ""} if not action_href else {}) }}{% endif %}
+</div>
+{%- endmacro %}
+
+{% macro confirm_dialog(id, titulo, texto, acao, perigo=True, thumb=None, cancelar="Manter") -%}
+<dialog class="bb-dialog" id="{{ id }}" aria-labelledby="{{ id }}-t" aria-describedby="{{ id }}-d">
+  <div class="bb-dialog__head">
+    {%- if thumb %}<img class="bb-dialog__thumb" src="{{ thumb }}" alt="">{% endif %}
+    <h2 class="bb-dialog__title" id="{{ id }}-t" data-dialog-title>{{ titulo }}</h2>
+  </div>
+  <p class="bb-dialog__text" id="{{ id }}-d" data-dialog-text>{{ texto }}</p>
+  {%- if caller %}{{ caller() }}{% endif %}
+  <div class="bb-dialog__actions">
+    {{ button(cancelar, tipo="secundario", attrs={"data-dialog-cancel": ""}) }}
+    {{ button(acao, tipo="perigo" if perigo else "principal", attrs={"data-dialog-ok": ""}) }}
+  </div>
+</dialog>
+{%- endmacro %}
+
+{% macro menu(items, label="Mais ações") -%}
+{#- items: [{"label", "href" | "action" (POST) | "data" (atributos), "hint", "danger"}]; o de perigo vai por último. -#}
+<div class="bb-card bb-card--float bb-menu" role="menu" aria-label="{{ label }}">
+  {%- for it in (items | rejectattr("danger") | list) + (items | selectattr("danger") | list) %}
+  {%- set cls = "bb-menu__item" ~ (" bb-menu__item--danger" if it.danger) %}
+  {%- if it.href %}
+  <a class="{{ cls }}" role="menuitem" href="{{ it.href }}"{{ (it.data or {}) | xmlattr }}><span>{{ it.label }}</span>{% if it.hint %}<small>{{ it.hint }}</small>{% endif %}</a>
+  {%- elif it.action %}
+  <form method="post" action="{{ it.action }}"><button class="{{ cls }}" role="menuitem"{{ (it.data or {}) | xmlattr }}><span>{{ it.label }}</span>{% if it.hint %}<small>{{ it.hint }}</small>{% endif %}</button></form>
+  {%- else %}
+  <button type="button" class="{{ cls }}" role="menuitem"{{ (it.data or {}) | xmlattr }}><span>{{ it.label }}</span>{% if it.hint %}<small>{{ it.hint }}</small>{% endif %}</button>
+  {%- endif %}
+  {%- endfor %}
+</div>
+{%- endmacro %}
+
+{% macro card(float=False, tag="section", cls="", attrs={}) -%}
+<{{ tag }} class="bb-card{{ ' bb-card--float' if float }}{{ ' ' ~ cls if cls }}"{{ attrs | xmlattr }}>{{ caller() }}</{{ tag }}>
+{%- endmacro %}
+
+{% macro kbd(text) -%}<kbd class="bb-kbd">{{ text }}</kbd>{%- endmacro %}

@@ -1,0 +1,127 @@
+{% extends "base.html" %}
+{% import "_ui.html" as ui %}
+{% block title %}Componentes · boorubot{% endblock %}
+{% block content %}
+{%- set RATING_OPTS = [("general", "Geral", "sem nudez"), ("sensitive", "Sensível", "decote, maiô"), ("questionable", "Questionável", "nudez parcial"), ("explicit", "Explícito", "sexo, nudez")] -%}
+<div class="catalog">
+  <header class="page-head">
+    <p class="eyebrow">Só para desenvolvimento</p>
+    <h1 class="display">Componentes</h1>
+    <p class="body-lg">Referência viva dos macros de <code>templates/_ui.html</code>, com os estados do Figma.</p>
+  </header>
+
+  <section class="catalog-sec" id="button"><h2 class="title-2">Button</h2>
+    <div class="catalog-row">
+      {{ ui.button("Aprovar e agendar") }}
+      {{ ui.button("Aprovar e agendar", estado="desligado") }}
+      {{ ui.button("Testar sem publicar", tipo="secundario", icon="teste") }}
+      {{ ui.button("Mais ações", tipo="suave") }}
+      {{ ui.button("Apagar arte", tipo="perigo") }}
+      {{ ui.button("Abrir calendário", tipo="link", href="/calendario") }}
+      {{ ui.button("Testar", tipo="secundario", size="sm") }}
+    </div>
+  </section>
+
+  <section class="catalog-sec" id="field"><h2 class="title-2">TextField</h2>
+    <div class="catalog-row catalog-row--top">
+      {{ ui.field("t1", "Título", value="bruxinha", hint="aparece no Danbooru como título do post") }}
+      {{ ui.field("t2", "Link original", placeholder="https://…") }}
+      {{ ui.field("t3", "Pasta do backup", value="backup", error="use o caminho completo da pasta") }}
+    </div>
+  </section>
+
+  <section class="catalog-sec" id="tag"><h2 class="title-2">Tag</h2>
+    <div class="bb-tags">
+      {{ ui.tag("1girl", "certeza") }}
+      {{ ui.tag("witch_hat", "conferir", score=0.62) }}
+      {{ ui.tag("original", "padrao") }}
+      {{ ui.tag("minha_tag", "propria") }}
+      {{ ui.tag("picnic_baskett", "nova") }}
+      {{ ui.tag("pink_hair", "sugestao", score=0.31) }}
+    </div>
+  </section>
+
+  <section class="catalog-sec" id="status"><h2 class="title-2">StatusBadge</h2>
+    <div class="catalog-row">
+      {{ ui.status("rascunho", "rascunho") }} {{ ui.status("agendado", "agendado") }} {{ ui.status("publicado", "publicado") }}
+      {{ ui.status("pediu login", "alerta") }} {{ ui.status("falhou", "falhou") }}
+    </div>
+  </section>
+
+  <section class="catalog-sec" id="rating"><h2 class="title-2">RatingOption</h2>
+    {{ ui.rating_group("", suggestion="sensitive", suggestion_conf=0.91, name="r1", options=RATING_OPTS) }}
+    <div class="catalog-gap"></div>
+    {{ ui.rating_group("general", suggestion="sensitive", suggestion_conf=0.91, name="r2", options=RATING_OPTS) }}
+  </section>
+
+  <section class="catalog-sec" id="toggle"><h2 class="title-2">Toggle e Segment</h2>
+    <div class="catalog-row">
+      {{ ui.toggle("a", True, "Modo teste") }}
+      {{ ui.toggle("b", False, "Abrir junto com o Windows") }}
+      {{ ui.segmented("periodo", [("7", "7 dias", "?p=7"), ("30", "30 dias", "?p=30"), ("tudo", "Tudo", "?p=tudo")], "30", label="Período") }}
+      {{ ui.segmented("freq", [("diario", "1 por dia", None), ("alternado", "dia sim, dia não", None), ("off", "desligado", None)], "diario", label="Frequência") }}
+    </div>
+  </section>
+
+  <section class="catalog-sec" id="site-row"><h2 class="title-2">SiteRow</h2>
+    <ul class="bb-sites">
+      {{ ui.site_row("danbooru", "vai para a moderação (até 3 dias)", True) }}
+      {{ ui.site_row("paheal", "fica de fora: não aceita personagem original", False, estado="fora", disabled=True) }}
+      {% call ui.site_row("rule34xxx", "pediu login de novo · ", True, estado="login") %}<a href="/sites">entrar</a>{% endcall %}
+    </ul>
+  </section>
+
+  <section class="catalog-sec" id="nav"><h2 class="title-2">NavItem</h2>
+    <nav class="catalog-nav" aria-label="Exemplo de menu">
+      {{ ui.nav_item("Início", "#nav", "inicio", True) }}
+      {{ ui.nav_item("Artes", "#nav", "artes", False, count=3) }}
+      {{ ui.nav_item("Sites", "#nav", "sites", False, dot=True) }}
+    </nav>
+  </section>
+
+  <section class="catalog-sec" id="toast"><h2 class="title-2">Toast</h2>
+    <div class="catalog-col">
+      {{ ui.toast("Saiu em 4 de 5 sites", "sucesso", action="ver", action_href="#toast") }}
+      {{ ui.toast("Arte apagada", "neutro", action="desfazer", action_href="#toast") }}
+      {{ ui.toast("O Gelbooru recusou o envio", "erro", action="corrigir", action_href="#toast") }}
+    </div>
+  </section>
+
+  <section class="catalog-sec" id="mochi"><h2 class="title-2">MochiNote e Mascotes</h2>
+    <div class="catalog-row catalog-row--top">
+      {{ ui.mochi_note("A Mochi já olhou", "Achei 18 tags e nenhum personagem conhecido, então marquei como personagem original.") }}
+      {{ ui.mochi_note("", "Estou olhando a arte…", "pensando") }}
+      {{ ui.mochi_note("Feito!", "Sua conta está conectada como Member.", "comemorando") }}
+      {{ ui.mochi_note("Ops", "O site pediu login de novo.", "ops") }}
+    </div>
+    <div class="catalog-row">
+      {% for p in ["bear", "bunny", "puppy", "chick", "cat-sleep", "paw"] %}{{ ui.pet(p, 48) }}{% endfor %}
+    </div>
+  </section>
+
+  <section class="catalog-sec" id="empty"><h2 class="title-2">EmptyState</h2>
+    {{ ui.empty("Nada para revisar", "Quando você subir uma arte, ela aparece aqui com as tags que a Mochi sugeriu.", action="Nova arte") }}
+  </section>
+
+  <section class="catalog-sec" id="dialog"><h2 class="title-2">ConfirmDialog e Menu</h2>
+    <div class="catalog-row catalog-row--top">
+      {{ ui.button("Abrir confirmação", tipo="secundario", attrs={"data-dialog-open": "catalog-confirm"}) }}
+      {{ ui.menu([{"label": "Publicar agora", "hint": "sai em todos os sites marcados"}, {"label": "Apagar arte", "danger": True}, {"label": "Ver testes e envios", "href": "#dialog"}]) }}
+    </div>
+    {{ ui.confirm_dialog("catalog-confirm", "Apagar \"bruxinha\"?", "A arte some da fila e do calendário. Você pode desfazer por alguns segundos.", "Apagar arte", thumb="/static/pets/mochi-feliz.svg") }}
+  </section>
+
+  <section class="catalog-sec" id="card"><h2 class="title-2">Card</h2>
+    <div class="catalog-row catalog-row--top">
+      {% call ui.card() %}<h3 class="title-3">Seção</h3><p class="small">Card plano, com borda.</p>{% endcall %}
+      {% call ui.card(float=True) %}<p class="small catalog-pad">Card flutuante, com sombra.</p>{% endcall %}
+      <p>Atalho: {{ ui.kbd("Ctrl") }} {{ ui.kbd("K") }}</p>
+    </div>
+  </section>
+
+  <section class="catalog-sec" id="type"><h2 class="title-2">Tipografia</h2>
+    <p class="display">Display 44</p><p class="title-1">Title 1 · 28</p><p class="title-2">Title 2 · 20</p><p class="title-3">Title 3 · 17</p>
+    <p class="body-lg">Body large 17</p><p class="body">Body 15</p><p class="small">Small 13</p><p class="eyebrow">Eyebrow 12</p><p class="number-xl">1.284</p>
+  </section>
+</div>
+{% endblock %}
