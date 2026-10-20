@@ -51,6 +51,18 @@ def first_day_score(publication: dict, snapshots: list[dict]) -> int | None:
     return best["score"] if best else None
 
 
+def previous_favorites(db: DB, start_day: date, days: int) -> int:
+    """Favoritos ganhos no período anterior de mesmo tamanho (para "18 a mais que o mês anterior")."""
+    prev_end = start_day - timedelta(days=1)
+    prev_start = datetime.combine(prev_end - timedelta(days=days - 1), time.min)
+    snaps = [s for s in db.all_metric_snapshots()
+             if prev_start <= datetime.fromisoformat(s["captured_at"]) < datetime.combine(start_day, time.min)]
+    series = favorites_by_day(snaps, prev_end, days,
+                              published_at={p["id"]: datetime.fromisoformat(p["created_at"])
+                                            for p in db.publications_with_posts()})
+    return sum(g for _, g in series)
+
+
 def build(db: DB, period: str = "30", now: datetime | None = None) -> dict:
     now = now or datetime.now()
     period = period if period in PERIODS else "30"
@@ -101,6 +113,8 @@ def build(db: DB, period: str = "30", now: datetime | None = None) -> dict:
         "period": period, "periods": PERIODS, "start": start_day,
         "has_data": bool(snaps_all), "has_publications": bool(pubs),
         "favorites": sum(g for _, g in series),
+        # comparação com o período anterior de mesmo tamanho; em "Tudo" não há anterior
+        "previous_favorites": previous_favorites(db, start_day, days) if PERIODS[period][1] else None,
         "first_day_score": sum(first_scores) / len(first_scores) if first_scores else None,
         "first_day_count": len(first_scores),
         "posts": len(ok_posts), "failed": len(failed_posts),

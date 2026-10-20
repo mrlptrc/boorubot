@@ -182,8 +182,10 @@ def build(db: DB, now: datetime | None = None) -> dict:
     next_info = None
     if events:
         when, _, post = events[0]
-        sites = [SITE_LABELS[s] for w, s, p in events if p["id"] == post["id"] and w.date() == when.date()]
+        keys = [s for w, s, p in events if p["id"] == post["id"] and w.date() == when.date()]
+        sites = [SITE_LABELS[s] for s in keys]
         next_info = {
+            "site_keys": keys,
             "post": post, "when": when, "countdown": countdown(when - now), "is_today": when.date() == today,
             "when_label": ("hoje" if when.date() == today else day_label(when.date(), today)) + when.strftime(" %H:%M"),
             "sites": sites,
@@ -238,4 +240,5 @@ def build(db: DB, now: datetime | None = None) -> dict:
         "to_check": to_check,
         "next_slot": next_free_day(db, default_sites(db), now),
         "to_confirm": [] if db.test_mode else db.needs_confirmation(),
+        "down": sorted(down, key=ALL_SITES.index),
     }
