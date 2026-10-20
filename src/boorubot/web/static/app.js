@@ -1,7 +1,7 @@
 /* boorubot · interações do painel
    Componentes do design system (templates/_ui.html): toasts, confirmação em <dialog> nativo, menus.
-   Shoelace (gaveta, abas) e ninja-keys (busca Ctrl+K) vêm por CDN e têm plano B: se não carregarem,
-   o painel continua funcionando (confirm() nativo, guia em página única, menu sem gaveta). */
+   A busca Ctrl+K fica em search.js. Shoelace (gaveta do menu no celular) vem por CDN e tem plano B:
+   se não carregar, o menu vira uma gaveta simples. */
 (function () {
   "use strict";
 
@@ -10,12 +10,10 @@
   const whenDefined = (tag, ms = 3500) =>
     Promise.race([customElements.whenDefined(tag).then(() => true), new Promise((r) => setTimeout(() => r(false), ms))]);
   const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
-  const PET = (name) => `/static/pets/${name}.svg`;
   const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 
   // Shoelace pronto (ou desistiu): libera a página. Evita "piscar" componentes sem estilo.
-  whenDefined("sl-tab-group", 2500).then(() => html.classList.remove("sl-loading"));
-  whenDefined("ninja-keys", 4000).then((ok) => html.classList.toggle("no-search", !ok));
+  whenDefined("sl-drawer", 2500).then(() => html.classList.remove("sl-loading"));
 
   // ---------------------------------------------------------------- toasts
   // Toast escuro do design system: sucesso (✓), neutro (com "desfazer") ou erro (×), com uma ação opcional.
@@ -112,12 +110,18 @@
   }
   window.boorubotDialog = openDialog;
 
+  // data-confirm-dialog="id" usa um diálogo pronto da página (ex.: "Publicar agora" com a lista de sites);
+  // senão, o genérico ganha título, texto, miniatura (data-confirm-thumb) e o rótulo da ação.
   function askConfirm(btn) {
-    const dialog = document.getElementById("confirm-dialog");
+    const own = btn.dataset.confirmDialog && document.getElementById(btn.dataset.confirmDialog);
+    const dialog = own || document.getElementById("confirm-dialog");
     const text = btn.dataset.confirm;
-    if (!dialog || !dialog.showModal) return Promise.resolve(window.confirm(text));
+    if (!dialog || !dialog.showModal) return Promise.resolve(window.confirm(text || "Tem certeza?"));
+    if (own) return openDialog(own);
     dialog.querySelector("[data-dialog-title]").textContent = btn.dataset.confirmTitle || "Tem certeza?";
     dialog.querySelector("[data-dialog-text]").textContent = text;
+    const thumb = dialog.querySelector("[data-dialog-thumb]");
+    if (thumb) { thumb.hidden = !btn.dataset.confirmThumb; if (btn.dataset.confirmThumb) thumb.src = btn.dataset.confirmThumb; }
     const ok = dialog.querySelector("[data-dialog-ok]");
     ok.textContent = btn.dataset.confirmOk || btn.textContent.trim() || "Confirmar";
     ok.className = "bb-btn " + ("confirmDanger" in btn.dataset ? "bb-btn--danger" : "bb-btn--primary");
@@ -131,7 +135,7 @@
       if (dialog && dialog.showModal) { ev.preventDefault(); openDialog(dialog); }
       return;
     }
-    const btn = ev.target.closest("[data-confirm]");
+    const btn = ev.target.closest("[data-confirm], [data-confirm-dialog]");
     if (!btn) return;
     if (btn.dataset.confirmed) { delete btn.dataset.confirmed; return; }
     ev.preventDefault();
@@ -147,100 +151,6 @@
     const drawer = document.getElementById("menu-drawer");
     if (drawer && defined("sl-drawer")) drawer.show(); else html.classList.toggle("menu-open");
   }));
-
-  // ----------------------------------------------------- busca Ctrl+K
-  const SITES = { danbooru: "Danbooru", gelbooru: "Gelbooru", paheal: "rule34.paheal", rule34us: "rule34.us", rule34xxx: "rule34.xxx" };
-  const GUIDE = [
-    ["antes", "Antes de começar"], ["pc-acordado", "O PC precisa estar acordado"], ["danbooru", "Conectar o Danbooru"],
-    ["gelbooru", "Conectar Gelbooru, paheal e rule34.us"], ["rule34xxx", "Conectar o rule34.xxx"], ["teste", "Testar um post"],
-    ["valendo", "Começar a postar de verdade"], ["dia-a-dia", "Dia a dia"], ["regras", "Regras dos sites"],
-    ["seguranca", "Segurança das suas contas"], ["problemas", "Algo deu errado?"],
-  ];
-  // os resultados da busca ficam dentro do shadow DOM do ninja-keys: o CSS da página não chega lá,
-  // então o tamanho vai inline (senão a miniatura da arte aparece no tamanho original)
-  const ICON_STYLE = "width:28px;height:28px;object-fit:cover;border-radius:8px;margin-right:8px;flex:none";
-  const icon = (pet) => `<img class="nk-pet" src="${PET(pet)}" alt="" style="${ICON_STYLE}">`;
-  const go = (url) => () => { location.href = url; };
-  function post(url) {
-    return () => {
-      const f = Object.assign(document.createElement("form"), { method: "post", action: url });
-      document.body.append(f); f.submit();
-    };
-  }
-  function newArt() {
-    const opener = document.querySelector("[data-new-art]");
-    if (opener) opener.click(); else location.href = "/";
-  }
-
-  function baseActions() {
-    const actions = [
-      { id: "nova-arte", title: "Subir nova arte", section: "Ações", icon: icon("puppy"), keywords: "upload imagem nova", handler: newArt },
-      { id: "metricas", title: "Atualizar métricas do Danbooru", section: "Ações", icon: icon("bear"), keywords: "score favoritos", handler: post("/metricas/atualizar") },
-      { id: "pg-fila", title: "Início", section: "Páginas", icon: icon("cat"), keywords: "fila painel do dia rascunhos agendados", handler: go("/") },
-      { id: "pg-calendario", title: "Calendário", section: "Páginas", icon: icon("bunny"), keywords: "agenda semana ritmo por site", handler: go("/calendario") },
-      { id: "cfg-ritmo", title: "Ritmo por site", section: "Páginas", icon: icon("bunny"), keywords: "dia sim dia não atraso desligar site", handler: go("/calendario") },
-      { id: "pg-metricas", title: "Métricas", section: "Páginas", icon: icon("bear"), keywords: "favoritos score gráfico ranking", handler: go("/metricas") },
-      { id: "pg-sites", title: "Sites", section: "Páginas", icon: icon("puppy"), keywords: "contas login danbooru chave", handler: go("/sites") },
-      { id: "pg-artes", title: "Abrir Artes", section: "Páginas", icon: icon("paw"), keywords: "histórico publicadas envios rascunhos", handler: go("/artes") },
-      { id: "pg-guia", title: "Guia", section: "Páginas", icon: icon("chick"), keywords: "ajuda tutorial", handler: go("/guia") },
-      { id: "cfg-teste", title: "Ajustes: modo teste, horário, backup", section: "Páginas", icon: icon("chick"), keywords: "configurações tags padrão windows", handler: go("/ajustes") },
-    ];
-    GUIDE.forEach(([id, title]) => actions.push({ id: "guia-" + id, title, section: "Guia", icon: icon("chick"), keywords: "guia ajuda " + id, handler: go("/guia#" + id) }));
-    Object.entries(SITES).forEach(([key, label]) => {
-      actions.push({ id: "testar-" + key, title: `Testar conexão: ${label}`, section: "Sites", icon: icon("bunny"), keywords: "sessão login checar", handler: post(`/sites/${key}/session`) });
-      if (key !== "danbooru") actions.push({ id: "entrar-" + key, title: `Entrar no ${label}`, section: "Sites", icon: icon("bunny"), keywords: "login captcha", handler: post(`/sites/${key}/login`) });
-    });
-    return actions;
-  }
-
-  whenDefined("ninja-keys", 4000).then(async (ok) => {
-    if (!ok) return;
-    const ninja = document.querySelector("ninja-keys");
-    ninja.data = baseActions();
-    document.querySelectorAll("[data-open-search]").forEach((b) => b.addEventListener("click", () => ninja.open()));
-    try {
-      const { posts } = await (await fetch("/busca.json")).json();
-      const arts = posts.map((p) => ({
-        id: "arte-" + p.id,
-        title: `${p.title} · ${p.status_label}`,
-        section: "Artes",
-        icon: `<img class="nk-thumb" src="/images/${encodeURIComponent(p.image)}" alt="" style="${ICON_STYLE}">`,
-        keywords: `${p.tags} ${p.status} #${p.id}`,
-        handler: go(`/posts/${p.id}`),
-      }));
-      ninja.data = [...arts, ...baseActions()];
-    } catch (e) {}
-  });
-
-  // ------------------------------------------------------ guia em abas
-  const tabs = document.querySelector(".guide-tabs");
-  if (tabs) {
-    whenDefined("sl-tab-group").then((ok) => {
-      if (!ok) return;
-      const names = [...tabs.querySelectorAll("sl-tab-panel")].map((p) => p.getAttribute("name"));
-      const fromHash = () => decodeURIComponent(location.hash.slice(1));
-      const small = matchMedia("(max-width: 860px)");
-      const place = () => tabs.setAttribute("placement", small.matches ? "top" : "start");
-      place(); small.addEventListener("change", place);
-      const open = (name, scroll) => {
-        if (!names.includes(name)) return false;
-        tabs.show(name);
-        if (scroll) document.querySelector(".guide").scrollIntoView({ behavior: reducedMotion ? "auto" : "smooth", block: "start" });
-        return true;
-      };
-      open(fromHash(), false);
-      tabs.addEventListener("sl-tab-show", (ev) => {
-        history.replaceState(null, "", "#" + ev.detail.name);
-        const panel = tabs.querySelector(`sl-tab-panel[name="${ev.detail.name}"]`);
-        if (panel && !reducedMotion) panel.animate([{ opacity: 0, transform: "translateY(10px)" }, { opacity: 1, transform: "none" }], { duration: 260, easing: "cubic-bezier(.2,.8,.2,1)" });
-      });
-      document.addEventListener("click", (ev) => {
-        const a = ev.target.closest('a[href^="#"]');
-        if (a && open(a.getAttribute("href").slice(1), true)) ev.preventDefault();
-      });
-      window.addEventListener("hashchange", () => open(fromHash(), true));
-    });
-  }
 
   // ------------------------------------------------------- animações
   if (!reducedMotion) {
