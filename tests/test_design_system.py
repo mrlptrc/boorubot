@@ -3,6 +3,13 @@
 import re
 from pathlib import Path
 
+import pytest
+from fastapi.testclient import TestClient
+
+from boorubot.db import DB
+from boorubot.web import app as app_mod
+from boorubot.worker import Worker
+
 WEB = Path(__file__).resolve().parents[1] / "src" / "boorubot" / "web"
 STATIC = WEB / "static"
 HEX = re.compile(r"#[0-9a-fA-F]{3,8}\b")
@@ -38,3 +45,56 @@ def test_tokens_css_matches_the_design_system_package():
     names = lambda t: set(re.findall(r"^\s*(--[\w-]+):", t, re.M))
     assert names((STATIC / "tokens.css").read_text()) == names(pkg.read_text())
     assert "#26704F" in (STATIC / "tokens.css").read_text()   # verde de sucesso que passa AA
+
+
+# --- DS-2: componentes ---------------------------------------------------------------------------------
+
+@pytest.fixture
+def client(tmp_path, monkeypatch):
+    images = tmp_path / "images"
+    images.mkdir()
+    monkeypatch.setattr(app_mod, "IMAGES_DIR", images)
+    monkeypatch.setattr("boorubot.db.IMAGES_DIR", images)
+    db = DB(tmp_path / "test.db")
+    return TestClient(app_mod.create_app(db, Worker(db), start_worker=False)), db
+
+
+def test_components_css_uses_only_tokens():
+    css = (STATIC / "components.css").read_text(encoding="utf-8")
+    assert color_literals(css) == []
+    assert "@import" not in css
+
+
+def test_ui_catalog_renders_every_component(client):
+    c, _ = client
+    page = c.get("/_ui")
+    assert page.status_code == 200
+    for cls in ("bb-btn--primary", "bb-btn--secondary", "bb-btn--soft", "bb-btn--danger", "bb-btn--link", "bb-field--error",
+                "bb-tag--check", "bb-tag--mine", "bb-tag--suggest", "bb-status--failed", "bb-rating__opt--suggested",
+                "bb-toggle", "bb-site--warn", "bb-site--off", "bb-nav__item", "bb-seg", "bb-toast", "bb-mochi", "bb-empty",
+                "bb-dialog", "bb-menu__item", "bb-card--float", "bb-kbd"):
+        assert cls in page.text, cls
+
+
+def test_ui_catalog_is_only_for_development(client):
+    c, db = client
+    db.set_setting("test_mode", "0")
+    assert c.get("/_ui").status_code == 404
+
+
+def test_components_have_accessibility_attributes(client):
+    page = client[0].get("/_ui").text
+    assert 'role="switch"' in page
+    assert 'aria-label="Remover 1girl"' in page
+    assert 'aria-current="page"' in page
+    assert 'role="radiogroup"' in page and 'type="radio" name="r2" value="general" checked' in page
+    # sugestão da IA nunca vem marcada
+    assert 'value="sensitive" checked' not in page
+    assert 'aria-invalid="true"' in page and 'aria-describedby="f-t3-hint"' in page
+
+
+def test_icons_are_inline_and_inherit_color(client):
+    page = client[0].get("/_ui").text
+    assert 'stroke="currentColor"' in page and 'aria-hidden="true" focusable="false"' in page
+    with pytest.raises(ValueError):
+        app_mod.icon_svg("../segredo")
