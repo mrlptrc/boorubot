@@ -48,6 +48,17 @@ STATUS_LABELS = {
 }
 
 
+# cor do StatusBadge de cada status (rascunho | agendado | publicado | alerta | falhou); o texto vem de STATUS_LABELS
+STATUS_TONE = {
+    "draft": "rascunho", "approved": "agendado", "publishing": "agendado", "done": "publicado", "partial": "alerta",
+    "failed": "falhou", "deleted": "falhou", "ok": "publicado", "skipped": "alerta", "uncertain": "alerta",
+    "not_published": "falhou", "site_down": "alerta", "dry_run": "agendado", "test_upload": "agendado",
+}
+# o que falta para aprovar, como frase da barra do editor ("falta escolher o rating")
+MISSING_PHRASES = {"sem tags": "faltam as tags", "escolha o rating": "falta escolher o rating",
+                   "nenhum site marcado": "falta marcar um site"}
+
+
 def normalize_tags(raw: str) -> list[str]:
     """Aceita "long_hair 1girl" (padrão booru) ou "long hair, 1girl" (vírgulas); remove repetidas."""
     items = raw.split(",") if "," in raw else raw.split()
@@ -150,7 +161,8 @@ def create_app(db: DB | None = None, worker: Worker | None = None, start_worker:
     templates = Jinja2Templates(directory=HERE / "templates")
     templates.env.globals.update(
         SITE_LABELS=SITE_LABELS, STATUS_LABELS=STATUS_LABELS, RATINGS=RATINGS, RATINGS_PT=RATINGS_PT,
-        ALL_SITES=ALL_SITES, BROWSER_MODE_LABELS=BROWSER_MODE_LABELS,
+        ALL_SITES=ALL_SITES, BROWSER_MODE_LABELS=BROWSER_MODE_LABELS, STATUS_TONE=STATUS_TONE,
+        MISSING_PHRASES=MISSING_PHRASES,
     )
     templates.env.globals["icon_svg"] = icon_svg
     templates.env.filters["quando"] = when_label
