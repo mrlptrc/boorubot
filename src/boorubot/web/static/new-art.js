@@ -39,25 +39,31 @@
     error: "não subiu",
   };
 
+  const MOCHI_THINKING = '<img class="na-mochi" src="/static/pets/mochi-pensando.svg" alt="" width="22" height="19">';
+
   function row(it) {
     const busy = it.state === "uploading" || it.state === "analisando" || it.state === "pendente";
     let text = STATE_TEXT[it.state] || "";
-    if (it.state === "pronta") text = it.info;
+    let tone = "";
+    if (it.state === "pronta") { text = "pronta · " + it.info; tone = " is-ok"; }
     if (it.state === "pendente" && it.waiting) text = `na fila da Mochi (${it.waiting} na frente)`;
-    if (it.state === "error" || it.state === "falhou") text += it.error ? ": " + it.error : "";
-    const bar = busy ? `<span class="na-bar${it.state === "uploading" ? "" : " indeterminate"}" role="progressbar" aria-label="${esc(text)}"
-        ${it.state === "uploading" ? `aria-valuemin="0" aria-valuemax="100" aria-valuenow="${it.progress}"` : ""}><span style="width:${it.state === "uploading" ? it.progress : 40}%"></span></span>` : "";
+    if (it.state === "error" || it.state === "falhou") { text += it.error ? ": " + it.error : ""; tone = " is-bad"; }
+    const pct = it.state === "uploading" ? it.progress : null;
+    const bar = busy ? `<span class="na-bar${pct === null ? " indeterminate" : ""}" role="progressbar" aria-label="${esc(text)}"
+        ${pct !== null ? `aria-valuemin="0" aria-valuemax="100" aria-valuenow="${pct}"` : ""}><span style="width:${pct !== null ? pct : 40}%"></span></span>` : "";
     let actions = "";
-    if (it.state === "waiting") actions = `<button type="button" class="na-btn" data-remove="${it.key}">tirar</button>`;
-    if (it.post && it.state !== "error") actions = `<a class="na-btn${it.state === "pronta" ? " strong" : ""}" href="/posts/${it.post.id}">Revisar</a>`;
+    if (it.state === "waiting") actions = `<button type="button" class="bb-btn bb-btn--link na-quiet" data-remove="${it.key}">tirar</button>`;
+    if (it.post && it.state !== "error") actions = `<a class="bb-btn bb-btn--link" href="/posts/${it.post.id}">Revisar</a>`;
     if (it.dup) {
       text = it.dup.published_at ? `essa arte já saiu em ${it.dup.published_label}` : `essa arte já está ${it.dup.where}`;
-      actions = `<a class="na-btn" href="/posts/${it.dup.id}">abrir a que já existe</a>` +
-        `<button type="button" class="na-btn strong" data-force="${it.key}">subir como arte nova</button>`;
+      tone = " is-warn";
+      actions = `<a class="bb-btn bb-btn--link" href="/posts/${it.dup.id}">abrir a que existe</a>` +
+        `<button type="button" class="bb-btn bb-btn--secondary bb-btn--sm" data-force="${it.key}">Subir mesmo assim</button>`;
     }
-    return `<li class="na-item na-${it.state}${it.dup ? " na-dup" : ""}">
+    const thinking = it.state === "analisando" || it.state === "pendente" ? MOCHI_THINKING : "";
+    return `<li class="na-item na-${it.state}">
       <img src="${it.url}" alt="">
-      <div class="na-text"><span class="na-name">${esc(it.file.name)}</span><span class="na-state">${esc(text)}</span>${bar}</div>
+      <div class="na-text"><span class="na-name">${esc(it.file.name)}</span><span class="na-state${tone}">${thinking}${esc(text)}</span>${bar}</div>
       <div class="na-actions">${actions}</div></li>`;
   }
 
@@ -157,7 +163,7 @@
     if (remove) {
       items = items.filter((i) => i.key !== remove.dataset.remove || i.state !== "waiting");
       render();
-      dialog.querySelector("[data-na-pick]").focus();
+      pick.focus();
     }
     const force = ev.target.closest("[data-force]");
     if (force) {
