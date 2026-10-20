@@ -1,19 +1,11 @@
 /* boorubot · interações do painel
    Componentes do design system (templates/_ui.html): toasts, confirmação em <dialog> nativo, menus.
-   A busca Ctrl+K fica em search.js. Shoelace (gaveta do menu no celular) vem por CDN e tem plano B:
-   se não carregar, o menu vira uma gaveta simples. */
+   A busca Ctrl+K fica em search.js. No celular, as folhas (dialog.bb-sheet) fecham com Esc, no véu ou arrastando para baixo. */
 (function () {
   "use strict";
 
-  const html = document.documentElement;
-  const defined = (tag) => Boolean(customElements.get(tag));
-  const whenDefined = (tag, ms = 3500) =>
-    Promise.race([customElements.whenDefined(tag).then(() => true), new Promise((r) => setTimeout(() => r(false), ms))]);
   const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
   const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
-
-  // Shoelace pronto (ou desistiu): libera a página. Evita "piscar" componentes sem estilo.
-  whenDefined("sl-drawer", 2500).then(() => html.classList.remove("sl-loading"));
 
   // ---------------------------------------------------------------- toasts
   // Toast escuro do design system: sucesso (✓), neutro (com "desfazer") ou erro (×), com uma ação opcional.
@@ -146,11 +138,28 @@
     });
   }, true);
 
-  // --------------------------------------------------- menu no celular
-  document.querySelectorAll("[data-open-menu]").forEach((b) => b.addEventListener("click", () => {
-    const drawer = document.getElementById("menu-drawer");
-    if (drawer && defined("sl-drawer")) drawer.show(); else html.classList.toggle("menu-open");
-  }));
+  // --------------------------------------------------- folhas no celular
+  // clique no véu fecha; arrastar a folha para baixo (pela alça ou pelo topo) também
+  document.querySelectorAll("dialog.bb-sheet").forEach((sheet) => {
+    sheet.addEventListener("click", (ev) => { if (ev.target === sheet) sheet.close(""); });
+    let startY = null;
+    sheet.addEventListener("pointerdown", (ev) => {
+      if (!ev.target.closest(".bb-sheet__grip, .bb-sheet__head") || ev.target.closest("a, button")) return;
+      startY = ev.clientY; sheet.setPointerCapture(ev.pointerId);
+    });
+    sheet.addEventListener("pointermove", (ev) => {
+      if (startY === null) return;
+      sheet.style.transform = `translateY(${Math.max(0, ev.clientY - startY)}px)`;
+    });
+    const end = (ev) => {
+      if (startY === null) return;
+      const moved = ev.clientY - startY;
+      startY = null; sheet.style.transform = "";
+      if (moved > 80) sheet.close("");
+    };
+    sheet.addEventListener("pointerup", end);
+    sheet.addEventListener("pointercancel", end);
+  });
 
   // ------------------------------------------------------- animações
   if (!reducedMotion) {

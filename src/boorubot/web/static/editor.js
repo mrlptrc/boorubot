@@ -7,6 +7,7 @@
   const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
   const pct = (v) => Math.round(v * 100) + "%";
   const SURE = 0.7; // a partir daqui a IA "tem certeza"
+  const MOBILE_TAGS = 6; // no celular o campo mostra só as primeiras
   // mesmo critério do normalize_tags do backend: "long hair" -> long_hair
   const clean = (t) => t.trim().toLowerCase().split(/\s+/).filter(Boolean).join("_");
   const X_ICON = '<svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" aria-hidden="true"><path d="M5 5l10 10M15 5L5 15"/></svg>';
@@ -34,7 +35,18 @@
     });
     input.setAttribute("aria-label", "Adicionar tag");
     input.id = box.id + "-new";
-    tagBox.append(list, input);
+    // celular: o campo mostra 6 tags; "+ N" abre o campo inteiro numa folha (#tags-sheet)
+    const more = Object.assign(document.createElement("button"), { type: "button", className: "bb-tag ed-tag-more", hidden: true });
+    tagBox.append(list, more, input);
+    more.addEventListener("click", () => {
+      const sheet = document.getElementById("tags-sheet");
+      if (!sheet || !window.boorubotDialog) return;
+      const spot = document.createComment("tag-field");
+      root.before(spot);
+      sheet.querySelector("[data-tags-sheet-body]").append(root);
+      window.boorubotDialog(sheet).then(() => spot.replaceWith(root));
+      input.focus();
+    });
     tagBox.addEventListener("click", (ev) => { if (ev.target === tagBox || ev.target === list) input.focus(); });
     const weakBox = Object.assign(document.createElement("div"), { className: "ed-weak" });
     const autocomplete = Object.assign(document.createElement("ul"), {
@@ -144,6 +156,9 @@
         return `<li class="bb-tag${cls}"${note ? ` title="${esc(note)}"` : ""}><span class="bb-tag__dot" aria-hidden="true"></span>${esc(t)}${sr}${extra}${remove}</li>`;
       }).join("");
       if (countEl) countEl.textContent = current.length + (current.length === 1 ? " escolhida" : " escolhidas");
+      more.hidden = current.length <= MOBILE_TAGS;
+      more.textContent = "+ " + (current.length - MOBILE_TAGS);
+      more.setAttribute("aria-label", `ver todas as ${current.length} tags`);
       const visibleWeak = weak.filter(([t]) => !current.includes(t));
       weakBox.hidden = disabled || !visibleWeak.length;
       weakBox.innerHTML = visibleWeak.length ? `<span class="ed-weak__label">A IA também viu:</span>` +
@@ -364,6 +379,11 @@
     const oc = document.getElementById("original_character");
     const ocOnly = document.querySelector("[data-oc-only]");
     if (oc && ocOnly) oc.addEventListener("change", () => { ocOnly.hidden = !oc.checked; });
+    const summary = document.querySelector("[data-sites-summary]");
+    if (summary) form.addEventListener("change", () => {
+      const total = form.querySelectorAll("input[name=sites][type=checkbox]").length;
+      summary.textContent = `${value("sites").length} de ${total} site${total === 1 ? "" : "s"}`;
+    });
     const count = document.querySelector("[data-sites-count]");
     if (count) form.addEventListener("change", () => {
       const n = value("sites").length;
