@@ -15,6 +15,12 @@
     </p>
   </div>
   {{ ui.button("Nova arte", icon="nova-arte", attrs={"data-new-art": ""}) }}
+  {# plano B sem JavaScript: a janela "Novas artes" esconde este form quando carrega #}
+  <form method="post" action="/posts" enctype="multipart/form-data" class="na-fallback" data-na-fallback>
+    <label for="na-fallback-file">Subir uma arte</label>
+    <input id="na-fallback-file" type="file" name="image" accept=".png,.jpg,.jpeg,.gif,.webp" required>
+    {{ ui.button("Enviar", tipo="secundario", type="submit", size="sm") }}
+  </form>
 </header>
 
 {% set a = d.alert %}

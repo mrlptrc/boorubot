@@ -66,23 +66,26 @@
 
   {{ ui.confirm_dialog("confirm-dialog", "Tem certeza?", "", "Confirmar", perigo=False, cancelar="Cancelar") }}
 
-  <dialog id="new-art" class="na-dialog" aria-labelledby="na-title">
+  <dialog id="new-art" class="na-dialog" aria-labelledby="na-title" aria-describedby="na-desc">
     <div class="na-head">
-      <div><h2 id="na-title">Novas artes</h2><p>Escolha uma ou várias imagens. A Mochi analisa cada uma enquanto você acompanha.</p></div>
-      <button type="button" class="icon-btn" data-na-close aria-label="Fechar">×</button>
+      <div><h2 id="na-title" class="title-1">Novas artes</h2><p id="na-desc">Elas entram como rascunho. A Mochi sugere as tags enquanto isso.</p></div>
+      <button type="button" class="na-close" data-na-close aria-label="Fechar">{{ ui.icon("fechar") }}</button>
     </div>
     <div class="na-drop" data-na-drop>
-      <img src="/static/pets/paw.svg" alt="">
-      <div><strong>Solte as imagens aqui</strong><span>PNG, JPG, GIF ou WEBP</span></div>
+      <img src="/static/pets/paw.svg" alt="" width="48" height="48">
+      <div><strong>Arraste as artes aqui</strong><span>PNG, JPG, GIF ou WEBP · várias de uma vez</span></div>
       <input type="file" accept=".png,.jpg,.jpeg,.gif,.webp" multiple hidden>
-      <button type="button" class="primary" data-na-pick>Escolher imagens</button>
+      <button type="button" class="bb-btn bb-btn--link" data-na-pick>escolher arquivos</button>
     </div>
-    <p class="na-first" data-na-first hidden>Na primeira vez, a Mochi baixa o modelo de tags (380 MB) e pode levar alguns minutos. Pode fechar esta janela, as artes continuam sendo analisadas.</p>
-    <p class="na-summary" data-na-summary aria-live="polite"></p>
     <ul class="na-list" data-na-list hidden aria-live="polite"></ul>
+    <div class="na-first" data-na-first hidden>
+      <img src="/static/pets/mochi-pensando.svg" alt="" width="40" height="35">
+      <p>Na primeira vez a Mochi baixa o modelo de tags (380 MB) e pode levar alguns minutos. Pode fechar esta janela, as artes continuam sendo analisadas.</p>
+    </div>
     <div class="na-foot">
-      <a class="na-btn strong" data-na-review href="/" hidden>Revisar primeira arte</a>
-      <button type="button" class="ghost" data-na-close>Fechar</button>
+      <p class="na-summary" data-na-summary aria-live="polite"></p>
+      {{ ui.button("Fechar", tipo="secundario", attrs={"data-na-close": ""}) }}
+      <a class="bb-btn bb-btn--primary" data-na-review href="/" hidden>Revisar a primeira</a>
     </div>
   </dialog>
 
