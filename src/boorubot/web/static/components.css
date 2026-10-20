@@ -70,8 +70,8 @@
 .bb-rating__opt[aria-checked="true"] { background: var(--blush); border: 2px solid var(--primary-strong); padding: 11px 15px; }
 
 /* Toggle */
-.bb-toggle { position: relative; width: 40px; height: 24px; border-radius: var(--radius-full); border: 0; background: var(--ink-faint); cursor: pointer; padding: 0; transition: background-color .15s ease; flex: none; }
-.bb-toggle::after { content: ""; position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border-radius: 99px; background: var(--surface); box-shadow: var(--shadow-sm); transition: transform .15s ease; }
+.bb-toggle { position: relative; width: 40px; height: 24px; border-radius: var(--radius-full); border: 0; background: var(--ink-faint); cursor: pointer; padding: 0; transition: background-color .12s ease; flex: none; }
+.bb-toggle::after { content: ""; position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border-radius: 99px; background: var(--surface); box-shadow: var(--shadow-sm); transition: transform .12s ease; }
 .bb-toggle[aria-checked="true"] { background: var(--primary); }
 .bb-toggle[aria-checked="true"]::after { transform: translateX(16px); }
 .bb-toggle:focus-visible { outline: none; box-shadow: var(--shadow-focus); }

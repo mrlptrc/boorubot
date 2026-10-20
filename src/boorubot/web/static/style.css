@@ -94,7 +94,7 @@ dialog.bb-sheet {
 dialog.bb-sheet:not([open]):not(:target) { display: none; }
 dialog.bb-sheet:target:not([open]) { display: block; position: fixed; inset: auto 0 0; z-index: 30; }
 dialog.bb-sheet::backdrop { background: var(--scrim); }
-dialog.bb-sheet[open] { animation: sheet-up .22s cubic-bezier(.2, .8, .2, 1); }
+dialog.bb-sheet[open] { animation: sheet-up .2s cubic-bezier(.2, .8, .2, 1); }
 @keyframes sheet-up { from { transform: translateY(40%); opacity: 0; } }
 .bb-sheet__grip { width: 40px; height: 5px; margin: 0 auto var(--space-2); border-radius: var(--radius-full); background: var(--pink-200); touch-action: none; }
 .bb-sheet__head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); padding: var(--space-2) 0 var(--space-3); touch-action: none; }
@@ -117,10 +117,10 @@ dialog.bb-sheet[open] { animation: sheet-up .22s cubic-bezier(.2, .8, .2, 1); }
 .drop {
   display: flex; flex-direction: row; align-items: center; justify-content: center; gap: 16px; padding: 22px;
   border: 2.5px dashed var(--pink-200); border-radius: 18px; cursor: pointer; text-align: left; background: var(--paper);
-  transition: background .2s, border-color .2s;
+  transition: background .12s, border-color .12s;
 }
 .drop > div { display: flex; flex-direction: column; gap: 2px; }
-.drop img { width: 78px; height: 78px; transition: transform .25s; }
+.drop img { width: 78px; height: 78px; transition: transform .12s; }
 .drop strong { font-family: var(--font-display); font-size: 20px; font-weight: 600; }
 .drop.over, .drop:hover { border-color: var(--primary); background: var(--blush); }
 .drop:hover img, .drop.over img { transform: translateY(-4px) rotate(-6deg); }
@@ -166,7 +166,7 @@ label small, label.check { font-weight: 400; }
 label.check { flex-direction: row; align-items: baseline; gap: 8px; flex-wrap: wrap; }
 :where(input, select, textarea) {
   font: inherit; font-weight: 400; color: var(--ink); background: var(--paper);
-  border: 2px solid var(--line); border-radius: 14px; padding: 8px 12px; width: 100%; transition: border-color .15s, box-shadow .15s;
+  border: 2px solid var(--line); border-radius: 14px; padding: 8px 12px; width: 100%; transition: border-color .12s, box-shadow .12s;
 }
 :where(input, select, textarea):focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 4px var(--blush); }
 :where(input, textarea)::placeholder { color: var(--ink-faint); }
@@ -220,17 +220,22 @@ button.danger:hover { background: var(--danger-bg); }
 /* --- animações ------------------------------------------------------------ */
 @view-transition { navigation: auto; }
 ::view-transition-old(root) { animation: .18s ease-in both fade-out; }
-::view-transition-new(root) { animation: .32s cubic-bezier(.2, .8, .2, 1) both fade-up; }
-.reveal { animation: fade-up .45s cubic-bezier(.2, .8, .2, 1) both; animation-delay: calc(var(--i, 0) * 45ms); }
+::view-transition-new(root) { animation: .2s cubic-bezier(.2, .8, .2, 1) both fade-up; }
+.reveal { animation: fade-up .2s cubic-bezier(.2, .8, .2, 1) both; animation-delay: calc(var(--i, 0) * 30ms); }
 .empty img { transform-origin: 50% 100%; }
 @keyframes fade-up { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
 @keyframes fade-out { to { opacity: 0; } }
 @keyframes pop-in { from { opacity: 0; transform: translateY(14px) scale(.9); } to { opacity: 1; transform: none; } }
 
+/* menos movimento: nada se desloca nem gira; o que aparece só troca de opacidade */
 @media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after { animation: none !important; transition: none !important; }
+  *, *::before, *::after {
+    animation-name: fade-only !important; animation-iteration-count: 1 !important; animation-delay: 0s !important;
+    transition-property: color, background-color, border-color, opacity !important;
+  }
   ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation: none !important; }
 }
+@keyframes fade-only { from { opacity: 0; } }
 
 /* --- cabeçalho de página e catálogo de componentes (/_ui, só desenvolvimento) ------------------------------------------- */
 .page-head { margin-bottom: var(--space-8); }
@@ -552,7 +557,7 @@ a.home-stat:hover { border-color: var(--pink-200); }
   }
   .ed-sites-open > span:last-child { font-size: 24px; color: var(--ink-soft); }
   .ed-sites > legend { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
-  .ed-sites .bb-sites { padding: 0; }
+  .ed-sites .bb-sites { padding: 0 var(--space-4); }
   .ed-sites .bb-site__name { width: auto; }
   /* barra de ações: acima da barra de páginas; testar e mais ações só com ícone, Aprovar ocupa o resto */
   .ed-bar { left: var(--space-2); right: var(--space-2); bottom: calc(var(--bottom-nav) + env(safe-area-inset-bottom) + var(--space-2)); padding: var(--space-2); gap: var(--space-2); flex-wrap: nowrap; }
@@ -624,6 +629,7 @@ td.arts-col-favs.is-top { color: var(--primary-deep); }
 
 /* --- sites (frames "Sites · desktop" e "Sites · painel do Danbooru") ------------------------------- */
 .page-head--pet .bb-pet { align-self: center; }
+@media (max-width: 767px) { .page-head--pet .bb-pet { display: none; } }
 .site-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-3); }
 .site-card { padding: var(--space-4) var(--space-5); gap: var(--space-3); }
 .site-card__main { display: flex; align-items: center; gap: var(--space-4); }
@@ -648,7 +654,7 @@ td.arts-col-favs.is-top { color: var(--primary-deep); }
 
 .bb-drawer {
   position: fixed; inset: 0 0 0 auto; width: min(500px, 100vw); max-width: none; height: 100vh; max-height: none; margin: 0;
-  padding: 0; border: 0; background: var(--surface); color: var(--ink); box-shadow: var(--shadow-lg);
+  padding: 0; border: 0; background: var(--surface); color: var(--ink); box-shadow: var(--shadow-lg); z-index: 30;
 }
 .bb-drawer::backdrop { background: var(--scrim-soft); }
 .bb-drawer[open] { display: flex; }
@@ -692,6 +698,8 @@ td.arts-col-favs.is-top { color: var(--primary-deep); }
 .settings-label { margin: 0; padding: 0; font: 700 17px/24px var(--font-display); color: var(--ink); }
 .settings-hint { margin: 0; color: var(--ink-soft); font-size: 15px; }
 .settings-time { width: 120px; text-align: center; font: 700 20px var(--font-display); }
+/* o botão do relógio dentro do campo de horário também recebe foco: o campo mostra o anel igual */
+.bb-input:focus-within { outline: none; border-color: var(--primary-strong); box-shadow: 0 0 0 3px var(--blush); }
 .settings-row__pet { display: flex; align-items: center; gap: var(--space-3); }
 .settings-pills { display: flex; flex-wrap: wrap; gap: var(--space-2); }
 .settings-pill { position: relative; display: inline-flex; flex-direction: row; cursor: pointer; }
@@ -765,7 +773,7 @@ td.arts-col-favs.is-top { color: var(--primary-deep); }
 .cal-cell--rest .cal-cell__name, .cal-cell--empty .cal-cell__name { color: var(--ink-soft); font-weight: 400; }
 .cal-cell--empty .cal-cell__box { border: 1.5px dashed var(--pink-200); background: none; color: var(--primary-strong); font-size: 26px; cursor: pointer; }
 .cal-cell--empty .cal-cell__box:hover { background: var(--blush); }
-.cal-cell--off .cal-cell__box { background: var(--paper); color: var(--ink-faint); font-size: 13px; }
+.cal-cell--off .cal-cell__box { background: var(--paper); color: var(--ink-soft); font-size: 13px; }
 .cal-cell__pin { position: absolute; margin: var(--space-1); }
 .cal-cell { position: relative; }
 .cal-cell__pin button { min-height: 0; padding: 2px 6px; border: 0; border-radius: var(--radius-full); background: var(--surface); font-size: 12px; cursor: pointer; }
@@ -781,6 +789,12 @@ td.arts-col-favs.is-top { color: var(--primary-deep); }
   .cal-nav { justify-content: flex-start; flex-wrap: wrap; }
   .cal-nav__label { min-width: 0; }
   .cal-card { padding: var(--space-3); }
+  /* coluna dos sites estreita e presa à esquerda; os dias rolam dentro do card */
+  .cal { min-width: 0; width: max-content; }
+  .cal-row { grid-template-columns: 104px repeat(7, 104px); gap: var(--space-2); }
+  .cal-row > :first-child { position: sticky; left: calc(-1 * var(--space-3)); z-index: 2; padding-left: var(--space-1); background: var(--surface); }
+  .cal-site b { font-size: 14px; }
+  .cal-site small { font-size: 13px; }
   .cal-rhythm__menu { width: min(340px, calc(100vw - var(--space-8))); }
 }
 
