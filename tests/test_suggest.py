@@ -194,3 +194,11 @@ def test_unchecked_oc_is_not_marked_again(db):
     run_suggestion(db, post_id, FakeTagger())  # "sugerir de novo"
     row = db.get_post(post_id)
     assert not row["original_character"] and row["oc_touched"] and not row["oc_auto"]
+
+
+def test_mochi_says_what_she_found_even_without_oc(db):
+    post_id = db.create_post("x.png", sites=["danbooru"])
+    run_suggestion(db, post_id, FakeTagger(characters=[("hatsune_miku", 0.97)]))
+    from boorubot.suggest import mochi_note
+    note = mochi_note(db.get_post(post_id))
+    assert note.startswith("Achei ") and "personagem original" not in note

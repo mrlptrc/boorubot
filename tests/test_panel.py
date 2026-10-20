@@ -242,8 +242,8 @@ def test_guide_and_checklist(client, db):
 
 
 @pytest.mark.parametrize("level, force, expected", [
-    ("", "0", "para saber se o post vai direto ao ar"),
-    ("20", "0", "vai para a fila de moderação, com até 3 dias"),
+    ("", "0", "para saber se vai direto ao ar"),
+    ("20", "0", "vai para a fila de moderação (até 3 dias)"),
     ("35", "0", "vai ao ar na hora"),
     ("35", "1", "você escolheu isso em Sites"),
 ])
@@ -536,10 +536,12 @@ def test_editor_layout_lists_every_site_with_its_state(client, db):
     db.set_session("gelbooru", False, "login caiu")
     db.update_post(post_id, original_character=True)
     page = c.get(f"/posts/{post_id}").text
-    assert page.count('class="site-row"') == 5 and 'role="switch"' in page
+    assert page.count('<li class="bb-site') == 5 and 'role="switch"' in page
     assert 'formaction="/sites/gelbooru/login"' in page and "pediu login de novo" in page
     assert "fica de fora: não aceita personagem original" in page
-    assert "se aprovar agora, sai" in page and "Aprovar e agendar" in page and "Mais ações" in page
+    # sem rating ainda: a barra diz o que falta e quando sai depois de aprovar
+    assert "falta escolher o rating" in page and "depois sai" in page
+    assert "Aprovar e agendar" in page and "Mais ações" in page
 
 
 def test_replace_image_keeps_fields_and_asks_ai_again(client, db):
