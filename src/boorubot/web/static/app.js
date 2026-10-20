@@ -168,8 +168,8 @@
     };
   }
   function newArt() {
-    const input = document.querySelector("#upload-form input[type=file]");
-    if (input) input.click(); else location.href = "/#nova";
+    const opener = document.querySelector("[data-new-art]");
+    if (opener) opener.click(); else location.href = "/";
   }
 
   function baseActions() {
@@ -251,9 +251,4 @@
 
   }
 
-  // "Subir nova arte" vindo de outra página: destaca a área de upload
-  if (location.hash === "#nova") {
-    const drop = document.getElementById("drop");
-    if (drop) { drop.scrollIntoView({ block: "center" }); drop.classList.add("wiggle"); }
-  }
 })();
