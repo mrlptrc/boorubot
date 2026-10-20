@@ -1,0 +1,473 @@
+{
+  "color": {
+    "paper": {
+      "$type": "color",
+      "$value": "#FFF6FA",
+      "$description": "Fundo da página (rosa 50). Nunca use cinza puro como fundo."
+    },
+    "surface": {
+      "$type": "color",
+      "$value": "#FFFFFF",
+      "$description": "Cards, campos, modais e a sidebar."
+    },
+    "blush": {
+      "$type": "color",
+      "$value": "#FFE4EE",
+      "$description": "Rosa 100. Item ativo da navegação, fundo de seleção, chip de status \"rascunho\"."
+    },
+    "line": {
+      "$type": "color",
+      "$value": "#F6D9E5",
+      "$description": "Bordas de card e campo, divisórias. Puxado para o rosa para não parecer cinza frio."
+    },
+    "ink": {
+      "$type": "color",
+      "$value": "#3B2234",
+      "$description": "Títulos e texto principal, sobre paper, surface e blush (13,5–14,3:1)."
+    },
+    "ink-soft": {
+      "$type": "color",
+      "$value": "#7A5A6E",
+      "$description": "Descrições, legendas e metadados, sobre paper e surface (5,6–6,0:1)."
+    },
+    "ink-faint": {
+      "$type": "color",
+      "$value": "#9C7D90",
+      "$description": "Placeholder, ícone inativo e trilha do toggle desligado, 13px ou maior (3,5–3,7:1). Nunca texto que precise ser lido."
+    },
+    "pink-200": {
+      "$type": "color",
+      "$value": "#FFC9DC",
+      "$description": "Fundo do botão principal desligado (\"Aprovar e agendar\" antes de escolher o rating)."
+    },
+    "pink-300": {
+      "$type": "color",
+      "$value": "#FF9EC4",
+      "$description": "Ilustração: bochechas da Mochi, confete. Não use em texto."
+    },
+    "pink-400": {
+      "$type": "color",
+      "$value": "#F56FA0",
+      "$description": "Ilustração e gráficos. Não use em texto."
+    },
+    "primary": {
+      "$type": "color",
+      "$value": "#E8467F",
+      "$description": "Rosa Mochi, a cor da marca. Toggle ligado, anel de foco suave, ícone ativo, barras de gráfico. Texto branco sobre ela não passa AA (3,7:1): para botão use primary-strong."
+    },
+    "primary-strong": {
+      "$type": "color",
+      "$value": "#CF336B",
+      "$description": "Fundo do botão principal, com on-primary por cima (4,8:1). Anel de foco (4,8:1 sobre surface)."
+    },
+    "primary-deep": {
+      "$type": "color",
+      "$value": "#A8245A",
+      "$description": "Links e texto rosa (\"Trocar imagem\", \"adicionar todas\"), sobre surface, paper e blush (5,7–6,9:1)."
+    },
+    "primary-pressed": {
+      "$type": "color",
+      "$value": "#7E1C45",
+      "$description": "Botão principal pressionado."
+    },
+    "on-primary": {
+      "$type": "color",
+      "$value": "#FFFFFF",
+      "$description": "Texto e ícone sobre primary-strong, primary-pressed e danger."
+    },
+    "lilac-100": {
+      "$type": "color",
+      "$value": "#EFE9FF",
+      "$description": "Fundo de info e de tudo que é da IA ou padrão dela: chip \"sugestão da IA\", tag padrão."
+    },
+    "lilac-300": {
+      "$type": "color",
+      "$value": "#C4B2F5",
+      "$description": "Ilustração (bolhas de pensamento, gota de suor da Mochi). Não use em texto."
+    },
+    "lilac-500": {
+      "$type": "color",
+      "$value": "#7B5BD6",
+      "$description": "Ponto das tags padrão, ícone de IA, segunda série de gráfico (4,9:1 sobre surface)."
+    },
+    "lilac-700": {
+      "$type": "color",
+      "$value": "#5A3FB0",
+      "$description": "Texto de info sobre lilac-100 (6,4:1)."
+    },
+    "ok": {
+      "$type": "color",
+      "$value": "#26704F",
+      "$description": "Sucesso: \"publicado\", \"conectado\". Texto sobre ok-bg (5,2:1) e surface (6,0:1). Sempre com palavra junto."
+    },
+    "ok-bg": {
+      "$type": "color",
+      "$value": "#DDF4E8",
+      "$description": "Fundo de chip e aviso de sucesso."
+    },
+    "warn": {
+      "$type": "color",
+      "$value": "#7A5600",
+      "$description": "Alerta: \"pediu login\", \"vale conferir\". Texto sobre warn-bg (5,5:1). Ponto das tags que a IA não tem certeza."
+    },
+    "warn-bg": {
+      "$type": "color",
+      "$value": "#FFE7A3",
+      "$description": "Fundo de chip e aviso de alerta, e de tag \"vale conferir\"."
+    },
+    "danger": {
+      "$type": "color",
+      "$value": "#B4233F",
+      "$description": "Erro e ação destrutiva: \"falhou\", \"Apagar arte\". Texto sobre danger-bg (5,3:1) e surface (6,5:1); fundo do botão de apagar com on-primary (6,5:1). Sempre com X ou palavra."
+    },
+    "danger-bg": {
+      "$type": "color",
+      "$value": "#FFE1E6",
+      "$description": "Fundo de chip e aviso de erro."
+    },
+    "toast": {
+      "$type": "color",
+      "$value": "#3B2234",
+      "$description": "Fundo dos avisos escuros (toasts). Alias visual de ink."
+    },
+    "on-toast": {
+      "$type": "color",
+      "$value": "#FFE4EE",
+      "$description": "Texto sobre toast (12,0:1). Ações do toast em pink-300 (7,5:1)."
+    },
+    "mochi-line": {
+      "$type": "color",
+      "$value": "#4A3043",
+      "$description": "Traço da Mochi e da marca. Só ilustração."
+    },
+    "sparkle": {
+      "$type": "color",
+      "$value": "#F5B83D",
+      "$description": "Acento Brilho: estrelinhas da Mochi. Nunca em texto, fundo de componente ou status."
+    }
+  },
+  "font": {
+    "family": {
+      "display": {
+        "$type": "fontFamily",
+        "$value": "Quicksand"
+      },
+      "body": {
+        "$type": "fontFamily",
+        "$value": "Nunito"
+      },
+      "mono": {
+        "$type": "fontFamily",
+        "$value": "ui-monospace"
+      }
+    },
+    "style": {
+      "display": {
+        "$type": "typography",
+        "$value": {
+          "fontFamily": "{font.family.display}",
+          "fontSize": "44px",
+          "fontWeight": 700,
+          "lineHeight": "52px",
+          "letterSpacing": "-0.01em"
+        },
+        "$description": "Título da página (nome da arte no editor, \"Bom dia!\" no Início). Um por tela."
+      },
+      "title-1": {
+        "$type": "typography",
+        "$value": {
+          "fontFamily": "{font.family.display}",
+          "fontSize": "28px",
+          "fontWeight": 700,
+          "lineHeight": "36px"
+        },
+        "$description": "Título de seção grande e de modal."
+      },
+      "title-2": {
+        "$type": "typography",
+        "$value": {
+          "fontFamily": "{font.family.display}",
+          "fontSize": "20px",
+          "fontWeight": 700,
+          "lineHeight": "28px"
+        },
+        "$description": "Título de card e de grupo."
+      },
+      "title-3": {
+        "$type": "typography",
+        "$value": {
+          "fontFamily": "{font.family.display}",
+          "fontSize": "17px",
+          "fontWeight": 700,
+          "lineHeight": "24px"
+        },
+        "$description": "Nome dentro de opção (rating, site), título de toast."
+      },
+      "body-lg": {
+        "$type": "typography",
+        "$value": {
+          "fontFamily": "{font.family.body}",
+          "fontSize": "17px",
+          "fontWeight": 400,
+          "lineHeight": "26px"
+        },
+        "$description": "Texto de destaque, fala da Mochi, introdução de página."
+      },
+      "body": {
+        "$type": "typography",
+        "$value": {
+          "fontFamily": "{font.family.body}",
+          "fontSize": "15px",
+          "fontWeight": 400,
+          "lineHeight": "24px"
+        },
+        "$description": "Texto padrão, conteúdo de campos."
+      },
+      "body-strong": {
+        "$type": "typography",
+        "$value": {
+          "fontFamily": "{font.family.body}",
+          "fontSize": "15px",
+          "fontWeight": 700,
+          "lineHeight": "24px"
+        },
+        "$description": "Rótulo de campo, nome de site, texto de botão."
+      },
+      "small": {
+        "$type": "typography",
+        "$value": {
+          "fontFamily": "{font.family.body}",
+          "fontSize": "13px",
+          "fontWeight": 400,
+          "lineHeight": "20px"
+        },
+        "$description": "Legenda, metadado, descrição curta de opção."
+      },
+      "small-strong": {
+        "$type": "typography",
+        "$value": {
+          "fontFamily": "{font.family.body}",
+          "fontSize": "13px",
+          "fontWeight": 700,
+          "lineHeight": "20px"
+        },
+        "$description": "Texto de tag e de chip de status."
+      },
+      "eyebrow": {
+        "$type": "typography",
+        "$value": {
+          "fontFamily": "{font.family.body}",
+          "fontSize": "12px",
+          "fontWeight": 800,
+          "lineHeight": "16px",
+          "letterSpacing": "0.08em"
+        },
+        "$description": "Rótulo acima de grupo, sempre em maiúsculas. Use pouco."
+      },
+      "number-xl": {
+        "$type": "typography",
+        "$value": {
+          "fontFamily": "{font.family.display}",
+          "fontSize": "32px",
+          "fontWeight": 800,
+          "lineHeight": "40px"
+        },
+        "$description": "Número grande de Métricas. Algarismos tabulares."
+      },
+      "code": {
+        "$type": "typography",
+        "$value": {
+          "fontFamily": "{font.family.mono}",
+          "fontSize": "13px",
+          "fontWeight": 400,
+          "lineHeight": "20px"
+        },
+        "$description": "Chaves de API, MD5, caminhos. Só em Ajustes."
+      }
+    }
+  },
+  "spacing": {
+    "space-1": {
+      "$type": "dimension",
+      "$value": "4px",
+      "$description": "Ícone e texto colados, ponto de cor e rótulo da tag."
+    },
+    "space-2": {
+      "$type": "dimension",
+      "$value": "8px",
+      "$description": "Entre tags, entre chips, gap interno de botão com ícone."
+    },
+    "space-3": {
+      "$type": "dimension",
+      "$value": "12px",
+      "$description": "Padding vertical de botão e campo, gap entre linhas de lista."
+    },
+    "space-4": {
+      "$type": "dimension",
+      "$value": "16px",
+      "$description": "Padding horizontal de campo e botão, margem lateral no celular."
+    },
+    "space-5": {
+      "$type": "dimension",
+      "$value": "20px",
+      "$description": "Padding de card compacto."
+    },
+    "space-6": {
+      "$type": "dimension",
+      "$value": "24px",
+      "$description": "Padding de card, gap entre cards, gutter do grid."
+    },
+    "space-8": {
+      "$type": "dimension",
+      "$value": "32px",
+      "$description": "Entre grupos dentro de uma seção."
+    },
+    "space-10": {
+      "$type": "dimension",
+      "$value": "40px",
+      "$description": "Entre seções da página."
+    },
+    "space-12": {
+      "$type": "dimension",
+      "$value": "48px",
+      "$description": "Padding lateral da área de conteúdo no desktop."
+    },
+    "space-16": {
+      "$type": "dimension",
+      "$value": "64px",
+      "$description": "Respiro de estados vazios (em volta da Mochi)."
+    }
+  },
+  "radius": {
+    "radius-xs": {
+      "$type": "dimension",
+      "$value": "6px",
+      "$description": "Tecla de atalho (Ctrl K), miniatura pequena."
+    },
+    "radius-sm": {
+      "$type": "dimension",
+      "$value": "10px",
+      "$description": "Ícone em caixa, swatch, célula do calendário."
+    },
+    "radius-input": {
+      "$type": "dimension",
+      "$value": "12px",
+      "$description": "Campos de texto, opções de rating, item da navegação."
+    },
+    "radius-md": {
+      "$type": "dimension",
+      "$value": "16px",
+      "$description": "Cards de lista, menus, avisos inline, toasts."
+    },
+    "radius-lg": {
+      "$type": "dimension",
+      "$value": "24px",
+      "$description": "Cards de seção, painel da imagem, modais."
+    },
+    "radius-xl": {
+      "$type": "dimension",
+      "$value": "32px",
+      "$description": "Bloco de destaque (capa, boas-vindas), folha do celular."
+    },
+    "radius-full": {
+      "$type": "dimension",
+      "$value": "999px",
+      "$description": "Botões, tags, chips, toggle, avatar."
+    }
+  },
+  "shadow": {
+    "shadow-sm": {
+      "$type": "shadow",
+      "$value": [
+        {
+          "offsetX": "0px",
+          "offsetY": "1px",
+          "blur": "2px",
+          "spread": "0px",
+          "color": "rgba(59, 34, 52, 0.06)"
+        },
+        {
+          "offsetX": "0px",
+          "offsetY": "1px",
+          "blur": "1px",
+          "spread": "0px",
+          "color": "rgba(232, 70, 127, 0.04)"
+        }
+      ],
+      "$description": "Botão secundário, card arrastável, tag em foco."
+    },
+    "shadow-md": {
+      "$type": "shadow",
+      "$value": [
+        {
+          "offsetX": "0px",
+          "offsetY": "8px",
+          "blur": "20px",
+          "spread": "-6px",
+          "color": "rgba(59, 34, 52, 0.14)"
+        }
+      ],
+      "$description": "Menus e popovers (\"Mais ações\", ritmo do calendário), barra de aprovar fixa."
+    },
+    "shadow-lg": {
+      "$type": "shadow",
+      "$value": [
+        {
+          "offsetX": "0px",
+          "offsetY": "24px",
+          "blur": "48px",
+          "spread": "-12px",
+          "color": "rgba(59, 34, 52, 0.28)"
+        }
+      ],
+      "$description": "Modais, busca Ctrl K, toasts."
+    },
+    "shadow-focus": {
+      "$type": "shadow",
+      "$value": [
+        {
+          "offsetX": "0px",
+          "offsetY": "0px",
+          "blur": "0px",
+          "spread": "2px",
+          "color": "#FFFFFF"
+        },
+        {
+          "offsetX": "0px",
+          "offsetY": "0px",
+          "blur": "0px",
+          "spread": "4px",
+          "color": "#CF336B"
+        }
+      ],
+      "$description": "Anel de foco do teclado em qualquer controle (primary-strong, 4,8:1 sobre surface)."
+    }
+  },
+  "layout": {
+    "sidebar-width": {
+      "$type": "dimension",
+      "$value": "248px",
+      "$description": "Largura da sidebar no desktop."
+    },
+    "content-max": {
+      "$type": "dimension",
+      "$value": "1120px",
+      "$description": "Largura máxima da área de conteúdo."
+    },
+    "touch-min": {
+      "$type": "dimension",
+      "$value": "44px",
+      "$description": "Altura mínima de qualquer alvo de toque no celular."
+    },
+    "bottom-nav": {
+      "$type": "dimension",
+      "$value": "72px",
+      "$description": "Altura da barra fixa do celular (sem a área segura)."
+    },
+    "breakpoint-mobile": {
+      "$type": "dimension",
+      "$value": "768px",
+      "$description": "Abaixo disso: uma coluna, barra fixa embaixo no lugar da sidebar."
+    }
+  }
+}
