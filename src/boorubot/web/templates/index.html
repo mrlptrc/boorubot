@@ -19,7 +19,7 @@
 {% set done = steps|selectattr('done')|list|length %}
 {% if done < steps|length %}
 <section class="card setup">
-  <img class="setup-pet" src="/static/pets/bunny.svg" alt="">
+  <img class="setup-pet" src="/static/pets/chick.svg" alt="">
   <div class="setup-head">
     <strong>Configuração inicial</strong>
     <span class="muted small">{{ done }} de {{ steps|length }}</span>
@@ -36,7 +36,7 @@
 
 <section class="summary" aria-label="Resumo">
   <div class="card stat">
-    <img class="stat-pet" src="/static/pets/cat.svg" alt="">
+    <img class="stat-pet" src="/static/pets/mochi-feliz.svg" alt="">
     <div class="stat-body">
       <span class="stat-label">A fila cobre</span>
       <span class="stat-big">{{ d.runway }} dia{{ 's' if d.runway != 1 }}</span>
@@ -61,7 +61,7 @@
       <span class="small">{{ n.sites|join(' · ') }}</span>
     </div>
     {% else %}
-    <img class="stat-pet" src="/static/pets/cat-sleep.svg" alt="">
+    <img class="stat-pet" src="/static/pets/mochi-dormindo.svg" alt="">
     <div class="stat-body">
       <span class="stat-label">Próximo post</span>
       <span class="stat-title">Fila vazia</span>
@@ -153,7 +153,7 @@
       {% else %}
       <div class="day empty-day{{ ' today' if w.today }}">
         <span class="day-label">{{ w.label }}</span>
-        <img src="/static/pets/cat-sleep.svg" alt="">
+        <img src="/static/pets/mochi-dormindo.svg" alt="">
         <span class="when">vazio</span>
       </div>
       {% endif %}
@@ -167,7 +167,7 @@
     <form method="post" action="/posts" enctype="multipart/form-data" id="upload-form">
       <label class="drop" id="drop">
         <input type="file" name="image" accept=".png,.jpg,.jpeg,.gif,.webp" required onchange="this.form.submit()">
-        <img src="/static/pets/puppy.svg" alt="">
+        <img src="/static/pets/paw.svg" alt="">
         <div><strong>+ Nova arte</strong>
         <span>clique ou arraste aqui</span></div>
       </label>

@@ -49,7 +49,7 @@
       <p class="ed-queue"><b>{{ queue_pos }}º de {{ queue_len }}</b> na fila{% if projected %} · próxima saída: <b>{{ projected|quando }}</b>{% endif %}</p>
       {% endif %}
       {% if post.published_at %}<p class="ed-queue">publicada em {{ post.published_at[8:10] }}/{{ post.published_at[5:7] }} às {{ post.published_at[11:16] }}</p>{% endif %}
-      <p class="mochi-note" id="mochi-note" {{ 'hidden' if not mochi }}><img src="/static/pets/cat.svg" alt="A Mochi"><span>{{ mochi }}</span></p>
+      <p class="mochi-note" id="mochi-note" {{ 'hidden' if not mochi }}><img src="/static/pets/mochi-feliz.svg" alt=""><span>{{ mochi }}</span></p>
     </aside>
 
     <div class="ed-fields">
