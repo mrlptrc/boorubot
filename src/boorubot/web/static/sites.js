@@ -4,11 +4,14 @@
 (function () {
   "use strict";
 
-  const open = document.querySelector("dialog.bb-drawer[open]");
-  if (open && open.showModal && window.boorubotDialog) {
-    open.close();
-    window.boorubotDialog(open);
-  }
+  // espera o app.js (que também é defer, mas vem depois na página) expor o boorubotDialog
+  document.addEventListener("DOMContentLoaded", () => {
+    const open = document.querySelector("dialog.bb-drawer[open]");
+    if (open && open.showModal && window.boorubotDialog) {
+      open.close();
+      window.boorubotDialog(open);
+    }
+  });
 
   const snapshot = (rows) => rows.map((r) => r.site + ":" + r.state).join(",");
   const initial = [...document.querySelectorAll("[data-site-row]")]
