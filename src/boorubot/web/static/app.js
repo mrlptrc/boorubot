@@ -97,7 +97,7 @@
       const ok = dialog.querySelector("[data-dialog-ok]");
       const cancel = dialog.querySelector("[data-dialog-cancel]");
       const onOk = () => dialog.close("ok");
-      const onCancel = () => dialog.close("");
+      const onCancel = (ev) => { ev.preventDefault(); dialog.close(""); };
       const onClose = () => {
         ok && ok.removeEventListener("click", onOk); cancel && cancel.removeEventListener("click", onCancel);
         dialog.removeEventListener("close", onClose);
@@ -178,12 +178,12 @@
       { id: "metricas", title: "Atualizar métricas do Danbooru", section: "Ações", icon: icon("bear"), keywords: "score favoritos", handler: post("/metricas/atualizar") },
       { id: "pg-fila", title: "Início", section: "Páginas", icon: icon("cat"), keywords: "fila painel do dia rascunhos agendados", handler: go("/") },
       { id: "pg-calendario", title: "Calendário", section: "Páginas", icon: icon("bunny"), keywords: "agenda semana ritmo por site", handler: go("/calendario") },
-      { id: "cfg-ritmo", title: "Ritmo por site", section: "Páginas", icon: icon("bunny"), keywords: "dia sim dia não atraso desligar site", handler: go("/sites#ritmo") },
+      { id: "cfg-ritmo", title: "Ritmo por site", section: "Páginas", icon: icon("bunny"), keywords: "dia sim dia não atraso desligar site", handler: go("/calendario") },
       { id: "pg-metricas", title: "Métricas", section: "Páginas", icon: icon("bear"), keywords: "favoritos score gráfico ranking", handler: go("/metricas") },
-      { id: "pg-sites", title: "Sites e configurações", section: "Páginas", icon: icon("puppy"), keywords: "contas modo teste horario backup", handler: go("/sites") },
+      { id: "pg-sites", title: "Sites", section: "Páginas", icon: icon("puppy"), keywords: "contas login danbooru chave", handler: go("/sites") },
       { id: "pg-artes", title: "Abrir Artes", section: "Páginas", icon: icon("paw"), keywords: "histórico publicadas envios rascunhos", handler: go("/artes") },
       { id: "pg-guia", title: "Guia", section: "Páginas", icon: icon("chick"), keywords: "ajuda tutorial", handler: go("/guia") },
-      { id: "cfg-teste", title: "Modo teste e horário do post", section: "Páginas", icon: icon("chick"), keywords: "configurações tags padrão", handler: go("/sites#config") },
+      { id: "cfg-teste", title: "Ajustes: modo teste, horário, backup", section: "Páginas", icon: icon("chick"), keywords: "configurações tags padrão windows", handler: go("/ajustes") },
     ];
     GUIDE.forEach(([id, title]) => actions.push({ id: "guia-" + id, title, section: "Guia", icon: icon("chick"), keywords: "guia ajuda " + id, handler: go("/guia#" + id) }));
     Object.entries(SITES).forEach(([key, label]) => {

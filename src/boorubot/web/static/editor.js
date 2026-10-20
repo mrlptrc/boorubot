@@ -18,7 +18,7 @@
   // (vale conferir), lilás (tag padrão das configurações), sem ponto (digitada por ela). O valor
   // enviado ao backend continua sendo o texto separado por espaço no textarea.
   function TagField(root) {
-    const box = root.querySelector("textarea[name=tags]");
+    const box = root.querySelector("textarea"); // tags do post ou tags padrão (Ajustes)
     const data = JSON.parse(root.dataset.tagField || "{}");
     let scores = data.scores || {};
     let weak = data.weak || [];
