@@ -181,7 +181,7 @@
       { id: "cfg-ritmo", title: "Ritmo por site", section: "Páginas", icon: icon("bunny"), keywords: "dia sim dia não atraso desligar site", handler: go("/sites#ritmo") },
       { id: "pg-metricas", title: "Métricas", section: "Páginas", icon: icon("bear"), keywords: "favoritos score gráfico ranking", handler: go("/metricas") },
       { id: "pg-sites", title: "Sites e configurações", section: "Páginas", icon: icon("puppy"), keywords: "contas modo teste horario backup", handler: go("/sites") },
-      { id: "pg-artes", title: "Artes", section: "Páginas", icon: icon("paw"), keywords: "histórico publicadas envios rascunhos", handler: go("/artes") },
+      { id: "pg-artes", title: "Abrir Artes", section: "Páginas", icon: icon("paw"), keywords: "histórico publicadas envios rascunhos", handler: go("/artes") },
       { id: "pg-guia", title: "Guia", section: "Páginas", icon: icon("chick"), keywords: "ajuda tutorial", handler: go("/guia") },
       { id: "cfg-teste", title: "Modo teste e horário do post", section: "Páginas", icon: icon("chick"), keywords: "configurações tags padrão", handler: go("/sites#config") },
     ];
