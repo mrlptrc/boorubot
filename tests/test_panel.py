@@ -407,10 +407,10 @@ def test_sites_page_toggles_startup(client, monkeypatch, tmp_path):
     monkeypatch.setattr(startup, "startup_dir", lambda: folder)
     monkeypatch.setenv("UV", str(uv))
     c, _ = client
-    assert "desligado" in c.get("/sites").text
+    assert 'data-setting="startup">' in c.get("/ajustes").text          # interruptor desligado
     c.post("/settings/startup", data={"action": "install"})
     assert (folder / startup.SCRIPT_NAME).exists()
-    assert "ligado</span>" in c.get("/sites").text
+    assert 'value="true" checked data-setting="startup"' in c.get("/ajustes").text
     c.post("/settings/startup", data={"action": "remove"})
     assert not (folder / startup.SCRIPT_NAME).exists()
 
@@ -429,7 +429,7 @@ def test_guide_explains_sleep_and_vps(client):
     c, _ = client
     guide = c.get("/guia").text
     assert 'id="pc-acordado"' in guide and "suspensão" in guide and "VPS" in guide
-    assert "/guia#pc-acordado" in c.get("/sites").text
+    assert "/guia#pc-acordado" in c.get("/ajustes").text
 
 
 def test_search_index_lists_posts_for_ctrl_k(client, db):

@@ -149,4 +149,4 @@ def test_robot_card_shows_test_mode_and_links_to_settings(client):
 def test_artes_and_ajustes_links_lead_somewhere(client):
     c, _ = client
     assert c.get("/artes").status_code == 200
-    assert c.get("/ajustes", follow_redirects=False).status_code == 303
+    assert c.get("/ajustes").status_code == 200

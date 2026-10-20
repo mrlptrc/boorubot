@@ -115,7 +115,7 @@ def test_sites_page_backup_settings(env):
     db, images, tmp = env
     w = Worker(db)
     c = TestClient(app_mod.create_app(db, w, start_worker=False))
-    assert "Backup diário" in c.get("/sites").text
+    assert "Backup diário" in c.get("/ajustes").text and "Backup diário" not in c.get("/sites").text
     r = c.post("/settings/backup", data={"backup_dir": "relativo"}, follow_redirects=False)
     assert "erro=" in r.headers["location"] and db.setting("backup_dir") == ""
     dest = str(tmp / "bk")

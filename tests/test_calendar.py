@@ -173,7 +173,7 @@ def test_post_page_day_per_site(db):
 
 def test_rhythm_settings_form(db):
     c = client(db)
-    assert 'id="ritmo"' in c.get("/sites").text
+    assert 'id="ritmo"' not in c.get("/sites").text          # o ritmo saiu de Sites e foi para o Calendário
     c.post("/settings/ritmo", data={"rhythm_rule34us": "dia_sim_dia_nao", "delay_gelbooru": "1",
                                     "rhythm_paheal": "hackeado", "delay_danbooru": "99"})
     assert db.site_rhythm("rule34us") == "dia_sim_dia_nao" and db.site_delay("gelbooru") == 1
