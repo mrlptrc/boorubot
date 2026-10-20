@@ -695,6 +695,11 @@ def create_app(db: DB | None = None, worker: Worker | None = None, start_worker:
         st["startup"] = {"supported": st["startup"].supported, "installed": st["startup"].installed}
         return st
 
+    @app.post("/ajustes/desligar-teste")
+    def turn_off_test_mode(volta: str = Form("/")):
+        db.set_setting("test_mode", "0")
+        return see_other(volta if volta.startswith("/") and not volta.startswith("//") else "/")
+
     @app.post("/ajustes/backup-agora")
     def backup_now_route():
         if db.setting("backup_dir"):
@@ -870,11 +875,18 @@ def create_app(db: DB | None = None, worker: Worker | None = None, start_worker:
 
     @app.get("/busca.json")
     def search_index():
-        """Artes para a busca Ctrl+K (o filtro roda no navegador)."""
-        return {"posts": [{
-            "id": p["id"], "title": p["title"] or f"#{p['id']}", "image": p["image"], "tags": p["tags"],
-            "status": p["status"], "status_label": STATUS_LABELS.get(p["status"], p["status"]),
-        } for p in db.list_posts()]}
+        """Artes para a busca Ctrl+K (o filtro roda no navegador), com a situação em palavras ("sai hoje às 18:00")."""
+        from boorubot import arts
+
+        rows = {r["post"]["id"]: r for r in arts.build(db, limit=10_000)["rows"]}
+        out = []
+        for p in db.list_posts():
+            r = rows.get(p["id"])
+            detail = (r["when"] + (f" · {r['favs']} favoritos" if r["favs"] else "")) if r else ""
+            out.append({"id": p["id"], "title": p["title"] or f"#{p['id']}", "image": p["image"], "tags": p["tags"],
+                        "status": p["status"], "status_label": STATUS_LABELS.get(p["status"], p["status"]),
+                        "detail": detail})
+        return {"posts": out}
 
     @app.get("/danbooru/autocomplete.json")
     def danbooru_autocomplete(q: str = ""):
