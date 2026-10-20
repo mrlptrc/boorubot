@@ -53,9 +53,8 @@ h2 small, label small, .small { color: var(--ink-soft); font-weight: 400; font-s
 .page { min-width: 0; display: flex; flex-direction: column; }
 main { width: 100%; max-width: calc(var(--content-max) + 2 * var(--space-12)); margin: 0 auto; padding: 36px var(--space-12) var(--space-12); }
 .mobile-top { display: none; }
-.icon-btn { width: var(--touch-min); height: var(--touch-min); padding: 0; font-size: 20px; line-height: 1; border-radius: var(--radius-input); display: inline-flex; align-items: center; justify-content: center; }
-.na-mobile { flex: none; background: var(--primary-strong); color: var(--on-primary); border: 0; font-size: 26px; }
-.na-mobile:hover { background: var(--primary-deep); }
+.icon-btn { width: var(--touch-min); height: var(--touch-min); padding: 0; font-size: 20px; line-height: 1; border-radius: var(--radius-input); display: inline-flex; align-items: center; justify-content: center; color: var(--ink); }
+.bottom-nav { display: none; }
 
 @media (max-width: 767px) {
   .app { grid-template-columns: minmax(0, 1fr); }
@@ -65,11 +64,44 @@ main { width: 100%; max-width: calc(var(--content-max) + 2 * var(--space-12)); m
     position: sticky; top: 0; z-index: 5; background: var(--surface); border-bottom: 1px solid var(--line);
   }
   .mobile-top .brand { font-size: 19px; padding: 0; gap: var(--space-2); }
-  main { padding: var(--space-4) var(--space-4) var(--space-10); }
-  /* sem Shoelace: o menu lateral vira gaveta simples */
-  html.menu-open .side { display: flex; position: fixed; inset: 0 auto 0 0; width: 280px; z-index: 20; box-shadow: 0 0 0 100vmax var(--scrim); }
+  main { padding: var(--space-4) var(--space-4) calc(var(--bottom-nav) + env(safe-area-inset-bottom) + var(--space-6)); }
+  /* barra fixa embaixo (DS-6): Início, Artes, "+", Calendário, Mais */
+  .bottom-nav {
+    position: fixed; z-index: 12; left: 0; right: 0; bottom: 0; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr));
+    align-items: center; height: calc(var(--bottom-nav) + env(safe-area-inset-bottom)); padding: 0 var(--space-2) env(safe-area-inset-bottom);
+    background: var(--surface); border-top: 1px solid var(--line); box-shadow: var(--shadow-sm);
+  }
+  .bottom-nav .bb-nav__item {
+    position: relative; flex-direction: column; justify-content: center; gap: 2px; height: 56px; min-height: var(--touch-min); padding: 0;
+    border-radius: var(--radius-input); background: none; color: var(--ink-soft); font-size: 12px; font-weight: 700;
+  }
+  .bottom-nav .bb-nav__item[aria-current="page"] { background: none; color: var(--primary-strong); }
+  .bottom-nav .bb-nav__count { position: absolute; top: 2px; left: calc(50% + 6px); min-width: 18px; height: 18px; padding: 0 5px; font-size: 11px; margin: 0; }
+  .bottom-nav .bb-nav__dot { position: absolute; top: 6px; left: calc(50% + 8px); margin: 0; }
+  .bottom-nav__add {
+    justify-self: center; display: grid; place-items: center; width: 56px; height: 56px; border-radius: var(--radius-full);
+    background: var(--primary-strong); color: var(--on-primary); box-shadow: var(--shadow-md);
+  }
+  .bottom-nav__add:hover { background: var(--primary-deep); }
+  .bottom-nav__add svg { width: 26px; height: 26px; }
 }
-.menu-drawer .side-nav { padding-top: var(--space-2); }
+
+/* folha que sobe de baixo (DS-6): <dialog> preso embaixo, cantos de cima arredondados */
+dialog.bb-sheet {
+  width: 100%; max-width: 560px; max-height: 85vh; margin: auto auto 0; padding: var(--space-2) var(--space-4) calc(var(--space-6) + env(safe-area-inset-bottom));
+  border: 0; border-radius: var(--radius-xl) var(--radius-xl) 0 0; background: var(--surface); color: var(--ink); box-shadow: var(--shadow-lg); overflow-y: auto;
+}
+dialog.bb-sheet:not([open]):not(:target) { display: none; }
+dialog.bb-sheet:target:not([open]) { display: block; position: fixed; inset: auto 0 0; z-index: 30; }
+dialog.bb-sheet::backdrop { background: var(--scrim); }
+dialog.bb-sheet[open] { animation: sheet-up .22s cubic-bezier(.2, .8, .2, 1); }
+@keyframes sheet-up { from { transform: translateY(40%); opacity: 0; } }
+.bb-sheet__grip { width: 40px; height: 5px; margin: 0 auto var(--space-2); border-radius: var(--radius-full); background: var(--pink-200); touch-action: none; }
+.bb-sheet__head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); padding: var(--space-2) 0 var(--space-3); touch-action: none; }
+.bb-sheet__head h2 { margin: 0; }
+.bb-sheet__close { display: inline-grid; place-items: center; width: var(--touch-min); height: var(--touch-min); border-radius: var(--radius-full); color: var(--ink-soft); }
+.bb-sheet__close:hover { background: var(--blush); color: var(--ink); }
+.bb-sheet .side-nav { padding: 0 0 var(--space-2); }
 
 .banner {
   display: flex; align-items: center; justify-content: center; gap: var(--space-3); flex-wrap: wrap;
@@ -184,24 +216,6 @@ button.danger:hover { background: var(--danger-bg); }
 .table td.num { white-space: nowrap; }
 .mini { width: 44px; height: 44px; object-fit: cover; border-radius: 12px; display: block; border: 2px solid var(--line); }
 @media (max-width: 640px) { .table { display: block; overflow-x: auto; } }
-
-/* --- componentes Shoelace no tema kawaii --------------------------------- */
-/* Shoelace com a nossa cara: diálogo, abas e gaveta usam os tokens, nada de azul */
-:root {
-  --sl-font-sans: var(--font-body); --sl-color-primary-50: var(--paper); --sl-color-primary-100: var(--blush);
-  --sl-color-primary-200: var(--pink-200); --sl-color-primary-300: var(--pink-300); --sl-color-primary-400: var(--pink-400);
-  --sl-color-primary-500: var(--primary); --sl-color-primary-600: var(--primary-strong); --sl-color-primary-700: var(--primary-deep);
-  --sl-color-primary-800: var(--primary-pressed); --sl-color-primary-900: var(--primary-pressed); --sl-color-primary-950: var(--ink);
-  --sl-color-neutral-0: var(--surface); --sl-color-neutral-700: var(--ink); --sl-color-neutral-600: var(--ink-soft);
-  --sl-input-border-color: var(--line); --sl-input-font-family: var(--font-body);
-  --sl-focus-ring-color: var(--primary-strong); --sl-border-radius-medium: var(--radius-input); --sl-border-radius-large: var(--radius-lg);
-  --sl-panel-background-color: var(--surface); --sl-panel-border-color: var(--line);
-  --sl-overlay-background-color: var(--scrim); --sl-shadow-x-large: var(--shadow-lg);
-}
-html.sl-loading sl-drawer { visibility: hidden; }
-sl-drawer:not(:defined), sl-dialog:not(:defined) { display: none; }
-.menu-drawer::part(panel) { background: var(--surface); border-right: 1px solid var(--line); }
-.menu-drawer::part(title) { font-family: var(--font-display); font-weight: 600; }
 
 /* --- animações ------------------------------------------------------------ */
 @view-transition { navigation: auto; }
@@ -507,22 +521,50 @@ a.home-stat:hover { border-color: var(--pink-200); }
 .ed-envios > summary { list-style: none; min-height: var(--touch-min); cursor: pointer; }
 .ed-envios > summary h2 { display: inline; margin: 0; }
 
+/* "Publicar em N de 5 sites ›" e o "+ N" das tags só existem no celular; no computador a folha dos sites fica no lugar */
+.ed-sites-open, .ed-tag-more, .ed-menu summary svg { display: none; }
+@media (min-width: 768px) {
+  dialog.bb-sheet.bb-sheet--inline:is([open], :not([open])) { display: block; position: static; max-width: none; max-height: none; margin: 0; padding: 0; border-radius: 0; box-shadow: none; background: none; overflow: visible; animation: none; }
+  dialog.bb-sheet--inline .bb-sheet__grip, dialog.bb-sheet--inline .bb-sheet__head { display: none; }
+}
+
 @media (max-width: 1100px) { .ed-grid { grid-template-columns: 300px minmax(0, 1fr); gap: var(--space-6); } }
 @media (max-width: 767px) {
-  .ed-grid { grid-template-columns: minmax(0, 1fr); }
-  .ed-art { position: static; }
-  .ed-art-card img { max-height: 50vh; }
-  .ed-bar { left: var(--space-2); right: var(--space-2); bottom: var(--space-2); }
+  .ed-grid { grid-template-columns: minmax(0, 1fr); gap: var(--space-5); }
+  /* arte (~40%) e a fala da Mochi lado a lado */
+  .ed-art { position: static; display: grid; grid-template-columns: 40% minmax(0, 1fr); gap: var(--space-2) var(--space-3); align-items: start; }
+  .ed-art-card { grid-row: span 3; padding: var(--space-1); }
+  .ed-art-card img { max-height: 40vh; }
+  .ed-art .ed-file { flex-direction: column; align-items: flex-start; gap: 0; font-size: 13px; }
+  .ed-art .bb-mochi { padding: 0; align-items: flex-start; }
+  .ed-art .bb-mochi img { width: 40px; height: auto; }
+  .ed-art .ed-queue { margin: 0; font-size: 14px; }
   .ed-title-row .save-status { margin-left: 0; width: 100%; }
-  .ed-when { display: none; }
-  .ed-legend { margin-left: 0; }
-  .ed-sites .bb-sites { padding: 0 var(--space-4); }
+  .ed-legend { display: none; }
+  /* tags: as 6 primeiras e o "+ N"; a folha mostra todas */
+  .ed-field > .tag-field .ed-tag-list > li:nth-child(n + 7) { display: none; }
+  .ed-tag-more { display: inline-flex; min-height: var(--touch-min); background: var(--lilac-100); color: var(--lilac-700); border: 0; font-weight: 800; cursor: pointer; }
+  .bb-sheet .ed-tag-more { display: none; }
+  .bb-sheet .ed-tagbox { min-height: 120px; }
+  .ed-sites-open {
+    display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); width: 100%; min-height: 56px; padding: 0 var(--space-4);
+    border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface); color: var(--ink); font: 400 16px var(--font-body); text-align: left; cursor: pointer;
+  }
+  .ed-sites-open > span:last-child { font-size: 24px; color: var(--ink-soft); }
+  .ed-sites > legend { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  .ed-sites .bb-sites { padding: 0; }
   .ed-sites .bb-site__name { width: auto; }
-  .editor { padding-bottom: 168px; }
-}
-@media (max-width: 520px) {
-  .ed-bar { flex-direction: column-reverse; align-items: stretch; }
-  .ed-bar-right .bb-btn--primary { flex: 1; }
+  /* barra de ações: acima da barra de páginas; testar e mais ações só com ícone, Aprovar ocupa o resto */
+  .ed-bar { left: var(--space-2); right: var(--space-2); bottom: calc(var(--bottom-nav) + env(safe-area-inset-bottom) + var(--space-2)); padding: var(--space-2); gap: var(--space-2); flex-wrap: nowrap; }
+  .ed-bar-left { flex-wrap: nowrap; gap: var(--space-2); }
+  .ed-bar-right { flex: 1; flex-wrap: nowrap; }
+  .ed-bar-right .bb-btn { flex: 1; padding: 0 var(--space-3); }
+  .ed-bar__label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  .ed-test, .ed-menu summary { width: var(--touch-min); min-width: var(--touch-min); padding: 0; justify-content: center; }
+  .ed-menu summary svg { display: block; }
+  .ed-menu summary::after { display: none; }
+  .ed-when { display: none; }
+  .editor { padding-bottom: calc(var(--bottom-nav) + 120px); }
 }
 
 /* --- artes (frame "Artes · desktop") ---------------------------------------------------------------- */
