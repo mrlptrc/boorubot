@@ -112,6 +112,7 @@
   <div>
     {% if not startup.supported %}
       <strong>Início automático</strong> <span class="pill">só no Windows</span>
+      <div class="muted small">O PC também <b>não pode estar dormindo</b> no horário do post: <a href="/guia#pc-acordado">veja como ajustar</a>.</div>
     {% elif startup.installed %}
       <strong>Início automático</strong> <span class="pill s-ok">ligado</span>
       <div class="muted small">O painel abre escondido quando o Windows inicia, sem janela na tela. Os posts saem mesmo se você esquecer de abrir.

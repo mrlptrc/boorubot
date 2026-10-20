@@ -1,6 +1,7 @@
 """Backup diário: banco consistente + imagens incrementais, nunca os perfis de navegador."""
 
 import sqlite3
+import sys
 from datetime import datetime
 
 import pytest
@@ -59,7 +60,10 @@ def test_relative_or_empty_path_is_rejected():
     for bad in ("", "   ", "backup", r".\pasta"):
         with pytest.raises(BackupError):
             validate_dest(bad)
-    assert validate_dest(r'"C:\Users\x\OneDrive\bk"').is_absolute()
+    if sys.platform == "win32":
+        assert validate_dest(r'"C:\Users\x\OneDrive\bk"').is_absolute()
+    else:
+        assert validate_dest('"/home/x/OneDrive/bk"').is_absolute()
 
 
 def test_backup_now_records_status(env):
