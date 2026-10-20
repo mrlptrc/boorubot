@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import uuid
 from datetime import datetime
+from functools import lru_cache
 from pathlib import Path
 from urllib.parse import quote
 
@@ -14,6 +16,7 @@ from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from markupsafe import Markup
 
 from boorubot import startup
 from boorubot.config import ALL_SITES, SITE_LABELS, build_site
@@ -97,6 +100,23 @@ def image_info(filename: str) -> str:
         return ""
 
 
+ICONS_DIR = HERE / "static" / "icons"
+
+
+@lru_cache(maxsize=None)
+def icon_svg(name: str, size: int = 20) -> Markup:
+    """SVG do ícone inline (herda currentColor); decorativo: o rótulo vem do texto ao lado ou do aria-label."""
+    if not name.replace("-", "").isalnum():
+        raise ValueError(f"ícone inválido: {name}")
+    svg = (ICONS_DIR / f"{name}.svg").read_text(encoding="utf-8")
+    svg = svg.replace('width="20" height="20"', f'width="{size}" height="{size}" aria-hidden="true" focusable="false"', 1)
+    return Markup(svg)
+
+
+def dict_without(d: dict, *keys: str) -> dict:
+    return {k: v for k, v in (d or {}).items() if k not in keys}
+
+
 def see_other(url: str) -> RedirectResponse:
     return RedirectResponse(url, status_code=303)
 
@@ -119,7 +139,9 @@ def create_app(db: DB | None = None, worker: Worker | None = None, start_worker:
         SITE_LABELS=SITE_LABELS, STATUS_LABELS=STATUS_LABELS, RATINGS=RATINGS, RATINGS_PT=RATINGS_PT,
         ALL_SITES=ALL_SITES, BROWSER_MODE_LABELS=BROWSER_MODE_LABELS,
     )
+    templates.env.globals["icon_svg"] = icon_svg
     templates.env.filters["quando"] = when_label
+    templates.env.filters["dict_without"] = dict_without
 
     def danbooru_mode() -> str:
         """Como o post entra no Danbooru, pelo nível REAL lido da conta (nunca presumido).
@@ -574,6 +596,13 @@ def create_app(db: DB | None = None, worker: Worker | None = None, start_worker:
         db.set_setting("danbooru_level_string", "")
         db.set_session("danbooru", False, "chave removida do painel")
         return see_other("/sites#danbooru")
+
+    @app.get("/_ui")
+    def ui_catalog(request: Request):
+        """Catálogo vivo dos componentes (só para desenvolvimento: modo teste ou BOORUBOT_DEBUG=1)."""
+        if not (db.test_mode or os.environ.get("BOORUBOT_DEBUG") == "1"):
+            raise HTTPException(404)
+        return render(request, "ui_catalog.html")
 
     @app.get("/guia")
     def guide(request: Request):
