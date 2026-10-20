@@ -198,22 +198,10 @@ button.danger:hover { background: var(--danger-bg); }
   --sl-panel-background-color: var(--surface); --sl-panel-border-color: var(--line);
   --sl-overlay-background-color: var(--scrim); --sl-shadow-x-large: var(--shadow-lg);
 }
-html.sl-loading sl-drawer, html.sl-loading sl-dialog { visibility: hidden; }
+html.sl-loading sl-drawer { visibility: hidden; }
 sl-drawer:not(:defined), sl-dialog:not(:defined) { display: none; }
 .menu-drawer::part(panel) { background: var(--surface); border-right: 1px solid var(--line); }
 .menu-drawer::part(title) { font-family: var(--font-display); font-weight: 600; }
-
-/* --- busca Ctrl+K (ninja-keys) ------------------------------------------- */
-ninja-keys {
-  --ninja-font-family: var(--font-body); --ninja-accent-color: var(--primary-strong); --ninja-text-color: var(--ink);
-  --ninja-secondary-text-color: var(--ink-soft); --ninja-secondary-background-color: var(--blush);
-  --ninja-selected-background: var(--blush); --ninja-group-text-color: var(--ink-soft);
-  --ninja-modal-background: var(--surface); --ninja-modal-shadow: var(--shadow-lg);
-  --ninja-overflow-background: var(--scrim-soft); --ninja-backdrop-filter: blur(4px);
-  --ninja-key-border-radius: 6px; --ninja-separate-border: 2px dashed var(--line); --ninja-footer-background: var(--paper);
-  --ninja-placeholder-color: var(--ink-faint); --ninja-icon-size: 28px; --ninja-actions-height: 380px; --ninja-top: 14%; --ninja-z-index: 30;
-}
-html.no-search .search-btn, html.no-search [data-open-search] { display: none; }
 
 /* --- animações ------------------------------------------------------------ */
 @view-transition { navigation: auto; }
@@ -858,3 +846,30 @@ code { background: var(--blush); color: var(--primary-deep); padding: 1px 6px; b
   .guide-nav { position: static; }
   .guide-content { padding: var(--space-6); }
 }
+
+/* --- busca Ctrl+K e modais (frame "Modais e avisos") ------------------------------------------------- */
+.bb-search { width: min(640px, calc(100vw - var(--space-8))); max-width: none; margin: 12vh auto auto; padding: 0; border: 0; border-radius: var(--radius-lg); background: var(--surface); color: var(--ink); box-shadow: var(--shadow-lg); overflow: hidden; }
+.bb-search::backdrop { background: var(--scrim); }
+.bb-search[open] { display: flex; flex-direction: column; max-height: 76vh; }
+.bb-search__head { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-4) var(--space-5); border-bottom: 1px solid var(--line); color: var(--primary-strong); }
+.bb-search__head input { flex: 1; min-height: 40px; border: 0; padding: 0; background: none; font: 400 19px var(--font-body); color: var(--ink); }
+.bb-search__head input:focus { box-shadow: none; }
+.bb-search__results { flex: 1; overflow-y: auto; padding: var(--space-2) var(--space-3) var(--space-3); }
+.bb-search__group { margin: var(--space-3) var(--space-2) var(--space-1); font-size: 12px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-soft); }
+.bb-search__item { display: flex; align-items: center; gap: var(--space-3); min-height: 52px; padding: var(--space-2) var(--space-3); border-radius: var(--radius-md); cursor: pointer; }
+.bb-search__item[aria-selected="true"] { background: var(--blush); }
+.bb-search__item > img { width: 40px; height: 40px; border-radius: var(--radius-sm); object-fit: cover; flex: none; }
+.bb-search__icon { width: 40px; display: inline-grid; place-items: center; color: var(--ink-soft); flex: none; }
+.bb-search__item > span:not(.bb-search__icon) { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.bb-search__item small { color: var(--ink-soft); font-size: 14px; }
+.bb-search__empty { margin: var(--space-6) var(--space-3); color: var(--ink-soft); }
+.bb-search__foot { display: flex; gap: var(--space-5); padding: var(--space-3) var(--space-5); border-top: 1px solid var(--line); background: var(--paper); font-size: 14px; color: var(--ink-soft); }
+.bb-search__hint { margin-left: auto; }
+.bb-dialog__thumb[hidden] { display: none; }
+.publish-sites { margin: 0; }
+.publish-warn { display: flex; gap: var(--space-2); margin: 0; padding: var(--space-3) var(--space-4); border-radius: var(--radius-md); background: var(--warn-bg); color: var(--warn); }
+.banner { margin: 0; }
+.banner .bb-btn { min-height: 32px; }
+@media (max-width: 767px) { .bb-search__hint { display: none; } .bb-search { margin-top: var(--space-4); } }
+.side-search { text-decoration: none; }
+.bb-search__head input::-webkit-search-cancel-button { -webkit-appearance: none; appearance: none; }
