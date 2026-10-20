@@ -9,7 +9,10 @@ ajustar aqui se alguma heurística errar.
 from __future__ import annotations
 
 import re
+import time
+from typing import Callable
 
+from playwright.sync_api import Error as PlaywrightError
 from playwright.sync_api import Page
 
 from boorubot.models import Post
@@ -67,16 +70,27 @@ class FormSite(Site):
 
     # --- login -----------------------------------------------------------------
 
-    def login(self) -> Result:
+    def login(self, cancelled: Callable[[], bool] = lambda: False) -> Result | None:
         """Abre o navegador visível no login (usuário/senha do .env já preenchidos).
-        A pessoa entra, resolve captcha se tiver e FECHA a janela; a sessão fica em .profiles/<site>."""
+        A pessoa entra, resolve captcha se tiver e FECHA a janela; a sessão fica em .profiles/<site>.
+        `cancelled()` verdadeiro (botão Cancelar no painel) fecha a janela e devolve None, sem mexer na sessão."""
         with open_page(self.name, self.browser_mode("login")) as page:
             page.goto(self.login_url)
             # .first: o paheal tem dois formulários de login na mesma página (lateral e centro)
             if self.username and self.password and page.locator("input[name=pass]").count():
                 page.locator("input[name=user]").first.fill(self.username)
                 page.locator("input[name=pass]").first.fill(self.password)
-            page.wait_for_event("close", timeout=self.login_timeout_ms)
+            # espera em fatias curtas (na thread do navegador) para poder cancelar sem fechar de outra thread
+            deadline = time.monotonic() + self.login_timeout_ms / 1000
+            while not page.is_closed():
+                if cancelled():
+                    return None
+                if time.monotonic() > deadline:
+                    raise TimeoutError("o login passou de 10 minutos sem a janela ser fechada")
+                try:
+                    page.wait_for_timeout(500)
+                except PlaywrightError:  # a janela fechou durante a espera
+                    break
         return self.session_check()
 
     def session_check(self) -> Result:

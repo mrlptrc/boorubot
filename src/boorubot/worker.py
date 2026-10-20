@@ -162,6 +162,7 @@ class Worker:
         self.suggestions: queue.Queue[int] = queue.Queue()
         self.suggesting: int | None = None
         self._stop = threading.Event()
+        self._cancel_login = threading.Event()  # botão Cancelar do "esperando login" em Sites
 
     def start(self) -> None:
         for post_id in self.db.posts_suggesting():  # painel fechou no meio de uma análise
@@ -204,6 +205,21 @@ class Worker:
 
     def submit(self, kind: str, target: int | str, label: str = "") -> None:
         self.jobs.put(Job(kind, target, label or f"{kind} {target}"))
+
+    def logins(self) -> list[str]:
+        """Sites com login esperando a pessoa (na fila ou com a janela aberta)."""
+        jobs = ([self.current] if self.current else []) + list(self.jobs.queue)
+        return [str(j.target) for j in jobs if j and j.kind == "login"]
+
+    def cancel_login(self, site: str) -> None:
+        """Tira da fila o login do site; se a janela já está aberta, pede para fechar."""
+        with self.jobs.mutex:
+            kept = [j for j in self.jobs.queue if not (j.kind == "login" and j.target == site)]
+            self.jobs.queue.clear()
+            self.jobs.queue.extend(kept)
+        current = self.current
+        if current and current.kind == "login" and current.target == site:
+            self._cancel_login.set()
 
     def pending(self) -> list[str]:
         items = [j.label for j in list(self.jobs.queue)]
@@ -250,8 +266,11 @@ class Worker:
                 self.db.set_session("danbooru_test", False, f"{type(exc).__name__}: {exc}")
         elif job.kind in ("login", "session"):
             site = build_site(str(job.target), self.db)
+            self._cancel_login.clear()
             try:
-                result = site.login() if job.kind == "login" else site.session_check()
+                result = site.login(self._cancel_login.is_set) if job.kind == "login" else site.session_check()
+                if result is None:  # login cancelado: a sessão fica como estava
+                    return
                 self.db.set_session(site.name, result.ok, result.message)
                 if site.name == "danbooru":
                     # nível real da conta: decide se o post vai direto ao ar ou para moderação
