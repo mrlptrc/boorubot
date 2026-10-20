@@ -206,18 +206,28 @@ def create_app(db: DB | None = None, worker: Worker | None = None, start_worker:
             return list(ALL_SITES)
 
     def setup_steps() -> list[dict]:
-        """Checklist de configuração mostrada na Fila até tudo estar pronto."""
+        """Os 7 passos "Para começar" do Guia, marcados pelo estado real (o Início mostra o mesmo progresso).
+        state: ok | warn (site pediu login de novo) | todo."""
         sessions = db.sessions()
-        steps = [{
-            "label": f"Conectar {SITE_LABELS[s]}",
-            "done": bool(sessions.get(s, {}).get("ok")),
-            "href": f"/guia#{s}",
-        } for s in default_sites()]
-        steps.append({"label": "Testar um post (botão \"Testar este post\")", "done": bool(db.test_runs()),
-                      "href": "/guia#teste"})
-        steps.append({"label": "Desligar o modo teste para começar a postar", "done": not db.test_mode,
-                      "href": "/guia#valendo"})
-        return steps
+        st = startup.status()
+
+        def site_state(*sites: str) -> str:
+            got = [sessions.get(x) for x in sites]
+            if all(g and g["ok"] for g in got):
+                return "ok"
+            return "warn" if any(g and not g["ok"] for g in got) else "todo"
+
+        steps = [
+            ("antes", "Antes de começar", "ok" if sessions else "todo"),
+            ("pc-acordado", "PC acordado na hora do post", "ok" if st.installed or not st.supported else "todo"),
+            ("danbooru", "Conectar o Danbooru", site_state("danbooru")),
+            ("gelbooru", "Gelbooru, paheal e rule34.us", site_state("gelbooru", "paheal", "rule34us")),
+            ("rule34xxx", "Conectar o rule34.xxx", site_state("rule34xxx")),
+            ("teste", "Testar um post", "ok" if db.test_runs() else "todo"),
+            ("valendo", "Postar de verdade", "todo" if db.test_mode else "ok"),
+        ]
+        return [{"id": i, "label": label, "state": state, "done": state == "ok", "href": f"/guia?passo={i}#{i}"}
+                for i, label, state in steps]
 
     def approval_errors(row: dict) -> list[str]:
         """O que falta para aprovar, testar ou publicar (mesma lista na tela e no backend)."""
@@ -768,8 +778,18 @@ def create_app(db: DB | None = None, worker: Worker | None = None, start_worker:
         return render(request, "ui_catalog.html")
 
     @app.get("/guia")
-    def guide(request: Request):
-        return render(request, "guide.html", sessions=db.sessions())
+    def guide(request: Request, passo: str = ""):
+        steps = setup_steps()
+        topics = [("dia-a-dia", "O dia a dia", "bunny"), ("regras", "Regras dos sites", "bear"),
+                  ("seguranca", "Segurança das contas", "puppy"), ("problemas", "Algo deu errado?", "chick")]
+        ids = [x["id"] for x in steps] + [t[0] for t in topics]
+        # sem passo na URL: abre o primeiro que falta (ou o dia a dia, com tudo pronto)
+        active = passo if passo in ids else next((x["id"] for x in steps if not x["done"]), "dia-a-dia")
+        sess = db.sessions().get("danbooru")
+        return render(request, "guide.html", steps=steps, topics=topics, active=active, sessions=db.sessions(),
+                      done=sum(x["done"] for x in steps), startup=startup.status(),
+                      danbooru_user=db.setting("danbooru_login"), daily_time=db.setting("daily_time"),
+                      danbooru_ok=bool(sess and sess["ok"]))
 
     @app.post("/sites/{name}/{kind}")
     def site_action(name: str, kind: str):
