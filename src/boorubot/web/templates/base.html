@@ -7,12 +7,13 @@
   <link rel="icon" type="image/svg+xml" href="/static/pets/favicon.svg">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600&family=Quicksand:wght@600;700&family=Nunito:wght@400;600;700;800&display=swap">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Quicksand:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap">
   {# Shoelace (componentes) e ninja-keys (busca Ctrl+K) por CDN, versão fixa. Se não carregarem, o painel
      continua funcionando: gaveta, diálogos e abas têm plano B em static/app.js. #}
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.20.1/cdn/themes/light.css">
   <script type="module" src="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.20.1/cdn/shoelace-autoloader.js" onerror="document.documentElement.classList.remove('sl-loading')"></script>
   <script type="module" src="https://unpkg.com/ninja-keys@1.2.2?module"></script>
+  <link rel="stylesheet" href="/static/tokens.css">
   <link rel="stylesheet" href="/static/style.css">
 </head>
 {% set path = request.url.path %}
@@ -38,9 +39,6 @@
           {%- if jobs %}<span class="spin"></span> {{ jobs[0] }}{% if jobs|length > 1 %} (+{{ jobs|length - 1 }}){% endif %}{% endif -%}
         </div>
         {% if test_mode %}<a class="side-test" href="/sites"><img src="/static/pets/chick.svg" alt="">modo teste ligado</a>{% endif %}
-        <div class="side-pets" aria-hidden="true">
-          <img src="/static/pets/bunny.svg" alt=""><img src="/static/pets/puppy.svg" alt=""><img src="/static/pets/bear.svg" alt="">
-        </div>
       </div>
     </aside>
 
