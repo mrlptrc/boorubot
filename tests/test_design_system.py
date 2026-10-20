@@ -156,3 +156,32 @@ def test_shared_helpers_stay_in_the_stylesheet():
     """.sr-only e [hidden] são usados em todas as telas: não podem sumir quando um bloco de tela é trocado."""
     css = (STATIC / "style.css").read_text(encoding="utf-8")
     assert ".sr-only {" in css and "[hidden] { display: none !important; }" in css and ".page-head {" in css
+
+
+# --- etapa 16: modais e busca ----------------------------------------------------------------------------
+
+def test_search_is_our_own_dialog_with_groups(client):
+    c, db = client
+    page = c.get("/").text
+    assert 'id="search"' in page and "ninja-keys" not in page and "/static/search.js" in page
+    assert 'href="/artes" data-open-search' in page                       # sem JavaScript, leva para Artes
+    db.create_post("a.png", title="sereia", tags="mermaid")
+    found = c.get("/busca.json").json()["posts"]
+    assert found[0]["title"] == "sereia" and found[0]["detail"]
+
+
+def test_delete_and_publish_dialogs_say_what_happens(client):
+    c, db = client
+    pid = db.create_post("a.png", title="bruxinha", tags="x", sites=["danbooru", "paheal"])
+    page = c.get(f"/posts/{pid}").text
+    assert "Apagar &#34;bruxinha&#34;?" in page or "Apagar &quot;bruxinha&quot;?" in page
+    assert 'data-confirm-thumb="/images/a.png"' in page and 'data-confirm-ok="Apagar arte"' in page
+    assert 'id="publicar-dialog"' in page and "Deixar na fila" in page and "Ela pula a fila" in page
+
+
+def test_test_mode_strip_turns_it_off(client):
+    c, db = client
+    r = c.post("/ajustes/desligar-teste", data={"volta": "/calendario"}, follow_redirects=False)
+    assert r.headers["location"] == "/calendario" and not db.test_mode
+    db.set_setting("test_mode", "1")
+    assert c.post("/ajustes/desligar-teste", data={"volta": "//evil.example"}, follow_redirects=False).headers["location"] == "/"
