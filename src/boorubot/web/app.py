@@ -249,7 +249,10 @@ def create_app(db: DB | None = None, worker: Worker | None = None, start_worker:
     def index(request: Request):
         from boorubot import dashboard
 
-        return render(request, "index.html", d=dashboard.build(db), steps=setup_steps())
+        from boorubot import insights
+
+        return render(request, "index.html", d=dashboard.build(db), steps=setup_steps(),
+                      fav=insights.build(db, "30"))
 
     def save_upload(name: str, data: bytes, image_md5: str = "") -> dict:
         """Uma arte nova: grava a imagem, cria o rascunho e põe na fila da IA."""
