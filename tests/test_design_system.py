@@ -150,3 +150,9 @@ def test_artes_and_ajustes_links_lead_somewhere(client):
     c, _ = client
     assert c.get("/artes").status_code == 200
     assert c.get("/ajustes").status_code == 200
+
+
+def test_shared_helpers_stay_in_the_stylesheet():
+    """.sr-only e [hidden] são usados em todas as telas: não podem sumir quando um bloco de tela é trocado."""
+    css = (STATIC / "style.css").read_text(encoding="utf-8")
+    assert ".sr-only {" in css and "[hidden] { display: none !important; }" in css and ".page-head {" in css

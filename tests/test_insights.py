@@ -117,15 +117,15 @@ def test_page_renders_without_data(db):
     c, _ = client(db)
     page = c.get("/metricas").text
     assert "Métricas" in page and "As métricas aparecem depois do primeiro post no Danbooru" in page
-    assert page.count("sem métrica por enquanto") == 5
+    assert page.count("não informa") == 5                  # nenhum site informou favoritos ainda
 
 
 def test_page_with_data_and_period_links(seeded):
     c, _ = client(seeded)
     page = c.get("/metricas?periodo=tudo").text
     assert 'href="/metricas?periodo=7"' in page and 'aria-current="page"' in page
-    assert "Favoritos por semana" in page and 'role="img"' in page and "semana de" in page
-    assert "sereia" in page and "sem métrica por enquanto" in page
+    assert "por semana" in page and 'role="img"' in page and "semana de" in page and "esta semana" in page
+    assert "sereia" in page and "não informa" in page
     assert "6,0" in page                                   # score médio nas 24 h, com vírgula
 
 
@@ -135,6 +135,13 @@ def test_refresh_button_lives_on_metrics_page(seeded):
     assert "/metricas/atualizar" not in c.get("/historico").text
     c.post("/metricas/atualizar")
     assert [j.kind for j in w.jobs.queue] == ["metrics"]
+
+
+def test_page_shows_the_comparison_in_words(seeded):
+    c, _ = client(seeded)
+    page = c.get("/metricas?periodo=30").text
+    assert "35 a mais que o mês anterior" in page
+    assert "a mais que" not in c.get("/metricas?periodo=tudo").text
 
 
 def test_compares_with_the_previous_period_of_the_same_size(seeded):
