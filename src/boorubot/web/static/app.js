@@ -1,7 +1,7 @@
 /* boorubot · interações do painel
-   Componentes: Shoelace (gaveta, diálogo, toasts, abas) e ninja-keys (busca Ctrl+K), por CDN.
-   Tudo aqui tem plano B: se uma lib não carregar (sem internet, CDN fora), o painel continua
-   funcionando como antes (confirm() nativo, guia em página única, menu sem gaveta). */
+   Componentes do design system (templates/_ui.html): toasts, confirmação em <dialog> nativo, menus.
+   Shoelace (gaveta, abas) e ninja-keys (busca Ctrl+K) vêm por CDN e têm plano B: se não carregarem,
+   o painel continua funcionando (confirm() nativo, guia em página única, menu sem gaveta). */
 (function () {
   "use strict";
 
@@ -18,20 +18,29 @@
   whenDefined("ninja-keys", 4000).then((ok) => html.classList.toggle("no-search", !ok));
 
   // ---------------------------------------------------------------- toasts
-  function toast(message, { pet = "cat", variant = "primary", duration = 4500 } = {}) {
-    if (defined("sl-alert")) {
-      const alert = Object.assign(document.createElement("sl-alert"), { variant, closable: true, duration });
-      alert.className = "cute-toast";
-      alert.innerHTML = `<img slot="icon" src="${PET(pet)}" alt=""><span>${esc(message)}</span>`;
-      document.body.append(alert);
-      return alert.toast();
-    }
+  // Toast escuro do design system: sucesso (✓), neutro (com "desfazer") ou erro (×), com uma ação opcional.
+  const toastRegion = () => document.getElementById("toasts") || document.body;
+  function armToast(el, duration) {
+    let timer = setTimeout(() => el.remove(), duration);
+    // com o foco ou o mouse no aviso (ex.: indo clicar em "desfazer"), ele espera
+    el.addEventListener("pointerenter", () => clearTimeout(timer));
+    el.addEventListener("focusin", () => clearTimeout(timer));
+    el.addEventListener("pointerleave", () => { timer = setTimeout(() => el.remove(), 4000); });
+    const close = el.querySelector("[data-toast-close]");
+    if (close) close.addEventListener("click", () => el.remove());
+  }
+  function toast(message, { kind = "neutro", action = "", href = "", duration = 6000 } = {}) {
     const el = document.createElement("div");
-    el.className = "toast-fallback";
-    el.innerHTML = `<img src="${PET(pet)}" alt=""><span>${esc(message)}</span>`;
-    document.body.append(el);
-    setTimeout(() => el.classList.add("out"), duration);
-    setTimeout(() => el.remove(), duration + 400);
+    el.className = "bb-toast"; el.setAttribute("role", "status"); el.dataset.toast = "";
+    const mark = kind === "sucesso" ? '<span class="bb-toast__icon bb-toast__icon--ok" aria-hidden="true">✓</span>'
+      : kind === "erro" ? '<span class="bb-toast__icon bb-toast__icon--err" aria-hidden="true">×</span>' : "";
+    el.innerHTML = `${mark}<span class="bb-toast__msg">${esc(message)}</span>`
+      + (action && href ? `<a class="bb-toast__action" href="${esc(href)}">${esc(action)}</a>` : "")
+      + '<button type="button" class="bb-toast__close" data-toast-close aria-label="Fechar aviso">'
+      + '<svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" aria-hidden="true"><path d="M5 5l10 10M15 5L5 15"/></svg></button>';
+    toastRegion().append(el);
+    armToast(el, duration);
+    return el;
   }
   window.boorubotToast = toast;
 
@@ -40,24 +49,19 @@
     const pending = sessionStorage.getItem("boorubot-toast");
     if (pending) {
       sessionStorage.removeItem("boorubot-toast");
-      const { message, pet } = JSON.parse(pending);
-      whenDefined("sl-alert", 2000).then(() => toast(message, { pet }));
+      const { message, kind } = JSON.parse(pending);
+      toast(message, { kind: kind || "sucesso" });
     }
   } catch (e) {}
 
   // ----------------------------------------- aviso (?aviso=...) por ~8 s
-  // Some sozinho e sai da URL (recarregar a página não repete o aviso nem o "desfazer").
-  const flash = document.querySelector("[data-flash]");
+  // Vem pronto do servidor (base.html). Some sozinho e sai da URL (recarregar não repete o aviso nem o "desfazer").
+  const flash = document.querySelector("#toasts [data-toast]");
   if (flash) {
     const url = new URL(location.href);
-    url.searchParams.delete("aviso"); url.searchParams.delete("desfazer");
+    url.searchParams.delete("aviso"); url.searchParams.delete("desfazer"); url.searchParams.delete("tipo");
     history.replaceState(null, "", url.pathname + url.search + url.hash);
-    let hideTimer = setTimeout(() => flash.remove(), 8000);
-    // com o foco ou o mouse no aviso (ex.: indo clicar em "desfazer"), ele espera
-    flash.addEventListener("pointerenter", () => clearTimeout(hideTimer));
-    flash.addEventListener("focusin", () => clearTimeout(hideTimer));
-    flash.addEventListener("pointerleave", () => { hideTimer = setTimeout(() => flash.remove(), 4000); });
-    flash.querySelector("[data-flash-close]").addEventListener("click", () => flash.remove());
+    armToast(flash, 8000);
   }
 
   // ------------------------------------------------- tarefas em andamento
@@ -75,7 +79,7 @@
           : "";
         if (busy && !jobs.length) {
           try {
-            sessionStorage.setItem("boorubot-toast", JSON.stringify({ message: `Pronto: ${lastLabel || "tarefa concluída"} ♡`, pet: "cat" }));
+            sessionStorage.setItem("boorubot-toast", JSON.stringify({ message: `Pronto: ${lastLabel || "tarefa concluída"}`, kind: "sucesso" }));
           } catch (e) {}
           location.reload();
         }
@@ -84,35 +88,54 @@
     }, 3000);
   }
 
-  // ------------------------------------------------ confirmações fofas
-  function askConfirm(text) {
-    const dialog = document.getElementById("confirm-dialog");
-    if (!dialog || !defined("sl-dialog")) return Promise.resolve(window.confirm(text));
-    dialog.querySelector("[data-confirm-text]").textContent = text;
+  // ------------------------------------------------------ confirmações
+  // <dialog> nativo (ConfirmDialog): showModal() prende o foco, Esc fecha e o foco volta ao botão de origem.
+  // Um botão com data-confirm="texto" usa o diálogo genérico de base.html; data-confirm-title e
+  // data-confirm-ok trocam o título e o rótulo da ação (padrão: o texto do próprio botão).
+  function openDialog(dialog) {
     return new Promise((resolve) => {
-      let answer = false;
-      const yes = dialog.querySelector("[data-confirm-yes]");
-      const no = dialog.querySelector("[data-confirm-no]");
-      const onYes = () => { answer = true; dialog.hide(); };
-      const onNo = () => dialog.hide();
-      const onHide = (ev) => {
-        if (ev.target !== dialog) return;
-        yes.removeEventListener("click", onYes); no.removeEventListener("click", onNo);
-        dialog.removeEventListener("sl-after-hide", onHide);
-        resolve(answer);
+      const ok = dialog.querySelector("[data-dialog-ok]");
+      const cancel = dialog.querySelector("[data-dialog-cancel]");
+      const onOk = () => dialog.close("ok");
+      const onCancel = () => dialog.close("");
+      const onClose = () => {
+        ok && ok.removeEventListener("click", onOk); cancel && cancel.removeEventListener("click", onCancel);
+        dialog.removeEventListener("close", onClose);
+        resolve(dialog.returnValue === "ok");
       };
-      yes.addEventListener("click", onYes); no.addEventListener("click", onNo);
-      dialog.addEventListener("sl-after-hide", onHide);
-      dialog.show();
+      ok && ok.addEventListener("click", onOk); cancel && cancel.addEventListener("click", onCancel);
+      dialog.addEventListener("close", onClose);
+      dialog.returnValue = "";
+      dialog.showModal();
+      (cancel || ok).focus();
     });
+  }
+  window.boorubotDialog = openDialog;
+
+  function askConfirm(btn) {
+    const dialog = document.getElementById("confirm-dialog");
+    const text = btn.dataset.confirm;
+    if (!dialog || !dialog.showModal) return Promise.resolve(window.confirm(text));
+    dialog.querySelector("[data-dialog-title]").textContent = btn.dataset.confirmTitle || "Tem certeza?";
+    dialog.querySelector("[data-dialog-text]").textContent = text;
+    const ok = dialog.querySelector("[data-dialog-ok]");
+    ok.textContent = btn.dataset.confirmOk || btn.textContent.trim() || "Confirmar";
+    ok.className = "bb-btn " + ("confirmDanger" in btn.dataset ? "bb-btn--danger" : "bb-btn--primary");
+    return openDialog(dialog);
   }
 
   document.addEventListener("click", (ev) => {
+    const opener = ev.target.closest("[data-dialog-open]");
+    if (opener) {
+      const dialog = document.getElementById(opener.dataset.dialogOpen);
+      if (dialog && dialog.showModal) { ev.preventDefault(); openDialog(dialog); }
+      return;
+    }
     const btn = ev.target.closest("[data-confirm]");
     if (!btn) return;
     if (btn.dataset.confirmed) { delete btn.dataset.confirmed; return; }
     ev.preventDefault();
-    askConfirm(btn.dataset.confirm).then((ok) => {
+    askConfirm(btn).then((ok) => {
       if (!ok) return;
       btn.dataset.confirmed = "1";
       if (btn.form && btn.form.requestSubmit) btn.form.requestSubmit(btn); else btn.click();
@@ -226,30 +249,6 @@
     const items = document.querySelectorAll("main > *:not(.editor), .grid > .thumb, .site-list > .card");
     items.forEach((el, i) => { el.classList.add("reveal"); el.style.setProperty("--i", Math.min(i, 14)); });
 
-    // polaroids inclinam seguindo o mouse
-    document.querySelectorAll(".thumb").forEach((card) => {
-      card.addEventListener("pointermove", (ev) => {
-        const r = card.getBoundingClientRect();
-        const x = (ev.clientX - r.left) / r.width - 0.5, y = (ev.clientY - r.top) / r.height - 0.5;
-        card.style.transform = `perspective(600px) rotateY(${x * 8}deg) rotateX(${-y * 8}deg) translateY(-3px)`;
-      });
-      card.addEventListener("pointerleave", () => { card.style.transform = ""; });
-    });
-
-    // coraçõezinhos ao clicar nos botões principais
-    document.addEventListener("pointerdown", (ev) => {
-      const btn = ev.target.closest("button.primary");
-      if (!btn) return;
-      for (let i = 0; i < 6; i++) {
-        const h = document.createElement("span");
-        h.className = "heart-pop"; h.textContent = i % 2 ? "♡" : "✿";
-        h.style.left = ev.clientX + "px"; h.style.top = ev.clientY + "px";
-        h.style.setProperty("--dx", (Math.random() * 80 - 40).toFixed(0) + "px");
-        h.style.setProperty("--dy", (-30 - Math.random() * 50).toFixed(0) + "px");
-        document.body.append(h);
-        setTimeout(() => h.remove(), 800);
-      }
-    });
   }
 
   // "Subir nova arte" vindo de outra página: destaca a área de upload
