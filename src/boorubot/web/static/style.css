@@ -15,83 +15,65 @@ h2 small, label small, .small { color: var(--ink-soft); font-weight: 400; font-s
 .muted { color: var(--ink-soft); }
 ::selection { background: var(--blush); }
 
-/* --- layout: menu lateral ---------------------------------------------- */
-.app { display: grid; grid-template-columns: 248px minmax(0, 1fr); min-height: 100vh; }
+/* --- casca: menu lateral (componente Sidebar do Figma) ------------------------------------------- */
+.app { display: grid; grid-template-columns: var(--sidebar-width) minmax(0, 1fr); min-height: 100vh; }
 .side {
-  position: sticky; top: 0; height: 100vh; display: flex; flex-direction: column; gap: 14px; padding: 18px 14px;
-  background: var(--surface); backdrop-filter: blur(8px); border-right: 2px dashed var(--pink-200);
-  view-transition-name: side;
+  position: sticky; top: 0; height: 100vh; display: flex; flex-direction: column; gap: var(--space-6);
+  padding: var(--space-6) var(--space-4); background: var(--surface); border-right: 1px solid var(--line); overflow-y: auto;
 }
-.brand { display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 22px; text-decoration: none; color: var(--ink); }
-.brand img { width: 48px; height: 48px; margin: -6px 0 -4px; }
-.search-btn {
-  display: flex; align-items: center; gap: 4px; width: 100%; padding: 8px 12px; border-radius: 14px; font-size: 14px;
-  background: var(--paper); border: 2px solid var(--line); box-shadow: none; color: var(--ink-soft); font-family: var(--font-body);
+.brand { display: flex; align-items: center; gap: var(--space-3); padding: 0 var(--space-2); font: 700 24px/32px var(--font-display); text-decoration: none; color: var(--ink); }
+.side-search {
+  display: flex; align-items: center; gap: var(--space-2); width: 100%; min-height: var(--touch-min); padding: 0 var(--space-2) 0 var(--space-4);
+  border: 0; border-radius: var(--radius-input); background: var(--paper); color: var(--ink-soft); font: 400 15px/1 var(--font-body); cursor: pointer;
 }
-.search-btn span { flex: 1; text-align: left; }
-.mag { width: 18px; height: 18px; flex: none; color: var(--primary-strong); }
-.icon-btn .mag { width: 20px; height: 20px; }
-.search-btn:hover { border-color: var(--primary); background: var(--surface); }
-.na-trigger {
-  min-height: 44px; padding: 0 14px; border: 0; border-radius: 12px; background: var(--primary-strong); color: var(--on-primary);
-  font: 700 15px/1 var(--font-body); cursor: pointer;
+.side-search span { flex: 1; text-align: left; }
+.side-search:hover { background: var(--blush); }
+.side-nav { display: flex; flex-direction: column; gap: var(--space-1); }
+.side-bottom { margin-top: auto; display: flex; flex-direction: column; gap: var(--space-2); }
+.jobs { font-size: 13px; color: var(--ink-soft); display: flex; align-items: center; gap: var(--space-2); }
+.jobs:not(:empty) { padding: var(--space-2) var(--space-3); border-radius: var(--radius-input); background: var(--paper); }
+.side-robot {
+  display: flex; align-items: flex-start; gap: var(--space-3); padding: var(--space-3) var(--space-4); border-radius: var(--radius-md);
+  background: var(--paper); color: var(--ink); text-decoration: none; font-size: 13px; line-height: 18px;
 }
-.na-trigger:hover { background: var(--primary-deep); }
-.na-mobile { flex: none; background: var(--primary-strong); color: var(--on-primary); font-size: 26px; }
-.na-mobile:hover { background: var(--primary-deep); }
-kbd {
-  font: 600 11px/1 var(--font-body); padding: 3px 6px; border-radius: 6px; color: var(--ink);
-  background: var(--surface); border: 1.5px solid var(--pink-200); }
-.side-nav { display: flex; flex-direction: column; gap: 4px; }
-.side-nav a {
-  position: relative; display: flex; align-items: center; gap: 10px; padding: 7px 12px 7px 8px; border-radius: 16px;
-  text-decoration: none; color: var(--ink-soft); font-family: var(--font-display); font-weight: 500; font-size: 16px;
-  border: 2px solid transparent; transition: background-color .12s, color .12s;
-}
-.side-nav a img { width: 32px; height: 32px; }
-.side-nav a:hover { background: var(--paper); color: var(--ink); }
-.side-nav a.on { background: var(--blush); border-color: var(--pink-200); color: var(--ink); }
-.side-bottom { margin-top: auto; display: flex; flex-direction: column; gap: 10px; }
-.jobs { font-size: 13px; color: var(--ink-soft); display: flex; align-items: center; gap: 8px; }
-.jobs:not(:empty) { padding: 8px 10px; border-radius: 14px; background: var(--paper); border: 2px solid var(--line); }
-.side-test {
-  display: flex; align-items: center; gap: 6px; font-size: 13px; text-decoration: none; color: var(--warn);
-  background: var(--warn-bg); border: 2px dashed var(--warn); border-radius: 14px; padding: 4px 10px;
-}
-.side-test img { width: 26px; height: 26px; }
+.side-robot > span:last-child { display: flex; flex-direction: column; }
+.side-robot b { font-size: 14px; font-weight: 800; }
+.side-robot span span { color: var(--ink-soft); }
+.side-robot__dot { width: 10px; height: 10px; margin-top: 5px; border-radius: var(--radius-full); flex: none; background: var(--ok); }
+.side-robot--warn .side-robot__dot { background: var(--warn); }
+.side-robot--danger .side-robot__dot { background: var(--danger); }
+.side-robot:hover { background: var(--blush); }
 .spin {
-  width: 18px; height: 18px; display: inline-block; flex: none;
-  background: url("/static/pets/paw.svg") center / contain no-repeat; animation: hop .9s ease-in-out infinite;
+  width: 16px; height: 16px; display: inline-block; flex: none; border-radius: var(--radius-full);
+  border: 2px solid var(--pink-200); border-top-color: var(--primary-strong); animation: spin .8s linear infinite;
 }
+@keyframes spin { to { transform: rotate(360deg); } }
 .page { min-width: 0; display: flex; flex-direction: column; }
+main { width: 100%; max-width: calc(var(--content-max) + 2 * var(--space-12)); margin: 0 auto; padding: 36px var(--space-12) var(--space-12); }
 .mobile-top { display: none; }
-.icon-btn { width: 42px; height: 42px; padding: 0; font-size: 20px; line-height: 1; border-radius: 14px; display: inline-flex; align-items: center; justify-content: center; }
+.icon-btn { width: var(--touch-min); height: var(--touch-min); padding: 0; font-size: 20px; line-height: 1; border-radius: var(--radius-input); display: inline-flex; align-items: center; justify-content: center; }
+.na-mobile { flex: none; background: var(--primary-strong); color: var(--on-primary); border: 0; font-size: 26px; }
+.na-mobile:hover { background: var(--primary-deep); }
 
-@media (max-width: 860px) {
+@media (max-width: 767px) {
   .app { grid-template-columns: minmax(0, 1fr); }
   .side { display: none; }
   .mobile-top {
-    display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 12px;
-    position: sticky; top: 0; z-index: 5; background: var(--surface); backdrop-filter: blur(8px);
-    border-bottom: 2px dashed var(--pink-200); view-transition-name: side;
+    display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); padding: var(--space-2) var(--space-4);
+    position: sticky; top: 0; z-index: 5; background: var(--surface); border-bottom: 1px solid var(--line);
   }
-  .mobile-top .brand { font-size: 19px; }
-  .mobile-top .brand img { width: 38px; height: 38px; }
-  main { padding-top: 14px; }
-  .drop { padding: 16px; }
-  .drop img { width: 60px; height: 60px; }
+  .mobile-top .brand { font-size: 19px; padding: 0; gap: var(--space-2); }
+  main { padding: var(--space-4) var(--space-4) var(--space-10); }
   /* sem Shoelace: o menu lateral vira gaveta simples */
-  html.menu-open .side { display: flex; position: fixed; inset: 0 auto 0 0; width: 260px; z-index: 20; box-shadow: 0 0 0 100vmax var(--scrim); }
+  html.menu-open .side { display: flex; position: fixed; inset: 0 auto 0 0; width: 280px; z-index: 20; box-shadow: 0 0 0 100vmax var(--scrim); }
 }
-@keyframes hop { 0%, 100% { transform: translateY(0) rotate(-10deg); } 50% { transform: translateY(-4px) rotate(10deg); } }
+.menu-drawer .side-nav { padding-top: var(--space-2); }
 
 .banner {
-  display: flex; align-items: center; justify-content: center; gap: 10px; flex-wrap: wrap;
-  background: var(--warn-bg); color: var(--warn); padding: 8px 16px; text-align: center; font-size: 14px;
-  border-bottom: 2px dashed var(--warn);
+  display: flex; align-items: center; justify-content: center; gap: var(--space-3); flex-wrap: wrap;
+  background: var(--lilac-100); color: var(--lilac-700); padding: var(--space-2) var(--space-4); text-align: center; font-size: 14px;
 }
-.banner img { width: 30px; height: 30px; margin: -4px 0; }
-.banner a { color: var(--warn); }
+.banner a { color: var(--lilac-700); font-weight: 700; }
 .alert { background: var(--danger-bg); color: var(--danger); padding: 10px 14px; border-radius: 16px; margin-bottom: 12px; border: 2px solid var(--danger-bg); }
 
 /* --- cartões ------------------------------------------------------------- */
@@ -262,8 +244,6 @@ details.tests summary h2 { display: inline-flex; }
 .tip { background: var(--surface); border: 2px solid var(--line); border-left: 6px solid var(--primary); padding: 10px 14px; border-radius: 6px 16px 16px 6px; font-size: 14px; }
 code { background: var(--blush); color: var(--primary-deep); padding: 1px 6px; border-radius: 6px; font-size: 0.9em; }
 
-/* --- rodapé -------------------------------------------------------------- */
-.foot { width: 100%; max-width: 1100px; margin: 26px auto 0; padding: 16px; text-align: center; color: var(--ink-soft); font-size: 13px; }
 
 /* --- componentes Shoelace no tema kawaii --------------------------------- */
 /* Shoelace com a nossa cara: diálogo, abas e gaveta usam os tokens, nada de azul */
@@ -280,7 +260,7 @@ code { background: var(--blush); color: var(--primary-deep); padding: 1px 6px; b
 }
 html.sl-loading sl-drawer, html.sl-loading sl-dialog { visibility: hidden; }
 sl-drawer:not(:defined), sl-dialog:not(:defined) { display: none; }
-.menu-drawer::part(panel) { background: var(--surface); border-right: 2px dashed var(--pink-200); }
+.menu-drawer::part(panel) { background: var(--surface); border-right: 1px solid var(--line); }
 .menu-drawer::part(title) { font-family: var(--font-display); font-weight: 600; }
 
 /* --- busca Ctrl+K (ninja-keys) ------------------------------------------- */
