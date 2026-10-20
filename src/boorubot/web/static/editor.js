@@ -9,12 +9,14 @@
   const SURE = 0.7; // a partir daqui a IA "tem certeza"
   // mesmo critério do normalize_tags do backend: "long hair" -> long_hair
   const clean = (t) => t.trim().toLowerCase().split(/\s+/).filter(Boolean).join("_");
-  const X_ICON = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
+  const X_ICON = '<svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" aria-hidden="true"><path d="M5 5l10 10M15 5L5 15"/></svg>';
+  // frases da barra (mesmas de MISSING_PHRASES no backend)
+  const MISSING = { "sem tags": "faltam as tags", "escolha o rating": "falta escolher o rating", "nenhum site marcado": "falta marcar um site" };
 
   // ------------------------------------------------------------- tags
-  // Cada tag vira uma etiqueta: verde (IA com certeza), amarela com % (vale conferir),
-  // lilás (tag padrão das configurações), neutra (digitada por ela). O valor enviado ao
-  // backend continua sendo o texto separado por espaço no textarea.
+  // Cada tag vira uma etiqueta do design system (Tag): ponto verde (IA com certeza), amarela com %
+  // (vale conferir), lilás (tag padrão das configurações), sem ponto (digitada por ela). O valor
+  // enviado ao backend continua sendo o texto separado por espaço no textarea.
   function TagField(root) {
     const box = root.querySelector("textarea[name=tags]");
     const data = JSON.parse(root.dataset.tagField || "{}");
@@ -24,17 +26,22 @@
     let unknown = new Set(); // etapa 12: tags que não existem no Danbooru
 
     root.classList.add("enhanced");
-    const list = Object.assign(document.createElement("ul"), { className: "tag-chips", role: "list" });
+    // caixa com as etiquetas e o campo de digitar no fim (como no Figma); clicar no vazio foca o campo
+    const tagBox = Object.assign(document.createElement("div"), { className: "ed-tagbox" });
+    const list = Object.assign(document.createElement("ul"), { className: "bb-tags ed-tag-list", role: "list" });
     const input = Object.assign(document.createElement("input"), {
-      type: "text", className: "tag-input", placeholder: "nova tag + Enter", autocomplete: "off", spellcheck: false,
+      type: "text", className: "ed-tag-input", placeholder: "digite uma tag e Enter…", autocomplete: "off", spellcheck: false,
     });
     input.setAttribute("aria-label", "Adicionar tag");
     input.id = box.id + "-new";
-    const weakBox = Object.assign(document.createElement("div"), { className: "tag-weak" });
+    tagBox.append(list, input);
+    tagBox.addEventListener("click", (ev) => { if (ev.target === tagBox || ev.target === list) input.focus(); });
+    const weakBox = Object.assign(document.createElement("div"), { className: "ed-weak" });
     const autocomplete = Object.assign(document.createElement("ul"), {
-      className: "tag-suggestions", role: "listbox", hidden: true,
+      className: "tag-suggestions bb-card bb-card--float", role: "listbox", hidden: true,
     });
-    box.after(list, input, autocomplete, weakBox);
+    box.after(tagBox, autocomplete, weakBox);
+    const countEl = document.querySelector("[data-tag-count]");
     const disabled = box.disabled || box.closest("fieldset[disabled]");
     if (disabled) input.hidden = true;
 
@@ -119,26 +126,29 @@
       }
     });
 
+    // [classe do componente Tag, texto de apoio para leitor de tela]
     function kind(tag) {
-      if (unknown.has(tag)) return ["new", "tag nova: confira a grafia"];
-      if (defaults.has(tag) && !(tag in scores)) return ["default", "tag padrão"];
-      if (tag in scores) return scores[tag] >= SURE ? ["sure", "IA tem certeza"] : ["check", "vale conferir: IA " + pct(scores[tag])];
-      return ["own", ""];
+      if (unknown.has(tag)) return [" bb-tag--new", "tag nova: confira a grafia"];
+      if (defaults.has(tag) && !(tag in scores)) return [" bb-tag--mine", "sua tag padrão"];
+      if (tag in scores) return scores[tag] >= SURE ? ["", "IA tem certeza"] : [" bb-tag--check", "vale conferir"];
+      return [" bb-tag--own", ""];
     }
 
     function render() {
       const current = tags();
       list.innerHTML = current.map((t) => {
-        const [k, title] = kind(t);
-        const extra = k === "check" ? ` <span class="tag-pct">${pct(scores[t])}</span>` : "";
-        const remove = disabled ? "" : `<button type="button" class="tag-x" data-remove="${esc(t)}" aria-label="remover ${esc(t)}">${X_ICON}</button>`;
-        return `<li class="tag tag-${k}"${title ? ` title="${esc(title)}"` : ""}><span>${esc(t)}</span>${extra}${remove}</li>`;
+        const [cls, note] = kind(t);
+        const extra = cls === " bb-tag--check" ? ` <span class="bb-tag__score">${pct(scores[t])}</span>` : "";
+        const remove = disabled ? "" : `<button type="button" class="bb-tag__x" data-remove="${esc(t)}" aria-label="Remover ${esc(t)}">${X_ICON}</button>`;
+        const sr = note ? `<span class="sr-only">, ${esc(note)}</span>` : "";
+        return `<li class="bb-tag${cls}"${note ? ` title="${esc(note)}"` : ""}><span class="bb-tag__dot" aria-hidden="true"></span>${esc(t)}${sr}${extra}${remove}</li>`;
       }).join("");
+      if (countEl) countEl.textContent = current.length + (current.length === 1 ? " escolhida" : " escolhidas");
       const visibleWeak = weak.filter(([t]) => !current.includes(t));
       weakBox.hidden = disabled || !visibleWeak.length;
-      weakBox.innerHTML = visibleWeak.length ? `<span class="tag-weak-label">A IA também viu:</span>` +
-        visibleWeak.map(([t, v]) => `<button type="button" class="tag-add" data-add="${esc(t)}">+ ${esc(t)} <span class="tag-pct">${pct(v)}</span></button>`).join("") +
-        `<button type="button" class="link-btn" data-add-all>adicionar todas</button>` : "";
+      weakBox.innerHTML = visibleWeak.length ? `<span class="ed-weak__label">A IA também viu:</span>` +
+        visibleWeak.map(([t, v]) => `<button type="button" class="bb-tag bb-tag--suggest" data-add="${esc(t)}">+ ${esc(t)} <span class="bb-tag__score">${pct(v)}</span></button>`).join("") +
+        `<button type="button" class="bb-btn bb-btn--link" data-add-all>adicionar todas</button>` : "";
     }
 
     list.addEventListener("click", (ev) => {
@@ -229,7 +239,9 @@
       if (errors.length) b.setAttribute("aria-describedby", "approve-why"); else b.removeAttribute("aria-describedby");
     });
     const why = document.getElementById("approve-why");
-    if (why) { why.hidden = !errors.length; why.textContent = errors.length ? "Falta: " + errors.join(", ") : ""; }
+    if (why) { why.hidden = !errors.length; why.textContent = errors.map((e) => MISSING[e] || e).join(", "); }
+    const when = document.querySelector("#approve-when b");
+    if (when && when.previousSibling) when.previousSibling.textContent = errors.length ? "depois sai " : "se aprovar agora, sai ";
     return errors;
   }
   if (form) {
@@ -305,22 +317,31 @@
   const suggestBtn = document.getElementById("suggest");
   const suggestInfo = document.getElementById("suggest-info");
   let suggestTimer = null;
+  // fala da Mochi embaixo da arte (MochiNote): título, texto e expressão
+  function mochiSays(title, text, face) {
+    const note = document.getElementById("mochi-note");
+    if (!note) return;
+    note.hidden = !text;
+    note.querySelector("img").src = `/static/pets/mochi-${face}.svg`;
+    const t = note.querySelector(".bb-mochi__title");
+    if (t) t.textContent = title;
+    note.querySelector(".bb-mochi__text").textContent = text || "";
+  }
   function showSuggest(st) {
     const busy = st.state === "pendente" || st.state === "analisando";
-    if (st.state === "pendente") suggestInfo.textContent = st.waiting ? `A Mochi olha esta arte em seguida (${st.waiting} na frente)` : "A Mochi vai olhar a arte agora";
-    else if (st.state === "analisando") suggestInfo.textContent = st.model_ready ? "A Mochi está olhando a arte…" : "Na primeira vez a Mochi baixa o modelo de tags (380 MB): pode levar alguns minutos";
-    else if (st.state === "falhou") suggestInfo.textContent = "A Mochi não conseguiu olhar: " + st.error;
+    if (st.state === "pendente") suggestInfo.textContent = st.waiting ? `a Mochi olha esta arte em seguida (${st.waiting} na frente)` : "a Mochi vai olhar a arte agora";
+    else if (st.state === "analisando") suggestInfo.textContent = st.model_ready ? "a Mochi está olhando a arte…" : "na primeira vez a Mochi baixa o modelo de tags (380 MB): pode levar alguns minutos";
+    else if (st.state === "falhou") { suggestInfo.textContent = "a Mochi não conseguiu olhar"; mochiSays("Não consegui olhar", st.error, "ops"); }
     else if (st.state === "pronta") {
       const added = tagField ? tagField.update(st) : 0;
-      suggestInfo.textContent = added ? `A Mochi já olhou: +${added} tags` : "A Mochi já olhou";
+      suggestInfo.textContent = added ? `+${added} tags da Mochi` : "";
       const oc = document.getElementById("original_character");
       if (oc && oc.checked !== st.original_character) { oc.checked = st.original_character; oc.dispatchEvent(new Event("change", { bubbles: true })); }
-      const note = document.getElementById("mochi-note");
-      if (note) { note.hidden = !st.mochi; note.querySelector("span").textContent = st.mochi; }
-      document.querySelectorAll(".rating-card").forEach((card) => {
-        const on = card.querySelector("input").value === st.rating_suggestion;
-        card.classList.toggle("suggested", on);
-        const badge = card.querySelector(".rating-ai");
+      mochiSays("A Mochi já olhou", st.mochi, "feliz");
+      document.querySelectorAll(".bb-rating__opt").forEach((opt) => {
+        const on = opt.querySelector("input").value === st.rating_suggestion;
+        opt.classList.toggle("bb-rating__opt--suggested", on);
+        const badge = opt.querySelector(".bb-rating__ai");
         badge.hidden = !on;
         if (on) badge.textContent = "sugestão da IA" + (st.rating_confidence ? " · " + pct(st.rating_confidence) : "");
       });
