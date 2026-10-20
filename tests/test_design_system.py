@@ -98,3 +98,20 @@ def test_icons_are_inline_and_inherit_color(client):
     assert 'stroke="currentColor"' in page and 'aria-hidden="true" focusable="false"' in page
     with pytest.raises(ValueError):
         app_mod.icon_svg("../segredo")
+
+
+# --- DS-3: mascotes ------------------------------------------------------------------------------------
+
+PETS = STATIC / "pets"
+
+
+def test_mochi_expressions_and_the_gang_are_available():
+    for name in ("mochi-feliz", "mochi-comemorando", "mochi-pensando", "mochi-dormindo", "mochi-ops",
+                 "bear", "bunny", "puppy", "chick", "cat-sleep", "paw"):
+        assert (PETS / f"{name}.svg").exists(), name
+
+
+def test_pets_are_decorative(client):
+    page = client[0].get("/_ui").text
+    assert '<img class="bb-pet" src="/static/pets/bear.svg" alt=""' in page
+    assert "side-pets" not in page   # o trio decorativo do rodapé da sidebar saiu
