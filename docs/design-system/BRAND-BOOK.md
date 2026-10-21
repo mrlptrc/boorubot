@@ -1,4 +1,4 @@
-O boorubot é o painel onde a artista sobe as artes dela, confere as tags que a IA sugeriu e deixa o robô publicar uma por dia no Danbooru, Gelbooru, paheal, rule34.us e rule34.xxx. O visual é kawaii e acolhedor; a informação é clara e honesta. Use este sistema para qualquer tela, e-mail ou material do boorubot.
+O boorubot é o painel onde a artista sobe as artes dela, confere as tags que a IA sugeriu e deixa o robô publicar uma por dia no Danbooru, paheal e rule34.xxx. O visual é kawaii e acolhedor; a informação é clara e honesta. Use este sistema para qualquer tela, e-mail ou material do boorubot.
 
 ## Princípios
 
@@ -13,7 +13,7 @@ Quem usa o boorubot é uma artista que posta fan art e personagens próprios em 
 - **Rosa e lilás em vez de azul corporativo.** O universo dela é anime e kawaii; um painel rosa parece um ateliê, não um sistema de TI. O rosa principal (`primary`) foi escurecido em `primary-strong` para que o botão com texto branco passe no contraste AA.
 - **Lilás separa a IA do resto.** Tudo que a máquina sugere ou que é padrão dela fica em lilás; o que ela decide fica em rosa. Dá para ver de relance quem fez o quê.
 - **Neutros ameixa em vez de cinza.** Cinza puro deixa o rosa com cara de doce barato. Neutros puxados para o ameixa (`ink`, `ink-soft`, `line`) mantêm a paleta quente e dão um texto bem escuro (14:1) para ler sem cansar.
-- **Quicksand nos títulos.** Letras redondas e geométricas, amigáveis sem ser infantis, e a fonte que ela escolheu entre cinco opções. **Nunito no texto:** também arredondada, conversa com a Quicksand, mas tem mais peso e altura de x, então lê bem em 13–15px e em telas de celular.
+- **Quicksand nos títulos.** Letras redondas e geométricas, amigáveis sem ser infantis. **Nunito no texto:** também arredondada, conversa com a Quicksand, mas tem mais peso e altura de x, então lê bem em 13–15px e em telas de celular.
 - **Base de 4px e cantos grandes.** Espaços generosos acompanham o "calma no ritmo"; cantos de 12 a 24px e botões em pílula repetem a forma redonda da Mochi.
 - **Sombras ameixa e quase nenhuma.** Cards ficam no plano, com borda; só o que flutua (menu, modal, toast) ganha sombra. A tela fica limpa e a hierarquia fica óbvia.
 - **A Mochi como voz.** Um mascote transforma "a IA analisou a imagem" em "A Mochi já olhou", e erros em algo que não assusta. Ela aparece onde há emoção (vazio, sucesso, erro, espera) e some onde há trabalho.

@@ -1,4 +1,4 @@
-﻿# boorubot · instalação no PC dela (Windows)
+﻿# boorubot · instalação no Windows
 #
 # Rodar uma vez, de dentro da pasta do boorubot (ex.: C:\boorubot), no PowerShell:
 #   powershell -ExecutionPolicy Bypass -File scripts\instalar-windows.ps1
@@ -28,7 +28,7 @@ Passo "painel abrindo junto com o Windows (escondido)"
 uv run boorubot startup install
 
 if (Test-Path "data\boorubot.db") {
-    Write-Host "`nDados encontrados em data\: a fila, o histórico e a chave do Danbooru vieram junto." -ForegroundColor Green
+    Write-Host "`nDados encontrados em data\: a fila, o histórico e as contas continuam como estavam." -ForegroundColor Green
 } else {
     Write-Host "`nSem pasta data\: o painel começa vazio, no modo teste. Siga o Guia do painel." -ForegroundColor Yellow
 }

@@ -1,7 +1,7 @@
 [project]
 name = "boorubot"
 version = "0.1.0"
-description = "Add your description here"
+description = "Painel local que publica artes em imageboards (Danbooru, rule34.paheal, rule34.xxx), uma por dia"
 authors = [
     { name = "mrlptrc", email = "murilopatricio@gmail.com" }
 ]
