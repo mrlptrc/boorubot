@@ -230,7 +230,10 @@ def test_defaults_prefill_new_posts(client, db):
     assert db.setting("daily_time") == "09:30"
 
 
-def test_guide_and_checklist(client, db):
+def test_guide_and_checklist(client, db, monkeypatch, tmp_path):
+    from boorubot import startup
+
+    monkeypatch.setattr(startup, "startup_dir", lambda: tmp_path)  # como no Windows, em qualquer sistema
     c, _ = client
     assert "api_keys/new" in c.get("/guia").text
     home = c.get("/").text
@@ -240,6 +243,9 @@ def test_guide_and_checklist(client, db):
     db.set_setting("test_mode", "0")
     post_id = db.create_post("a.png")
     db.add_test_run(post_id, "danbooru", "dry_run")
+    home = c.get("/").text
+    assert "6 de 7 passos prontos" in home and 'href="/guia?passo=pc-acordado#pc-acordado"' in home
+    c.post("/settings/startup", data={"action": "install"})    # falta só o início automático
     assert "Configuração inicial" not in c.get("/").text
 
 
