@@ -277,7 +277,7 @@
     if (name === "original_character") return form.querySelector("input[name=original_character]").checked;
     return form.querySelector(`[name=${name}]`).value;
   };
-  const FIELDS = ["title", "tags", "rating", "source", "commentary_title", "commentary_description", "original_character", "sites"];
+  const FIELDS = ["title", "tags", "rating", "source", "commentary_title", "commentary_description", "original_character", "sites", "paheal_tags"];
   const snapshot = () => Object.fromEntries(FIELDS.filter((f) => form.querySelector(`[name=${f}]`)).map((f) => [f, JSON.stringify(value(f))]));
   let saved = form ? snapshot() : {};
   let debounce = null, retry = null, retryWait = 2000, inflight = null;
@@ -304,6 +304,7 @@
       if (r.status === 409) { say(body.error || "não dá mais para editar esta arte", "error"); return; }
       if (!r.ok) throw new Error(body.error || r.status);
       Object.keys(diff).forEach((k) => { saved[k] = JSON.stringify(diff[k]); });
+      if (body.post) showPaheal(body.post);
       retryWait = 2000;
       say("salvo às " + body.saved_at, "ok");
       if (Object.keys(changed()).length) schedule(); // ela mexeu de novo enquanto salvava
@@ -315,6 +316,37 @@
     return inflight;
   }
   function schedule() { clearTimeout(debounce); debounce = setTimeout(save, 800); }
+
+  // tags do paheal: a Mochi remonta quando as tags da arte mudam (enquanto ela não editar)
+  const pahealField = document.querySelector("[data-paheal-field]");
+  const pahealBox = document.getElementById("paheal_tags");
+  const pahealAuto = document.querySelector("[data-paheal-auto]");
+  function showPaheal(post) {
+    if (!pahealBox || post.paheal_tags === undefined) return;
+    if (document.activeElement !== pahealBox) {
+      pahealBox.value = post.paheal_tags;
+      saved.paheal_tags = JSON.stringify(post.paheal_tags);
+    }
+    const origin = document.querySelector("[data-paheal-origin]");
+    if (origin) origin.textContent = post.paheal_tags_manual ? "você editou" : "a Mochi montou a partir das tags acima";
+    if (pahealAuto) pahealAuto.hidden = !post.paheal_tags_manual;
+  }
+  if (pahealField && form) {
+    // só aparece com o paheal marcado e sem OC (o paheal não aceita OC)
+    form.addEventListener("change", () => {
+      const on = form.querySelector("input[name=sites][value=paheal]");
+      const oc = form.querySelector("input[name=original_character]");
+      pahealField.hidden = !(on && on.checked) || Boolean(oc && oc.checked);
+    });
+  }
+  if (pahealAuto && postId) pahealAuto.addEventListener("click", async () => {
+    await save();
+    const r = await fetch(`/posts/${postId}`, {
+      method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ paheal_auto: true }),
+    });
+    const body = await r.json().catch(() => ({}));
+    if (r.ok && body.post) { showPaheal(body.post); say("salvo às " + body.saved_at, "ok"); }
+  });
 
   if (form && postId && editable) {
     form.addEventListener("focusout", (ev) => {

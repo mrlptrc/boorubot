@@ -98,6 +98,19 @@
           {% if editable %}<p class="ed-hint">Separe por espaço, no padrão do Danbooru. <button type="button" class="bb-btn bb-btn--link" id="suggest" {{ 'disabled' if ai_busy }}>Pedir para a Mochi olhar de novo</button></p>{% endif %}
         </div>
 
+        {# o paheal só aceita série, personagem e artista: lista própria, montada pela IA até ela editar #}
+        <div class="ed-field ed-paheal" data-paheal-field {{ 'hidden' if 'paheal' not in post.sites or post.original_character }}>
+          <div class="ed-label-row">
+            <label for="paheal_tags" class="ed-label">Tags do paheal</label>
+            <span class="ed-sub" data-paheal-origin>{{ 'você editou' if post.paheal_tags_manual else 'a Mochi montou a partir das tags acima' }}</span>
+            {% if editable %}<button type="button" class="bb-btn bb-btn--link" data-paheal-auto {{ 'hidden' if not post.paheal_tags_manual }}>refazer pela Mochi</button>{% endif %}
+          </div>
+          <textarea id="paheal_tags" name="paheal_tags" class="bb-input" rows="2" aria-describedby="paheal-hint"
+                    placeholder="nome_da_artista personagem série">{{ post.paheal_tags }}</textarea>
+          <p class="ed-hint" id="paheal-hint">O paheal só aceita <b>série, personagem e artista</b> (sem o parêntese do Danbooru).
+            Tags de conteúdo, como <code>1girl</code>, roupa ou atos, fazem o envio ser recusado. Pode editar à vontade.</p>
+        </div>
+
         {% set rating_cards = [
           ('general', 'Geral', 'sem nudez nem insinuação'),
           ('sensitive', 'Sensível', 'decote, maiô, insinuação leve'),
@@ -237,6 +250,21 @@
     </ul>
     {% if spam %}<p class="publish-warn"><span aria-hidden="true">⚠</span> Já saiu um post hoje. Dois no mesmo dia podem parecer spam para os sites.</p>{% endif %}
   {% endcall %}
+
+  {% if refused %}
+  <section class="ed-section" id="recusado" aria-labelledby="recusado-t">
+    <h2 id="recusado-t">O site recusou esta arte</h2>
+    <p>Nada foi publicado nesses sites. O robô <b>não reenvia sozinho</b>, porque mandar igual daria o mesmo erro.</p>
+    {% for site, label, why in refused %}
+    <form method="post" action="/posts/{{ post.id }}/conferir" class="pin-form">
+      <input type="hidden" name="site" value="{{ site }}">
+      <p><b>{{ label }}:</b> {{ why.split('. Nada foi publicado')[0] }}.
+        {% if site == 'paheal' %}Corrija as <a href="#paheal_tags">tags do paheal</a>: ao salvar, a arte volta para a fila do paheal.{% endif %}</p>
+      {{ ui.button("Tentar de novo", tipo="secundario", type="submit", size="sm", attrs={"name": "action", "value": "nao_saiu", "data-confirm": "A arte volta para a fila do " ~ label ~ " e é enviada de novo no próximo horário dele."}) }}
+    </form>
+    {% endfor %}
+  </section>
+  {% endif %}
 
   {% if uncertain %}
   <section class="ed-section" id="conferir" aria-labelledby="conferir-t">
