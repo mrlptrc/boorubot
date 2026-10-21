@@ -1,5 +1,6 @@
 # boorubot
 
+[![testes](https://github.com/mrlptrc/boorubot/actions/workflows/testes.yml/badge.svg)](https://github.com/mrlptrc/boorubot/actions/workflows/testes.yml)
 ![Python 3.13](https://img.shields.io/badge/Python-3.13-3776AB?logo=python&logoColor=white)
 ![FastAPI](https://img.shields.io/badge/FastAPI-009688?logo=fastapi&logoColor=white)
 ![SQLite](https://img.shields.io/badge/SQLite-003B57?logo=sqlite&logoColor=white)
