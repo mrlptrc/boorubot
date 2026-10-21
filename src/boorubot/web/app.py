@@ -141,6 +141,16 @@ def dict_without(d: dict, *keys: str) -> dict:
     return {k: v for k, v in (d or {}).items() if k not in keys}
 
 
+class FreshStatic(StaticFiles):
+    """CSS e JS sempre conferidos com o servidor (ETag → 304): depois de atualizar o painel,
+    o navegador não mistura a página nova com o estilo antigo."""
+
+    def file_response(self, *args, **kwargs):
+        response = super().file_response(*args, **kwargs)
+        response.headers["Cache-Control"] = "no-cache"
+        return response
+
+
 def see_other(url: str) -> RedirectResponse:
     return RedirectResponse(url, status_code=303)
 
@@ -157,7 +167,7 @@ def create_app(db: DB | None = None, worker: Worker | None = None, start_worker:
     app.state.db, app.state.worker, app.state.tag_api = db, worker, tag_api
     IMAGES_DIR.mkdir(parents=True, exist_ok=True)
     app.mount("/images", StaticFiles(directory=IMAGES_DIR), name="images")
-    app.mount("/static", StaticFiles(directory=HERE / "static"), name="static")
+    app.mount("/static", FreshStatic(directory=HERE / "static"), name="static")
     templates = Jinja2Templates(directory=HERE / "templates")
     templates.env.globals.update(
         SITE_LABELS=SITE_LABELS, STATUS_LABELS=STATUS_LABELS, RATINGS=RATINGS, RATINGS_PT=RATINGS_PT,

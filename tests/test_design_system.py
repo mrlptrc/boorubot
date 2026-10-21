@@ -185,3 +185,9 @@ def test_test_mode_strip_turns_it_off(client):
     assert r.headers["location"] == "/calendario" and not db.test_mode
     db.set_setting("test_mode", "1")
     assert c.post("/ajustes/desligar-teste", data={"volta": "//evil.example"}, follow_redirects=False).headers["location"] == "/"
+
+
+def test_static_files_are_revalidated_after_an_update(client):
+    # painel atualizado não pode ficar com o CSS/JS antigo no cache do navegador
+    r = client[0].get("/static/style.css")
+    assert r.headers["cache-control"] == "no-cache" and r.headers.get("etag")
