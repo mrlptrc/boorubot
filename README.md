@@ -6,6 +6,12 @@ Painel local para artistas publicarem as próprias artes em imageboards (Danboor
 A artista sobe a arte, a Mochi (um tagger que roda no próprio PC) sugere tags e rating no padrão do Danbooru,
 ela revisa e aprova. A arte entra numa fila e o robô publica uma por dia, no horário escolhido, em cada site marcado.
 
+<p align="center">
+  <img src="docs/demo/fluxo.gif" alt="Demonstração: do Início para Artes, abrir um rascunho com as tags que a Mochi sugeriu, escolher o rating, aprovar e ver a arte entrar no Calendário e nas Métricas" width="960">
+</p>
+
+<p align="center"><sub>Rascunho → tags da Mochi → rating → aprovar → a arte ganha um dia no calendário. Dados de demonstração.</sub></p>
+
 | Site | Como publica | Login |
 |---|---|---|
 | Danbooru | API oficial (`/uploads.json` → `/posts.json`) | chave de API, cadastrada no painel |
@@ -70,6 +76,25 @@ A primeira sugestão de tags baixa ~380 MB (modelo [`SmilingWolf/wd-vit-tagger-v
 - **Sites**: contas, sessão de cada site e envio assistido.
 - **Ajustes**: horário, tags e sites padrão, modo teste, início automático e backup.
 - **Ctrl+K** busca artes, páginas e ações. Funciona no celular (barra de navegação embaixo).
+
+### Telas
+
+| Início | Editor da arte |
+|---|---|
+| ![Início: a arte de hoje, quantos dias a fila cobre, favoritos e os próximos dias](docs/demo/inicio.png) | ![Editor: tags com a confiança da IA, tags do paheal e rating sugerido](docs/demo/editor.png) |
+| **Calendário** | **Métricas** |
+| ![Calendário: semana por site, com a arte prevista em cada dia](docs/demo/calendario.png) | ![Métricas: favoritos por semana, artes mais amadas e tabela por site](docs/demo/metricas.png) |
+| **Artes** | **Sites** |
+| ![Artes: todas as artes com a situação em cada site](docs/demo/artes.png) | ![Sites: conta e sessão de cada site, rule34.xxx em envio assistido](docs/demo/sites.png) |
+
+<p align="center">
+  <img src="docs/demo/celular-inicio.png" alt="Início no celular" width="250">
+  <img src="docs/demo/celular-editor.png" alt="Editor no celular" width="250">
+  <img src="docs/demo/celular-calendario.png" alt="Calendário no celular" width="250">
+</p>
+
+Os prints e o GIF usam um banco de demonstração com artes geradas por código. Para refazer depois de mudar
+alguma tela: `scripts/demo/gerar.sh` (precisa de ffmpeg e ImageMagick).
 
 ## Comandos
 
