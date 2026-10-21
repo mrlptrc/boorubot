@@ -135,7 +135,7 @@ def test_sidebar_counts_reviews_and_flags_login(client):
     c, db = client
     db.create_post("a.png", title="a")
     assert 'bb-nav__dot' not in c.get("/").text
-    db.set_session("gelbooru", False, "pediu login")
+    db.set_session("paheal", False, "pediu login")
     page = c.get("/").text
     assert 'class="bb-nav__count" aria-label="1 para revisar">1<' in page
     assert 'class="bb-nav__dot"' in page

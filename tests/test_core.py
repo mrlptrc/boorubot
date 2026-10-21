@@ -31,7 +31,7 @@ def test_load_example():
     assert post.image.name == "arte.png"
     assert post.rating == "general"
     assert post.tags_for("danbooru")[-1] == "commentary"
-    assert "commentary" not in post.tags_for("gelbooru")
+    assert "commentary" not in post.tags_for("paheal")
 
 
 def test_tags_are_normalized(post_dir):

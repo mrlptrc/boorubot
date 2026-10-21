@@ -12,7 +12,7 @@ from boorubot.db import DB, to_post
 from boorubot.models import Post
 from boorubot.sites import forms
 from boorubot.sites.base import ContentRefused, Result
-from boorubot.sites.forms import Paheal, Rule34us
+from boorubot.sites.forms import Paheal
 from boorubot.tag_api import DanbooruTagAPI
 from boorubot.web import app as app_mod
 from boorubot.worker import Worker
@@ -82,7 +82,7 @@ def test_editor_fills_paheal_tags_and_she_can_write_her_own(client, db):
 def test_paheal_receives_only_its_list():
     post = Post.load(EXAMPLE)
     post.only_tags = {"paheal": ["artista_exemplo", "zero_two"]}
-    assert post.tags_for("paheal") == ["artista_exemplo", "zero_two"] and post.tags_for("gelbooru") == post.tags
+    assert post.tags_for("paheal") == ["artista_exemplo", "zero_two"] and post.tags_for("rule34xxx") == post.tags
 
 
 def test_old_art_without_paheal_tags_never_sends_the_full_list(db, monkeypatch):
@@ -138,14 +138,6 @@ def test_paheal_invalid_tag_page_is_a_refusal(browser_page):
           "<div>Invalid tag used: anal, please see /wiki/content%20tag%20attempted</div>")
     msg = Paheal()._content_refused(browser_page)
     assert '"anal"' in msg and "série, personagem e artista" in msg
-
-
-def test_rule34us_bouncing_to_an_empty_form_is_a_refusal(browser_page):
-    serve(browser_page, "https://rule34.us/index.php?r=posts/create",
-          '<form><input type="file" name="file"><button>Upload File</button></form>')
-    assert "voltou para o formulário vazio" in Rule34us()._content_refused(browser_page)
-    serve(browser_page, "https://rule34.us/index.php?r=posts/view&id=5", "<p>post</p>")
-    assert Rule34us()._content_refused(browser_page) == ""
 
 
 def test_publish_raises_content_refused_after_submit(monkeypatch, tmp_path):

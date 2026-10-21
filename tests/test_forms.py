@@ -6,11 +6,11 @@ import pytest
 from playwright.sync_api import sync_playwright
 
 from boorubot.models import Post
-from boorubot.sites.forms import FormSiteError, Gelbooru, Paheal, Rule34xxx
+from boorubot.sites.forms import FormSiteError, Paheal, Rule34xxx
 
 EXAMPLE = Path(__file__).resolve().parents[1] / "queue" / "exemplo-001"
 
-# Formato do Gelbooru 0.2 (page=post&s=add)
+# Formato do motor Gelbooru 0.2 (page=post&s=add), o mesmo do rule34.xxx
 GELBOORU_FORM = """
 <form id="search"><input name="tags" type="text"></form>
 <form method="post" enctype="multipart/form-data" action="index.php?page=post&s=add">
@@ -21,21 +21,6 @@ GELBOORU_FORM = """
   <input type="radio" name="rating" value="e">
   <input type="radio" name="rating" value="q">
   <input type="radio" name="rating" value="s">
-  <input type="submit" name="submit" value="Upload">
-</form>
-"""
-
-# Formulário REAL do Gelbooru (capturado logado em 14/10/2026): rating g/s/q/e
-GELBOORU_REAL_FORM = """
-<form method="post" enctype="multipart/form-data" action="index.php?page=post&s=add">
-  <input type="file" name="upload">
-  <input type="text" name="source">
-  <input type="text" name="title">
-  <textarea name="tags"></textarea>
-  <input type="radio" name="rating" value="e">
-  <input type="radio" name="rating" value="q">
-  <input type="radio" name="rating" value="s">
-  <input type="radio" name="rating" value="g">
   <input type="submit" name="submit" value="Upload">
 </form>
 """
@@ -67,7 +52,7 @@ def fill(browser, html, site, post):
     return page
 
 
-def test_gelbooru_like_form(browser):
+def test_gelbooru02_form_rule34xxx(browser):
     post = Post.load(EXAMPLE)
     page = fill(browser, GELBOORU_FORM, Rule34xxx(), post)
     upload = page.locator("form[action*='s=add']")
@@ -79,24 +64,12 @@ def test_gelbooru_like_form(browser):
     assert page.locator("form#search input[name=tags]").input_value() == ""
 
 
-@pytest.mark.parametrize("rating, value", [
-    ("general", "g"), ("sensitive", "s"), ("questionable", "q"), ("explicit", "e"),
-])
-def test_gelbooru_real_form_ratings(browser, rating, value):
-    post = Post.load(EXAMPLE)
-    post.rating = rating
-    page = fill(browser, GELBOORU_REAL_FORM, Gelbooru(), post)
-    checked = page.locator("input[name=rating]:checked").evaluate_all("rs => rs.map(r => r.value)")
-    assert checked == [value]
-
-
 def test_rating_without_matching_option_fails_loudly(browser):
     post = Post.load(EXAMPLE)
     post.rating = "general"
-    only_eq = GELBOORU_REAL_FORM.replace('<input type="radio" name="rating" value="s">', "").replace(
-        '<input type="radio" name="rating" value="g">', "")
+    only_eq = GELBOORU_FORM.replace('<input type="radio" name="rating" value="s">', "")
     with pytest.raises(FormSiteError, match="sem opção"):
-        fill(browser, only_eq, Gelbooru(), post)  # sem g: não chuta outro rating
+        fill(browser, only_eq, Rule34xxx(), post)  # sem "safe": não chuta outro rating
 
 
 def test_shimmie_form(browser):

@@ -11,7 +11,7 @@ from boorubot.web import app as app_mod
 from boorubot.worker import Worker
 
 NOW = datetime(2026, 10, 14, 12, 0)   # quarta
-SITES = ["danbooru", "gelbooru", "paheal", "rule34us", "rule34xxx"]
+SITES = ["danbooru", "paheal", "rule34xxx"]
 
 
 @pytest.fixture
@@ -22,6 +22,7 @@ def db(tmp_path, monkeypatch):
     monkeypatch.setattr("boorubot.db.IMAGES_DIR", images)
     d = DB(tmp_path / "c.db")
     d.set_setting("daily_time", "18:00")
+    d.set_setting("assisted_rule34xxx", "")  # aqui o rule34.xxx é enviado pelo robô
     return d
 
 
@@ -52,14 +53,14 @@ def test_rows_follow_each_site_queue(db):
 
 
 def test_delay_and_every_other_day(db):
-    db.set_setting("delay_gelbooru", "1")
-    db.set_setting("rhythm_rule34us", "dia_sim_dia_nao")
+    db.set_setting("delay_rule34xxx", "1")
+    db.set_setting("rhythm_paheal", "dia_sim_dia_nao")
     ids = approve(db, 3)
     cal = calendar_view.build(db, NOW)
-    assert posts(row(cal, "gelbooru"))[:4] == [None, ids[0], ids[1], ids[2]]
-    r = row(cal, "rule34us")
+    assert posts(row(cal, "rule34xxx"))[:4] == [None, ids[0], ids[1], ids[2]]
+    r = row(cal, "paheal")
     assert posts(r)[:5] == [ids[0], None, ids[1], None, ids[2]] and r["cells"][1]["kind"] == "rest"
-    assert "1 dia depois" in row(cal, "gelbooru")["rhythm"]
+    assert "1 dia depois" in row(cal, "rule34xxx")["rhythm"]
 
 
 def test_site_off(db):
@@ -112,13 +113,13 @@ def client(db):
 
 
 def test_calendar_page_renders_draggable_cells(db):
-    db.set_setting("delay_gelbooru", "1")
+    db.set_setting("delay_rule34xxx", "1")
     approve(db, 2)
     db.set_session("rule34xxx", False, "sem sessão")
     page = client(db).get("/calendario").text
     assert "Calendário" in page and "Na fila, depois desta semana" in page and "pediu login" in page
     assert 'draggable="true"' in page and 'data-drop-site="danbooru"' in page
-    assert page.count('class="cal-row') == 6                # cabeçalho + 5 sites
+    assert page.count('class="cal-row') == 4                # cabeçalho + 3 sites
     assert "Próxima semana" in page and "Esta semana" in client(db).get("/calendario?semana=1").text
 
 
@@ -146,7 +147,7 @@ def test_drag_rejects_bad_moves(db):
     future = (datetime.now().date() + timedelta(days=1)).isoformat()
     assert c.post("/calendario/fixar", data={"post_id": a, "site": "danbooru", "day": past}).status_code == 400
     assert c.post("/calendario/fixar", data={"post_id": draft, "site": "danbooru", "day": future}).status_code == 400
-    assert c.post("/calendario/fixar", data={"post_id": a, "site": "gelbooru", "day": future}).status_code == 400
+    assert c.post("/calendario/fixar", data={"post_id": a, "site": "rule34xxx", "day": future}).status_code == 400
     db.set_setting("rhythm_paheal", "desligado")
     assert c.post("/calendario/fixar", data={"post_id": a, "site": "paheal", "day": future,
                                              "add_site": "true"}).status_code == 400
@@ -155,29 +156,29 @@ def test_drag_rejects_bad_moves(db):
 def test_drag_from_queue_box_adds_the_site(db):
     a = approve(db, 1, ["danbooru"])[0]
     future = (datetime.now().date() + timedelta(days=2)).isoformat()
-    r = client(db).post("/calendario/fixar", data={"post_id": a, "site": "gelbooru", "day": future, "add_site": "true"})
+    r = client(db).post("/calendario/fixar", data={"post_id": a, "site": "rule34xxx", "day": future, "add_site": "true"})
     assert r.status_code == 200
-    assert db.get_post(a)["sites"] == ["danbooru", "gelbooru"] and "gelbooru" in db.post_pins(a)
+    assert db.get_post(a)["sites"] == ["danbooru", "rule34xxx"] and "rule34xxx" in db.post_pins(a)
 
 
 def test_post_page_day_per_site(db):
-    a = approve(db, 1, ["danbooru", "gelbooru"])[0]
+    a = approve(db, 1, ["danbooru", "rule34xxx"])[0]
     c = client(db)
     assert "Dia por site" in c.get(f"/posts/{a}").text
     future = (datetime.now().date() + timedelta(days=4)).isoformat()
-    c.post(f"/posts/{a}/dia", data={"site": "gelbooru", "day": future, "action": "pin"})
-    assert db.post_pins(a)["gelbooru"].isoformat() == future
-    c.post(f"/posts/{a}/dia", data={"site": "gelbooru", "action": "unpin"})
+    c.post(f"/posts/{a}/dia", data={"site": "rule34xxx", "day": future, "action": "pin"})
+    assert db.post_pins(a)["rule34xxx"].isoformat() == future
+    c.post(f"/posts/{a}/dia", data={"site": "rule34xxx", "action": "unpin"})
     assert db.post_pins(a) == {}
 
 
 def test_rhythm_settings_form(db):
     c = client(db)
     assert 'id="ritmo"' not in c.get("/sites").text          # o ritmo saiu de Sites e foi para o Calendário
-    c.post("/settings/ritmo", data={"rhythm_rule34us": "dia_sim_dia_nao", "delay_gelbooru": "1",
-                                    "rhythm_paheal": "hackeado", "delay_danbooru": "99"})
-    assert db.site_rhythm("rule34us") == "dia_sim_dia_nao" and db.site_delay("gelbooru") == 1
-    assert db.site_rhythm("paheal") == "diario" and db.site_delay("danbooru") == 0
+    c.post("/settings/ritmo", data={"rhythm_paheal": "dia_sim_dia_nao", "delay_rule34xxx": "1",
+                                    "rhythm_rule34xxx": "hackeado", "delay_danbooru": "99"})
+    assert db.site_rhythm("paheal") == "dia_sim_dia_nao" and db.site_delay("rule34xxx") == 1
+    assert db.site_rhythm("rule34xxx") == "diario" and db.site_delay("danbooru") == 0
 
 
 # --- etapa 15: ordem da fila pelo calendário, ritmo no menu, semanas passadas ----------------------
@@ -213,8 +214,8 @@ def test_rhythm_saved_from_the_calendar_shows_in_the_grid(db):
 
 def test_days_after_a_login_wait_depend_on_it(db):
     approve(db, 3)
-    db.set_session("gelbooru", False, "sem sessão")
-    row = next(r for r in calendar_view.build(db, NOW)["rows"] if r["site"] == "gelbooru")
+    db.set_session("rule34xxx", False, "sem sessão")
+    row = next(r for r in calendar_view.build(db, NOW)["rows"] if r["site"] == "rule34xxx")
     kinds = [c["kind"] for c in row["cells"] if c["kind"] in ("waiting", "blocked")]
     assert kinds[0] == "waiting" and set(kinds[1:]) == {"blocked"}
 

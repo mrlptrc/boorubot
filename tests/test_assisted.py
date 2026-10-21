@@ -119,7 +119,7 @@ def test_robot_retry_wait_does_not_delay_her(db):
 
 
 def test_switched_off_site_is_not_a_login_alert(db):
-    pid = approved(db, sites=("danbooru", "gelbooru"))
-    db.set_session("gelbooru", False, "reputação")
-    db.set_setting("rhythm_gelbooru", "desligado")
-    assert "session" not in [a.kind for a in dashboard.alerts(db, ["danbooru", "gelbooru"], db.get_post(pid))]
+    pid = approved(db, sites=("danbooru", "paheal"))
+    db.set_session("paheal", False, "pediu login")
+    db.set_setting("rhythm_paheal", "desligado")
+    assert "session" not in [a.kind for a in dashboard.alerts(db, ["danbooru", "paheal"], db.get_post(pid))]

@@ -20,7 +20,9 @@ def db(tmp_path, monkeypatch):
     images.mkdir()
     monkeypatch.setattr(app_mod, "IMAGES_DIR", images)
     monkeypatch.setattr("boorubot.db.IMAGES_DIR", images)
-    return DB(tmp_path / "test.db")
+    d = DB(tmp_path / "test.db")
+    d.set_setting("assisted_rule34xxx", "")  # aqui o rule34.xxx é enviado pelo robô
+    return d
 
 
 @pytest.fixture
@@ -40,7 +42,7 @@ def test_upload_creates_draft_with_all_sites(client, db):
     post_id = upload(c)
     row = db.get_post(post_id)
     assert row["status"] == "draft" and row["title"] == "minha arte"
-    assert row["sites"] == ["danbooru", "gelbooru", "paheal", "rule34us", "rule34xxx"]
+    assert row["sites"] == ["danbooru", "paheal", "rule34xxx"]
     assert c.get(f"/posts/{post_id}").status_code == 200
     assert c.get("/").status_code == 200
 
@@ -175,18 +177,18 @@ class FakeSite:
 
 def test_publish_records_each_site_and_retries_only_failures(db, monkeypatch):
     (app_mod.IMAGES_DIR / "a.png").write_bytes(PNG)
-    outcomes = {"danbooru": "ok", "paheal": "skip", "gelbooru": "boom"}
+    outcomes = {"danbooru": "ok", "paheal": "skip", "rule34xxx": "boom"}
     monkeypatch.setattr(worker_mod, "build_site", lambda n, db=None: FakeSite(n, outcomes[n]))
     db.set_setting("test_mode", "0")
-    post_id = db.create_post("a.png", tags="x", sites=["danbooru", "paheal", "gelbooru"])
+    post_id = db.create_post("a.png", tags="x", sites=["danbooru", "paheal", "rule34xxx"])
 
-    # o Gelbooru falhou: a arte continua na fila só para ele (tentativa automática depois)
+    # o rule34.xxx falhou: a arte continua na fila só para ele (tentativa automática depois)
     assert publish_post(db, post_id) == "approved"
     assert {p["site"]: p["status"] for p in db.publications(post_id)} == {
-        "danbooru": "ok", "paheal": "skipped", "gelbooru": "failed"}
-    assert db.pending_sites(db.get_post(post_id)) == ["gelbooru"]
+        "danbooru": "ok", "paheal": "skipped", "rule34xxx": "failed"}
+    assert db.pending_sites(db.get_post(post_id)) == ["rule34xxx"]
 
-    outcomes["gelbooru"] = "ok"
+    outcomes["rule34xxx"] = "ok"
     assert publish_post(db, post_id) == "done"
     assert [p["site"] for p in db.publications(post_id)].count("danbooru") == 1  # não reenviou
 
@@ -220,11 +222,11 @@ def test_danbooru_test_and_live_accounts_never_mix(db):
 def test_defaults_prefill_new_posts(client, db):
     c, _ = client
     c.post("/settings", data={"test_mode": "true", "daily_time": "09:30",
-                              "default_tags": "Nome Artista, commission", "default_sites": ["danbooru", "gelbooru"]})
+                              "default_tags": "Nome Artista, commission", "default_sites": ["danbooru", "rule34xxx"]})
     post_id = upload(c)
     row = db.get_post(post_id)
     assert row["tags"] == "nome_artista commission"
-    assert row["sites"] == ["danbooru", "gelbooru"]
+    assert row["sites"] == ["danbooru", "rule34xxx"]
     assert db.setting("daily_time") == "09:30"
 
 
@@ -233,7 +235,7 @@ def test_guide_and_checklist(client, db):
     assert "api_keys/new" in c.get("/guia").text
     home = c.get("/").text
     assert "Configuração inicial" in home and "de 7 passos prontos" in home and "Antes de começar" in home
-    for site in ("danbooru", "gelbooru", "paheal", "rule34us", "rule34xxx"):
+    for site in ("danbooru", "paheal", "rule34xxx"):
         db.set_session(site, True, "ok")
     db.set_setting("test_mode", "0")
     post_id = db.create_post("a.png")
@@ -335,7 +337,7 @@ def recorder(monkeypatch):
 
 def test_testing_a_queued_post_changes_nothing(db, recorder):
     (app_mod.IMAGES_DIR / "a.png").write_bytes(PNG)
-    post_id = db.create_post("a.png", tags="x", sites=["danbooru", "gelbooru"])
+    post_id = db.create_post("a.png", tags="x", sites=["danbooru", "rule34xxx"])
     db.approve(post_id)
     before = db.get_post(post_id)
     run_post_test(db, post_id)
@@ -343,20 +345,20 @@ def test_testing_a_queued_post_changes_nothing(db, recorder):
     assert (after["status"], after["queue_pos"], after["published_at"]) == ("approved", before["queue_pos"], None)
     assert db.publications(post_id) == []                     # histórico real intocado
     assert db.setting("last_published_at") == ""              # ritmo intocado
-    assert {r["site"] for r in db.test_runs(post_id)} == {"danbooru", "gelbooru"}
+    assert {r["site"] for r in db.test_runs(post_id)} == {"danbooru", "rule34xxx"}
     assert all(test for _, test, _ in recorder.calls)         # só sites em modo teste
 
 
 def test_test_post_uploads_to_testbooru_only_with_test_account(db, recorder):
     (app_mod.IMAGES_DIR / "a.png").write_bytes(PNG)
-    post_id = db.create_post("a.png", tags="x", sites=["danbooru", "gelbooru"])
+    post_id = db.create_post("a.png", tags="x", sites=["danbooru", "rule34xxx"])
     run_post_test(db, post_id)
     assert ("danbooru", True, True) in recorder.calls          # sem conta de teste: só simula
     recorder.calls.clear()
     db.set_setting("danbooru_test_api_key", "k")
     run_post_test(db, post_id)
     assert ("danbooru", True, False) in recorder.calls         # envio real, mas no testbooru
-    assert ("gelbooru", True, True) in recorder.calls          # forms: sempre simulação no teste
+    assert ("rule34xxx", True, True) in recorder.calls          # forms: sempre simulação no teste
 
 
 def test_production_refuses_to_run_in_test_mode(db, recorder):
@@ -419,10 +421,10 @@ def test_browser_mode_setting_from_sites_page(client, db):
     c, _ = client
     page = c.get("/sites").text
     assert "invisível (sem janela)" in page and "janela escondida" in page
-    c.post("/settings/browser/gelbooru", data={"mode": "visible"})
-    assert db.setting("browser_mode_gelbooru") == "visible"
+    c.post("/settings/browser/paheal", data={"mode": "visible"})
+    assert db.setting("browser_mode_paheal") == "visible"
     assert c.post("/settings/browser/danbooru", data={"mode": "visible"}).status_code == 404
-    assert c.post("/settings/browser/gelbooru", data={"mode": "xyz"}).status_code == 404
+    assert c.post("/settings/browser/paheal", data={"mode": "xyz"}).status_code == 404
 
 
 def test_guide_explains_sleep_and_vps(client):
@@ -533,11 +535,11 @@ def test_editor_has_no_save_button(client, db):
 def test_editor_layout_lists_every_site_with_its_state(client, db):
     c, _ = client
     post_id = upload(c)
-    db.set_session("gelbooru", False, "login caiu")
+    db.set_session("rule34xxx", False, "login caiu")
     db.update_post(post_id, original_character=True)
     page = c.get(f"/posts/{post_id}").text
-    assert page.count('<li class="bb-site') == 5 and 'role="switch"' in page
-    assert 'formaction="/sites/gelbooru/login"' in page and "pediu login de novo" in page
+    assert page.count('<li class="bb-site') == 3 and 'role="switch"' in page
+    assert 'formaction="/sites/rule34xxx/login"' in page and "pediu login de novo" in page
     assert "fica de fora: não aceita personagem original" in page
     # sem rating ainda: a barra diz o que falta e quando sai depois de aprovar
     assert "falta escolher o rating" in page and "depois sai" in page
@@ -559,12 +561,12 @@ def test_replace_image_keeps_fields_and_asks_ai_again(client, db):
 def test_latest_test_result_shows_on_each_site_row(client, db):
     c, _ = client
     post_id = upload(c)
-    db.add_test_run(post_id, "gelbooru", "failed", message="campo de tags não encontrado")
+    db.add_test_run(post_id, "rule34xxx", "failed", message="campo de tags não encontrado")
     db.add_test_run(post_id, "danbooru", "failed", message="antigo")
     db.add_test_run(post_id, "danbooru", "dry_run", message="simulado")
     page = c.get(f"/posts/{post_id}").text
     row = lambda site: page.split(f'data-site="{site}"')[1].split("</li>")[0]
-    assert "teste falhou às" in row("gelbooru") and "campo de tags não encontrado" in row("gelbooru")
+    assert "teste falhou às" in row("rule34xxx") and "campo de tags não encontrado" in row("rule34xxx")
     assert "teste ok às" in row("danbooru") and "antigo" not in row("danbooru")  # só o mais recente
     assert "teste" not in row("paheal").replace("site-row-text", "")
 
@@ -656,7 +658,7 @@ def test_guide_marks_steps_from_the_real_state(client, db):
     assert "de 7 passos prontos" in page and 'id="antes"' in page and "Para consultar" in page
     assert 'class="guide-link is-active" href="/guia?passo=antes#antes"' in page   # abre no primeiro que falta
     db.set_session("danbooru", True, "ok")
-    db.set_session("gelbooru", True, "ok")
+    db.set_session("rule34xxx", True, "ok")
     db.set_session("paheal", False, "pediu login")
     page = c.get("/guia?passo=danbooru").text
     assert "Feito!</b> Sua conta está conectada" in page
@@ -673,6 +675,6 @@ def test_guide_text_is_up_to_date_with_v2(client):
 
 def test_old_guide_anchors_still_work(client):
     page = client[0].get("/guia").text
-    for anchor in ("pc-acordado", "danbooru", "gelbooru", "rule34xxx", "teste", "valendo", "problemas"):
+    for anchor in ("pc-acordado", "danbooru", "paheal", "rule34xxx", "teste", "valendo", "problemas"):
         assert f'id="{anchor}"' in page
     assert ".guide-step:target" in (Path(app_mod.__file__).parent / "static" / "style.css").read_text()
