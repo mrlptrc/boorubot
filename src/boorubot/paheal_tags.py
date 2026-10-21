@@ -2,7 +2,7 @@
 
 Tag de conteúdo (1girl, roupa, atos, fetiche…) faz o upload ser recusado ("Invalid tag used").
 Cada arte guarda uma lista própria para o paheal: montada sozinha a partir das tags da arte
-enquanto ela não mexer; se ela editar, vale o que ela escreveu (`paheal_tags_manual`).
+enquanto a artista não mexer; se ela editar, vale o que ela escreveu (`paheal_tags_manual`).
 """
 
 from __future__ import annotations
@@ -36,7 +36,7 @@ def _split(tag: str) -> tuple[str, str]:
 
 def build(tags: Iterable[str], categories: dict[str, int], artists: Iterable[str] = ()) -> list[str]:
     """Só artista, série e personagem (sem o parêntese do Danbooru) + as exceções permitidas.
-    Sem categoria conhecida, uma tag com parêntese conta como personagem e as tags padrão dela como artista."""
+    Sem categoria conhecida, uma tag com parêntese conta como personagem e as tags padrão (de Ajustes) como artista."""
     artists = set(artists)
     out: list[str] = []
     has_subject = False
@@ -66,7 +66,7 @@ def normalize(raw: str) -> str:
 
 
 def refresh(db, post_id: int, lookup: Lookup | None = None) -> str:
-    """Remonta as tags do paheal da arte (se ela não editou à mão). `lookup` busca as categorias no
+    """Remonta as tags do paheal da arte (se a artista não editou à mão). `lookup` busca as categorias no
     Danbooru; sem ele, ou se a consulta falhar, usa só o parêntese e as tags padrão. Retorna a lista."""
     row = db.get_post(post_id)
     if not row:

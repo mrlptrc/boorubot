@@ -1,4 +1,4 @@
-"""Tela Artes: tudo o que ela subiu, com a situação de cada arte e o estado dela em cada site.
+"""Tela Artes: tudo o que a artista subiu, com a situação de cada arte e o estado dela em cada site.
 
 Uma consulta para cada coisa (posts, publicações, métricas, sessões) e um plano do agendador;
 nada de consulta por linha.

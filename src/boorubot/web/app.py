@@ -91,7 +91,7 @@ def clean_post_fields(row: dict, data: dict) -> dict:
         from boorubot.paheal_tags import normalize
 
         tags = normalize(str(data["paheal_tags"]))
-        if tags != row["paheal_tags"]:  # ela escreveu: vale o que ela escreveu
+        if tags != row["paheal_tags"]:  # a artista escreveu: vale o que ela escreveu
             out.update(paheal_tags=tags, paheal_tags_manual=1)
     if data.get("paheal_auto") in (True, "true", "1", 1, "on"):
         out["paheal_tags_manual"] = 0  # "refazer pela IA": remonta a partir das tags da arte
@@ -339,7 +339,7 @@ def create_app(db: DB | None = None, worker: Worker | None = None, start_worker:
 
     @app.post("/posts/{post_id}/imagem")
     async def replace_image(post_id: int, image: UploadFile = File(...)):
-        """Trocar imagem: mantém tudo que ela escreveu e pede para a IA olhar de novo."""
+        """Trocar imagem: mantém tudo que a artista escreveu e pede para a IA olhar de novo."""
         row = post_or_404(post_id)
         ext = Path(image.filename or "").suffix.lower()
         if row["status"] not in EDITABLE:
@@ -411,7 +411,7 @@ def create_app(db: DB | None = None, worker: Worker | None = None, start_worker:
         )
 
     def manual_sends(row: dict) -> list[dict]:
-        """Envio assistido: o que ela precisa para enviar à mão em cada site que ainda falta.
+        """Envio assistido: o que a artista precisa para enviar à mão em cada site que ainda falta.
         Nada no modo teste: teste e produção nunca se misturam."""
         from boorubot.db import to_post
         from boorubot.sites.forms import FORM_SITES
@@ -431,7 +431,7 @@ def create_app(db: DB | None = None, worker: Worker | None = None, start_worker:
 
     @app.post("/posts/{post_id}/manual")
     def manual_send(post_id: int, site: str = Form(...), action: str = Form(...), url: str = Form("")):
-        """Ela enviou à mão (Saiu) ou decidiu não enviar (Pular) num site de envio assistido."""
+        """A artista enviou à mão (Saiu) ou decidiu não enviar (Pular) num site de envio assistido."""
         from boorubot.worker import refresh_post_status
 
         row = post_or_404(post_id)
@@ -470,7 +470,7 @@ def create_app(db: DB | None = None, worker: Worker | None = None, start_worker:
         return tag_api.categories(tags, db.setting("danbooru_login"), db.setting("danbooru_api_key"))
 
     def after_save(post_id: int, before: dict) -> None:
-        """Tags da arte mudaram: remonta as do paheal (se ela não editou). As do paheal mudaram depois
+        """Tags da arte mudaram: remonta as do paheal (se a artista não editou). As do paheal mudaram depois
         de uma recusa: a arte volta para a fila do paheal."""
         from boorubot import paheal_tags
         from boorubot.worker import refresh_post_status
@@ -515,7 +515,7 @@ def create_app(db: DB | None = None, worker: Worker | None = None, start_worker:
 
     @app.post("/posts/{post_id}/conferir")
     def check_uncertain(post_id: int, site: str = Form(...), action: str = Form(...), url: str = Form("")):
-        """Envio incerto: uma pessoa olhou no site e diz se saiu. Só ela decide reenviar (sem duplicata)."""
+        """Envio incerto: uma pessoa olhou no site e diz se saiu. Só a pessoa decide reenviar (sem duplicata)."""
         from boorubot.worker import refresh_post_status
 
         row = post_or_404(post_id)

@@ -26,8 +26,9 @@ DB_PATH = DATA_DIR / "boorubot.db"
 # fila, e cada site pega a próxima arte dele, 1 por dia, >= MIN_GAP entre posts do site, sem
 # acumular atraso. Dias fixados no calendário (site_pins) passam na frente.
 MIN_GAP = timedelta(hours=12)
-# o que ela marca à mão no envio assistido (o "desfazer" só apaga estes)
-MANUAL_MARKS = ("enviado à mão", "envio à mão: ela decidiu não enviar")
+# o que a artista marca à mão no envio assistido (o "desfazer" só apaga estes); o último é o texto
+# antigo do "Não vou enviar", que ainda aparece em bancos de antes
+MANUAL_MARKS = ("enviado à mão", "envio à mão: decidiu não enviar", "envio à mão: ela decidiu não enviar")
 
 # Ritmo por site: diário (padrão), dia sim/dia não ou desligado, e atraso em dias contado a
 # partir do 1º site em que a arte saiu.
@@ -119,7 +120,7 @@ NEW_POST_COLUMNS = (
     ("suggest_error", "TEXT NOT NULL DEFAULT ''"),
     ("tag_scores", "TEXT NOT NULL DEFAULT '{}'"),  # {tag: confiança} das tags que a IA sugeriu
     ("weak_tags", "TEXT NOT NULL DEFAULT '[]'"),   # [[tag, confiança]] entre 0,25 e 0,35: só sugestão
-    ("oc_touched", "INTEGER NOT NULL DEFAULT 0"),  # ela mexeu no OC: a IA não marca nem desmarca mais
+    ("oc_touched", "INTEGER NOT NULL DEFAULT 0"),  # a artista mexeu no OC: a IA não marca nem desmarca mais
     ("oc_auto", "INTEGER NOT NULL DEFAULT 0"),     # OC marcado pela IA (nenhum personagem conhecido)
     # rating '' = ninguém escolheu ainda (posts novos); a IA só SUGERE, em colunas próprias
     ("rating_suggestion", "TEXT NOT NULL DEFAULT ''"),
@@ -127,7 +128,7 @@ NEW_POST_COLUMNS = (
     ("deleted_at", "TEXT"),                                  # quando foi apagada (status 'deleted')
     ("status_before_delete", "TEXT NOT NULL DEFAULT ''"),    # para o "desfazer"
     ("image_md5", "TEXT NOT NULL DEFAULT ''"),             # identifica upload repetido sem bloquear repost
-    # paheal só aceita série/personagem/artista: lista própria, montada sozinha até ela editar
+    # paheal só aceita série/personagem/artista: lista própria, montada sozinha até a artista editar
     ("paheal_tags", "TEXT NOT NULL DEFAULT ''"),
     ("paheal_tags_manual", "INTEGER NOT NULL DEFAULT 0"),
 )
@@ -143,7 +144,7 @@ DEFAULT_SETTINGS = {
     "danbooru_level": "",          # preenchido pelo teste de conexão (nível real da conta)
     "danbooru_level_string": "",
     "danbooru_force_pending": "0",  # 1 = mesmo Contributor, manda para a fila de moderação
-    # envio assistido: o robô prepara, ela envia pelo navegador dela (a Cloudflare do rule34.xxx barra o robô)
+    # envio assistido: o robô prepara, a artista envia pelo próprio navegador (a Cloudflare do rule34.xxx barra o robô)
     "assisted_rule34xxx": "1",
     "last_published_at": "",  # último post real: base do limitador de ritmo
     "metrics_last_run": "",   # última coleta de métricas bem-sucedida
@@ -246,7 +247,7 @@ class DB:
     # --- settings ----------------------------------------------------------------
 
     def assisted(self, site: str) -> bool:
-        """Site de envio assistido: o robô não abre o site; ela envia à mão e marca no painel."""
+        """Site de envio assistido: o robô não abre o site; a artista envia à mão e marca no painel."""
         return self.setting(f"assisted_{site}") == "1"
 
     def setting(self, key: str) -> str:
@@ -457,7 +458,7 @@ class DB:
                          "JOIN posts ON posts.id = p.post_id ORDER BY p.id DESC LIMIT ?", (limit,))
 
     def manual_mark(self, post_id: int, site: str) -> dict | None:
-        """O último registro desse site nesta arte, se foi ela que marcou à mão (Saiu / Não vou enviar)."""
+        """O último registro desse site nesta arte, se foi a artista que marcou à mão (Saiu / Não vou enviar)."""
         rows = self._all("SELECT * FROM publications WHERE post_id = ? AND site = ? ORDER BY id DESC LIMIT 1",
                          (post_id, site))
         return rows[0] if rows and rows[0]["message"] in MANUAL_MARKS else None
@@ -472,7 +473,7 @@ class DB:
         self._exec("DELETE FROM publications WHERE id = ?", (publication_id,))
         post = self.get_post(post_id)
         if post and post["status"] in ("done", "partial"):
-            # volta para o começo da fila: era a vez dela nesse site
+            # volta para o começo da fila: era a vez desta arte nesse site
             first = self._all("SELECT MIN(queue_pos) AS m FROM posts WHERE status = 'approved'")[0]["m"]
             self.update_post(post_id, status="approved", queue_pos=(first or 1) - 1)
         return post_id
@@ -484,7 +485,7 @@ class DB:
     def published_sites(self, post_id: int) -> set[str]:
         """Sites que NÃO recebem mais esta arte automaticamente: já saiu, foi pulada pela regra,
         o último envio ficou incerto (pode ter saído: só uma pessoa decide, para não duplicar)
-        ou o site recusou o conteúdo (reenviar igual daria o mesmo erro: espera ela corrigir)."""
+        ou o site recusou o conteúdo (reenviar igual daria o mesmo erro: espera a artista corrigir)."""
         rows = self._all("SELECT site, status FROM publications WHERE post_id = ? ORDER BY id", (post_id,))
         latest = {r["site"]: r["status"] for r in rows}
         ever = {r["site"] for r in rows if r["status"] in ("ok", "skipped")}

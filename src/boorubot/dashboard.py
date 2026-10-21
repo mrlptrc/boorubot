@@ -124,7 +124,7 @@ class Alert:
     site: str = ""
     label: str = ""
     others: int = 0     # quantos sites do próximo post continuam funcionando
-    post: dict | None = None  # manual: a arte que é para ela enviar hoje
+    post: dict | None = None  # manual: a arte que é para a artista enviar hoje
 
 
 def alerts(db: DB, sites_in_use: list[str], next_post: dict | None) -> list[Alert]:
@@ -136,7 +136,7 @@ def alerts(db: DB, sites_in_use: list[str], next_post: dict | None) -> list[Aler
     if not db.test_mode:
         from boorubot.scheduler import turn_now
 
-        for site in ALL_SITES:  # envio assistido: chegou a vez de uma arte, quem envia é ela
+        for site in ALL_SITES:  # envio assistido: chegou a vez de uma arte, quem envia é a artista
             post = turn_now(db, site) if db.assisted(site) and db.site_rhythm(site) != "desligado" else None
             if post:
                 found.append(Alert("manual", site, SITE_LABELS[site], post=post))

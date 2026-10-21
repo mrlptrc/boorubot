@@ -98,7 +98,7 @@
           {% if editable %}<p class="ed-hint">Separe por espaço, no padrão do Danbooru. <button type="button" class="bb-btn bb-btn--link" id="suggest" {{ 'disabled' if ai_busy }}>Pedir para a Mochi olhar de novo</button></p>{% endif %}
         </div>
 
-        {# o paheal só aceita série, personagem e artista: lista própria, montada pela IA até ela editar #}
+        {# o paheal só aceita série, personagem e artista: lista própria, montada pela IA até a artista editar #}
         <div class="ed-field ed-paheal" data-paheal-field {{ 'hidden' if 'paheal' not in post.sites or post.original_character }}>
           <div class="ed-label-row">
             <label for="paheal_tags" class="ed-label">Tags do paheal</label>
@@ -303,7 +303,7 @@
   </section>
   {% endif %}
 
-  {# o que ela marcou à mão, com desfazer (fora do formulário: arte publicada tem os campos travados) #}
+  {# o que a artista marcou à mão, com desfazer (fora do formulário: arte publicada tem os campos travados) #}
   {% set marked = site_rows|selectattr("manual_mark")|list %}
   {% if marked %}
   <section class="ed-section" id="marcado-a-mao" aria-labelledby="marcado-t">

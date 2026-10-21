@@ -2,7 +2,7 @@
 
 Roda numa fila própria do worker (nunca na fila de publicação): o primeiro uso baixa ~380 MB e
 uma publicação não pode esperar por isso. A sugestão só ACRESCENTA ao post: nunca apaga tag,
-nunca escolhe o rating (só sugere) e nunca desfaz o que ela já mexeu.
+nunca escolhe o rating (só sugere) e nunca desfaz o que a artista já mexeu.
 """
 
 from __future__ import annotations
@@ -15,19 +15,19 @@ log = logging.getLogger("boorubot.suggest")
 
 
 def merge_tags(current: list[str], suggested: list[str]) -> list[str]:
-    """As tags do post primeiro (na ordem dela), depois as novas da IA, sem repetir."""
+    """As tags do post primeiro (na ordem da artista), depois as novas da IA, sem repetir."""
     return list(dict.fromkeys([*current, *suggested]))
 
 
 def apply_suggestion(db: DB, post_id: int, s) -> None:
-    """Junta a sugestão ao post. Lê o post de novo aqui: ela pode ter editado durante a análise."""
+    """Junta a sugestão ao post. Lê o post de novo aqui: a artista pode ter editado durante a análise."""
     row = db.get_post(post_id)
     if not row:
         return
     tags = merge_tags(row["tag_list"], s.tags)
     fields = {}
     if not row["oc_touched"]:
-        # nenhum personagem conhecido acima do limite = personagem original (ela pode desmarcar)
+        # nenhum personagem conhecido acima do limite = personagem original (a artista pode desmarcar)
         oc = not s.characters
         fields = {"original_character": oc, "oc_auto": int(oc)} if oc or row["oc_auto"] else {}
     db.update_post(
@@ -37,21 +37,21 @@ def apply_suggestion(db: DB, post_id: int, s) -> None:
         rating_suggestion=s.rating, rating_confidence=round(float(s.rating_scores.get(s.rating, 0)), 3),
         **fields,
     )
-    # pré-preenche as tags do paheal (se ela não editou): o tagger já sabe quem é personagem
+    # pré-preenche as tags do paheal (se a artista não editou): o tagger já sabe quem é personagem
     from boorubot import paheal_tags
     known = {name: paheal_tags.CHARACTER for name, _ in s.characters}
     paheal_tags.refresh(db, post_id, lambda tags: known)
 
 
 def oc_fields(row: dict, original_character: bool) -> dict:
-    """Ela mudou o OC na tela: a escolha dela vale daqui para frente."""
+    """A artista mudou o OC na tela: a escolha dela vale daqui para frente."""
     if bool(original_character) == row["original_character"]:
         return {}
     return {"oc_touched": 1, "oc_auto": 0}
 
 
 def mochi_note(row: dict) -> str:
-    """O recado da Mochi embaixo da arte, depois que ela olhou (vazio antes disso)."""
+    """O recado da Mochi embaixo da arte, depois que a Mochi olhou (vazio antes disso)."""
     n = len(row["tag_scores"])
     found = f"Achei {n} tag{'s' if n != 1 else ''}"
     if row["oc_auto"] and row["original_character"]:
@@ -68,7 +68,7 @@ def mochi_note(row: dict) -> str:
 
 
 def accept_weak(row: dict, tags: list[str]) -> dict:
-    """Ela adicionou uma tag de "a IA também viu": a tag passa a ter a confiança da IA e sai das fracas."""
+    """A artista adicionou uma tag de "a IA também viu": a tag passa a ter a confiança da IA e sai das fracas."""
     weak = dict(row["weak_tags"])
     taken = {t: v for t, v in weak.items() if t in tags}
     if not taken:

@@ -522,7 +522,7 @@ a.home-stat:hover { border-color: var(--pink-200); }
 .ed-menu-list .bb-menu__item--danger { border-top: 1px solid var(--line); border-radius: 0 0 var(--radius-input) var(--radius-input); }
 
 .ed-section { margin-top: var(--space-10); }
-/* envio assistido: passo a passo para ela enviar à mão */
+/* envio assistido: passo a passo para enviar à mão */
 .ed-manual__intro { color: var(--ink-soft); }
 .ed-manual { display: flex; flex-direction: column; gap: var(--space-3); margin-top: var(--space-4); padding: var(--space-5) var(--space-6); }
 .ed-manual h3 { margin: 0; }

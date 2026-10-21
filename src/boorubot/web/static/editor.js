@@ -16,7 +16,7 @@
 
   // ------------------------------------------------------------- tags
   // Cada tag vira uma etiqueta do design system (Tag): ponto verde (IA com certeza), amarela com %
-  // (vale conferir), lilás (tag padrão das configurações), sem ponto (digitada por ela). O valor
+  // (vale conferir), lilás (tag padrão das configurações), sem ponto (digitada pela artista). O valor
   // enviado ao backend continua sendo o texto separado por espaço no textarea.
   function TagField(root) {
     const box = root.querySelector("textarea"); // tags do post ou tags padrão (Ajustes)
@@ -209,7 +209,7 @@
     scheduleTagCheck();
     return {
       root, input, tags, setTags, render, checkUnknown,
-      update(next) { // sugestão da IA chegou: junta sem apagar o que ela tem
+      update(next) { // sugestão da IA chegou: junta sem apagar o que já está no campo
         scores = { ...scores, ...(next.scores || {}) };
         weak = next.weak || weak;
         const current = tags();
@@ -307,7 +307,7 @@
       if (body.post) showPaheal(body.post);
       retryWait = 2000;
       say("salvo às " + body.saved_at, "ok");
-      if (Object.keys(changed()).length) schedule(); // ela mexeu de novo enquanto salvava
+      if (Object.keys(changed()).length) schedule(); // a artista mexeu de novo enquanto salvava
     }).catch(() => {
       say("não salvou, tentando de novo", "error");
       retry = setTimeout(save, retryWait);
@@ -317,7 +317,7 @@
   }
   function schedule() { clearTimeout(debounce); debounce = setTimeout(save, 800); }
 
-  // tags do paheal: a Mochi remonta quando as tags da arte mudam (enquanto ela não editar)
+  // tags do paheal: a Mochi remonta quando as tags da arte mudam (enquanto a artista não editar)
   const pahealField = document.querySelector("[data-paheal-field]");
   const pahealBox = document.getElementById("paheal_tags");
   const pahealAuto = document.querySelector("[data-paheal-auto]");

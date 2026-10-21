@@ -1,4 +1,4 @@
-"""Backup diário para uma pasta escolhida (ex.: uma pasta do OneDrive dela).
+"""Backup diário para uma pasta escolhida (ex.: uma pasta do OneDrive).
 
 - banco: cópia consistente com a API de backup do SQLite (segura com o painel rodando)
 - imagens: cópia incremental (só arquivos novos ou alterados; nada é apagado no destino)

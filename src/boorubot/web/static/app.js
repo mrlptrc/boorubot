@@ -147,7 +147,7 @@
     if (!field) return;
     try {
       await navigator.clipboard.writeText(field.value);
-    } catch (e) {  // sem permissão de área de transferência: seleciona para ela copiar com Ctrl+C
+    } catch (e) {  // sem permissão de área de transferência: seleciona para copiar com Ctrl+C
       field.select();
       document.execCommand && document.execCommand("copy");
     }

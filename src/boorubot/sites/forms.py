@@ -120,7 +120,7 @@ class FormSite(Site):
         return line[:200]
 
     def _content_refused(self, page: Page) -> str:
-        """O site recusou esta arte (e não a conta)? Frase para ela entender, ou ""."""
+        """O site recusou esta arte (e não a conta)? Frase para a artista entender, ou ""."""
         return ""
 
     def _logged_in(self, page: Page) -> bool:

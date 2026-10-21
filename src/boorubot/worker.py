@@ -47,7 +47,7 @@ def _send(db: DB, post, post_id: int, site: str) -> str:
         status = "skipped"
         db.add_publication(post_id, site, status, message=str(exc))
     except ContentRefused as exc:
-        # o site recusou esta arte: não reenvia igual; volta para a fila do site quando ela corrigir
+        # o site recusou esta arte: não reenvia igual; volta para a fila do site quando a artista corrigir
         status = "refused"
         db.add_publication(post_id, site, status, message=str(exc))
         log.warning("%s recusou o post %s: %s", site, post_id, exc)
@@ -103,7 +103,7 @@ def publish_post(db: DB, post_id: int) -> str:
     results = []
     for site in db.pending_sites(row):
         if db.assisted(site):
-            continue  # envio assistido: ela envia pelo navegador dela
+            continue  # envio assistido: a artista envia pelo próprio navegador
         status = _send(db, post, post_id, site)
         _after_send(db, post_id, site, status)
         results.append(status)

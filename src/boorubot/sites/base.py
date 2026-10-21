@@ -23,7 +23,7 @@ class AccountRefused(SiteUnavailable):
 
 class ContentRefused(Exception):
     """O site recusou ESTA arte (ex.: paheal "Invalid tag used"). Nada foi publicado e reenviar igual
-    daria o mesmo erro: o robô não reenvia sozinho; volta para a fila do site quando ela corrigir."""
+    daria o mesmo erro: o robô não reenvia sozinho; volta para a fila do site quando a artista corrigir."""
 
 
 @dataclass

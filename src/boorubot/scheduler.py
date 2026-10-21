@@ -76,7 +76,7 @@ def simulate_site(db: DB, site: str, now: datetime, days: int, first_day: dict[i
                     key=lambda x: (x[0], x[1]))
     flow = [p for p in pending if p["id"] not in pins]
     last = db.site_last_published(site)
-    # espera depois de falha é coisa do robô; no envio assistido quem envia é ela
+    # espera depois de falha é coisa do robô; no envio assistido quem envia é a artista
     backoff = None if db.assisted(site) else db.site_backoff(site)
 
     cells: dict[date, Cell] = {}
@@ -139,7 +139,7 @@ def plan(db: DB, now: datetime | None = None, days: int = 14) -> dict[str, dict[
 def site_due(db: DB, site: str, now: datetime | None = None) -> dict | None:
     """O que o worker deve publicar AGORA neste site (no máximo 1), segundo a mesma simulação."""
     if db.assisted(site):
-        return None  # envio assistido: quem envia é ela, pelo navegador dela
+        return None  # envio assistido: quem envia é a artista, pelo próprio navegador
     session = db.sessions().get(site)
     if session and not session["ok"]:
         return None  # site pausado: só volta quando a sessão voltar (Entrar / Testar)

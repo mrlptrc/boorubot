@@ -127,7 +127,7 @@
 <section class="bb-card home-confirm" aria-labelledby="confirmar">
   <h2 id="confirmar" class="title-2">Confirme antes de postar</h2>
   <p>Estas artes foram aprovadas com o <b>modo teste</b> ligado. Por segurança elas <b>não vão ao ar</b>
-    até você confirmar que valem de verdade (arte sua ou dela, tags e rating conferidos).</p>
+    até você confirmar que valem de verdade (arte certa, tags e rating conferidos).</p>
   <div class="chips-row">
     {% for p in d.to_confirm %}
     <a class="art-chip" href="/posts/{{ p.id }}"><img src="/images/{{ p.image }}" alt="">{{ p.title or ('#' ~ p.id) }}</a>
