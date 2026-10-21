@@ -21,6 +21,11 @@ class AccountRefused(SiteUnavailable):
     o re-teste automático não insiste, para o robô não ficar batendo na conta."""
 
 
+class ContentRefused(Exception):
+    """O site recusou ESTA arte (ex.: paheal "Invalid tag used"). Nada foi publicado e reenviar igual
+    daria o mesmo erro: o robô não reenvia sozinho; volta para a fila do site quando ela corrigir."""
+
+
 @dataclass
 class Result:
     site: str
