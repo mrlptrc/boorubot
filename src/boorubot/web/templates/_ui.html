@@ -16,7 +16,8 @@
 
 {% macro button(label, tipo="principal", estado="padrao", icon=None, href=None, type="button", attrs={}, size=None) -%}
 {%- set cls = "bb-btn bb-btn--" ~ BTN.get(tipo, "primary") ~ (" bb-btn--sm" if size == "sm" else "") ~ (" " ~ attrs.class if attrs.class) -%}
-{%- set extra = attrs | dict_without("class") -%}
+{%- set extra = dict(attrs) -%}
+{%- set _ = extra.pop("class", None) -%}
 {%- if href and estado != "desligado" -%}
 <a class="{{ cls }}" href="{{ href }}"{{ extra | xmlattr }}>{% if icon %}{{ icon_svg(icon, 18) }}{% endif %}{{ label }}</a>
 {%- else -%}
@@ -31,7 +32,7 @@
   <input class="bb-input" id="{{ fid }}" name="{{ name }}" type="{{ type }}" value="{{ value }}"
          {%- if placeholder %} placeholder="{{ placeholder }}"{% endif %}
          {%- if error or hint %} aria-describedby="{{ fid }}-hint"{% endif %}
-         {%- if error %} aria-invalid="true"{% endif %}{{ attrs | dict_without("id") | xmlattr }}>
+         {%- if error %} aria-invalid="true"{% endif %}{%- set extra = dict(attrs) -%}{%- set _ = extra.pop("id", None) -%}{{ extra | xmlattr }}>
   {%- if error or hint %}
   <span class="bb-field__hint" id="{{ fid }}-hint">{{ error or hint }}</span>
   {%- endif %}
