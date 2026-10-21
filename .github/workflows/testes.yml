@@ -1,0 +1,33 @@
+name: testes
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  pytest:
+    name: pytest (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        # Windows é onde o painel roda de verdade; Linux é onde ele é desenvolvido
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+      - name: Dependências
+        run: uv sync --locked
+      - name: Chromium do Playwright
+        run: uv run playwright install --with-deps chromium
+      # um teste abre o navegador com janela (login); no Linux do CI ela vai para uma tela virtual
+      - name: Testes (Linux)
+        if: runner.os == 'Linux'
+        run: xvfb-run -a uv run pytest -q
+      - name: Testes (Windows)
+        if: runner.os == 'Windows'
+        run: uv run pytest -q
