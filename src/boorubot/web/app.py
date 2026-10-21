@@ -42,6 +42,7 @@ STATUS_LABELS = {
     "done": "publicado", "partial": "parcial", "failed": "falhou",
     "ok": "publicado", "skipped": "pulado",
     "uncertain": "conferir no site", "not_published": "não saiu (conferido)",
+    "refused": "recusado pelo site",
     "site_down": "site pausado (login/captcha/fora do ar)",
     "dry_run": "simulado", "test_upload": "enviado ao testbooru",
     "deleted": "apagada",
@@ -52,7 +53,7 @@ STATUS_LABELS = {
 STATUS_TONE = {
     "draft": "rascunho", "approved": "agendado", "publishing": "agendado", "done": "publicado", "partial": "alerta",
     "failed": "falhou", "deleted": "falhou", "ok": "publicado", "skipped": "alerta", "uncertain": "alerta",
-    "not_published": "falhou", "site_down": "alerta", "dry_run": "agendado", "test_upload": "agendado",
+    "not_published": "falhou", "refused": "falhou", "site_down": "alerta", "dry_run": "agendado", "test_upload": "agendado",
 }
 # o que falta para aprovar, como frase da barra do editor ("falta escolher o rating")
 MISSING_PHRASES = {"sem tags": "faltam as tags", "escolha o rating": "falta escolher o rating",
@@ -86,6 +87,14 @@ def clean_post_fields(row: dict, data: dict) -> dict:
     if "sites" in data:
         sites = data["sites"] if isinstance(data["sites"], list) else [data["sites"]]
         out["sites"] = [s for s in ALL_SITES if s in sites]
+    if "paheal_tags" in data:
+        from boorubot.paheal_tags import normalize
+
+        tags = normalize(str(data["paheal_tags"]))
+        if tags != row["paheal_tags"]:  # ela escreveu: vale o que ela escreveu
+            out.update(paheal_tags=tags, paheal_tags_manual=1)
+    if data.get("paheal_auto") in (True, "true", "1", 1, "on"):
+        out["paheal_tags_manual"] = 0  # "refazer pela IA": remonta a partir das tags da arte
     return out
 
 
@@ -349,6 +358,11 @@ def create_app(db: DB | None = None, worker: Worker | None = None, start_worker:
         from boorubot.suggest import mochi_note
 
         row = post_or_404(post_id)
+        if row["status"] in EDITABLE and not row["paheal_tags_manual"]:
+            from boorubot import paheal_tags
+
+            paheal_tags.refresh(db, post_id, paheal_lookup)
+            row = db.get_post(post_id)
         queue_ids = [p["id"] for p in db.queue()]
         today = datetime.now().date()
         plans = plan(db, days=60) if post_id in queue_ids else {}
@@ -387,10 +401,28 @@ def create_app(db: DB | None = None, worker: Worker | None = None, start_worker:
             has_test_account=bool(db.setting("danbooru_test_api_key")),
             projected=min(planned) if planned else None, site_days=site_days, today=today.isoformat(),
             uncertain=[(s, SITE_LABELS[s]) for s in db.uncertain_sites(post_id)],
+            refused=[(s, SITE_LABELS[s], why) for s, why in db.refused_sites(post_id).items()],
             queue_pos=queue_ids.index(post_id) + 1 if post_id in queue_ids else None, queue_len=len(queue_ids),
             published_today=any(db.site_last_published(s) and db.site_last_published(s).date() == today
                                 for s in row["sites"]),
         )
+
+    def paheal_lookup(tags: list[str]) -> dict[str, int]:
+        return tag_api.categories(tags, db.setting("danbooru_login"), db.setting("danbooru_api_key"))
+
+    def after_save(post_id: int, before: dict) -> None:
+        """Tags da arte mudaram: remonta as do paheal (se ela não editou). As do paheal mudaram depois
+        de uma recusa: a arte volta para a fila do paheal."""
+        from boorubot import paheal_tags
+        from boorubot.worker import refresh_post_status
+
+        paheal_tags.refresh(db, post_id, paheal_lookup)
+        row = db.get_post(post_id)
+        if row["paheal_tags"] != before["paheal_tags"] and "paheal" in db.refused_sites(post_id):
+            db.add_publication(post_id, "paheal", "not_published", message="tags do paheal corrigidas: volta para a fila")
+            if row["status"] in ("partial", "failed"):
+                db.update_post(post_id, status="approved")
+            refresh_post_status(db, post_id)
 
     def pin_post(post_id: int, site: str, day: str, add_site: bool = False) -> str | None:
         """Fixa a arte num dia, num site. Devolve um erro em texto ou None."""
@@ -428,7 +460,7 @@ def create_app(db: DB | None = None, worker: Worker | None = None, start_worker:
         from boorubot.worker import refresh_post_status
 
         row = post_or_404(post_id)
-        if site not in db.uncertain_sites(post_id):
+        if site not in db.uncertain_sites(post_id) and not (action == "nao_saiu" and site in db.refused_sites(post_id)):
             return see_other(f"/posts/{post_id}")
         if action == "saiu":
             link = url.strip() if url.strip().startswith("http") else ""
@@ -498,6 +530,7 @@ def create_app(db: DB | None = None, worker: Worker | None = None, start_worker:
         commentary_description: str = Form(""),
         original_character: bool = Form(False),
         sites: list[str] = Form([]),
+        paheal_tags: str | None = Form(None),
     ):
         row = post_or_404(post_id)
         if action == "delete":  # esconde; o worker remove de vez depois de 24 h
@@ -505,11 +538,15 @@ def create_app(db: DB | None = None, worker: Worker | None = None, start_worker:
             return see_other(f"/?aviso={quote('Arte apagada')}&desfazer={post_id}")
 
         if row["status"] in EDITABLE:
-            db.update_post(post_id, **clean_post_fields(row, {
+            fields = {
                 "title": title, "tags": tags, "rating": rating, "source": source,
                 "commentary_title": commentary_title, "commentary_description": commentary_description,
                 "original_character": original_character, "sites": sites,
-            }))
+            }
+            if paheal_tags is not None:
+                fields["paheal_tags"] = paheal_tags
+            db.update_post(post_id, **clean_post_fields(row, fields))
+            after_save(post_id, row)
 
         if action == "publish_now" and db.test_mode:
             return see_other(f"/posts/{post_id}?erro=" + quote(
@@ -549,9 +586,11 @@ def create_app(db: DB | None = None, worker: Worker | None = None, start_worker:
         fields = clean_post_fields(row, data)
         if fields:
             db.update_post(post_id, **fields)
+            after_save(post_id, row)
         row = db.get_post(post_id)
         return {"ok": True, "saved_at": datetime.now().strftime("%H:%M"), "approval_errors": approval_errors(row),
-                "post": {k: row[k] for k in ("title", "tags", "rating", "sites", "original_character", "source")}}
+                "post": {k: row[k] for k in ("title", "tags", "rating", "sites", "original_character", "source",
+                                             "paheal_tags", "paheal_tags_manual")}}
 
     @app.post("/fila/teste")
     def confirm_all(action: str = Form(...)):
