@@ -383,6 +383,7 @@ def create_app(db: DB | None = None, worker: Worker | None = None, start_worker:
         site_rows = [{
             "site": s, "label": SITE_LABELS[s], "checked": s in row["sites"],
             "off": db.site_rhythm(s) == "desligado", "done": s in done, "assisted": db.assisted(s),
+            "manual_mark": db.manual_mark(post_id, s),
             "when": days_by_site.get(s, {}).get("when"), "pinned": pins.get(s),
             # None = nunca testado; False = sessão caiu (pediu login de novo)
             "session_ok": bool(sessions[s]["ok"]) if s in sessions else None,
@@ -438,18 +439,32 @@ def create_app(db: DB | None = None, worker: Worker | None = None, start_worker:
             return see_other(f"/posts/{post_id}?erro=" + quote("modo teste ligado: nada vai ao ar, nem à mão"))
         if not db.assisted(site) or site not in db.pending_sites(row):
             return see_other(f"/posts/{post_id}")
+        from boorubot.db import MANUAL_MARKS
+
         if action == "saiu":
             link = url.strip() if url.strip().startswith("http") else ""
-            db.add_publication(post_id, site, "ok", link, "enviado à mão")
+            db.add_publication(post_id, site, "ok", link, MANUAL_MARKS[0])
             db.mark_post_published_at(post_id)
             aviso = f"Marcado como enviado no {SITE_LABELS[site]}."
         elif action == "pular":
-            db.add_publication(post_id, site, "skipped", message="envio à mão: ela decidiu não enviar")
+            db.add_publication(post_id, site, "skipped", message=MANUAL_MARKS[1])
             aviso = f"{SITE_LABELS[site]} pulado nesta arte."
         else:
             return see_other(f"/posts/{post_id}")
         refresh_post_status(db, post_id)
-        return see_other(f"/posts/{post_id}?aviso=" + quote(aviso) + "&tipo=sucesso")
+        mark = db.manual_mark(post_id, site)
+        return see_other(f"/posts/{post_id}?aviso=" + quote(aviso) + "&tipo=sucesso&desfazer_envio=" + str(mark["id"]))
+
+    @app.post("/envios/{publication_id}/desfazer")
+    def undo_manual_send(publication_id: int):
+        """Clicou em Saiu / Não vou enviar sem querer: a arte volta a esperar o envio à mão."""
+        from boorubot.worker import refresh_post_status
+
+        post_id = db.undo_manual_mark(publication_id)
+        if post_id is None:
+            return see_other("/?aviso=" + quote("Não deu para desfazer: já não é a última marcação desse site.") + "&tipo=erro")
+        refresh_post_status(db, post_id)
+        return see_other(f"/posts/{post_id}?aviso=" + quote("Desfeito: a arte voltou a esperar o envio à mão.") + "#manual")
 
     def paheal_lookup(tags: list[str]) -> dict[str, int]:
         return tag_api.categories(tags, db.setting("danbooru_login"), db.setting("danbooru_api_key"))
