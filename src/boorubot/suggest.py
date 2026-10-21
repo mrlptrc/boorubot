@@ -37,6 +37,10 @@ def apply_suggestion(db: DB, post_id: int, s) -> None:
         rating_suggestion=s.rating, rating_confidence=round(float(s.rating_scores.get(s.rating, 0)), 3),
         **fields,
     )
+    # pré-preenche as tags do paheal (se ela não editou): o tagger já sabe quem é personagem
+    from boorubot import paheal_tags
+    known = {name: paheal_tags.CHARACTER for name, _ in s.characters}
+    paheal_tags.refresh(db, post_id, lambda tags: known)
 
 
 def oc_fields(row: dict, original_character: bool) -> dict:

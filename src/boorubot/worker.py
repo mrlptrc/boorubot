@@ -11,10 +11,11 @@ import time
 from dataclasses import dataclass, field
 from datetime import datetime
 
+from boorubot import paheal_tags
 from boorubot.config import ALL_SITES, build_site
 from boorubot.db import DB, to_post
 from boorubot.scheduler import BACKOFF, RECHECK_EVERY, pending_posts, rule_skips, site_due
-from boorubot.sites.base import AccountRefused, SiteUnavailable, SkipPost
+from boorubot.sites.base import AccountRefused, ContentRefused, SiteUnavailable, SkipPost
 
 log = logging.getLogger("boorubot.worker")
 
@@ -27,8 +28,17 @@ class Job:
     started: float = field(default=0.0)
 
 
+def _ready_post(db: DB, row: dict):
+    """Arte sem tags do paheal (antiga, ou a página não abriu desde então): monta agora, sem rede,
+    para o paheal nunca receber a lista inteira, que ele recusa."""
+    if not row["paheal_tags"] and not row["paheal_tags_manual"]:
+        paheal_tags.refresh(db, row["id"])
+        row = db.get_post(row["id"])
+    return to_post(row)
+
+
 def _send(db: DB, post, post_id: int, site: str) -> str:
-    """Um envio REAL para um site; grava em publications. Retorna ok | skipped | failed | uncertain."""
+    """Um envio REAL para um site; grava em publications. Retorna ok | skipped | refused | failed | uncertain."""
     try:
         result = build_site(site, db).publish(post, dry_run=False)
         status = "ok" if result.ok else ("uncertain" if result.info.get("uncertain") else "failed")
@@ -36,6 +46,11 @@ def _send(db: DB, post, post_id: int, site: str) -> str:
     except SkipPost as exc:
         status = "skipped"
         db.add_publication(post_id, site, status, message=str(exc))
+    except ContentRefused as exc:
+        # o site recusou esta arte: não reenvia igual; volta para a fila do site quando ela corrigir
+        status = "refused"
+        db.add_publication(post_id, site, status, message=str(exc))
+        log.warning("%s recusou o post %s: %s", site, post_id, exc)
     except SiteUnavailable as exc:
         # o problema é o site: pausa o site inteiro (sessão = desconectado) e não gasta tentativa da arte
         status = "site_down"
@@ -67,8 +82,8 @@ def refresh_post_status(db: DB, post_id: int) -> str:
         return row["status"] if row else "missing"
     if db.pending_sites(row):
         final = "approved"
-    else:  # nada mais automático: incerto vira "parcial" e aparece em "Para revisar"
-        final = "partial" if db.uncertain_sites(post_id) else "done"
+    else:  # nada mais automático: incerto ou recusado vira "parcial" e aparece em "Para revisar"
+        final = "partial" if db.uncertain_sites(post_id) or db.refused_sites(post_id) else "done"
     if final != row["status"]:
         db.update_post(post_id, status=final, queue_pos=row["queue_pos"] if final == "approved" else None)
     return final
@@ -84,7 +99,7 @@ def publish_post(db: DB, post_id: int) -> str:
     if db.test_mode:
         log.warning("post %s: produção bloqueada com o modo teste ligado", post_id)
         return "blocked"
-    post = to_post(row)
+    post = _ready_post(db, row)
     results = []
     for site in db.pending_sites(row):
         status = _send(db, post, post_id, site)
@@ -108,7 +123,7 @@ def publish_site(db: DB, post_id: int, site: str) -> str:
     if site in db.published_sites(post_id):
         refresh_post_status(db, post_id)
         return "ok"
-    status = _send(db, to_post(row), post_id, site)
+    status = _send(db, _ready_post(db, row), post_id, site)
     _after_send(db, post_id, site, status)
     refresh_post_status(db, post_id)
     return status
@@ -131,7 +146,7 @@ def run_post_test(db: DB, post_id: int) -> list[str]:
     row = db.get_post(post_id)
     if not row or row["status"] == "deleted":
         return []
-    post = to_post(row)
+    post = _ready_post(db, row)
     has_test_account = bool(db.setting("danbooru_test_api_key"))
     results = []
     for name in row["sites"]:
