@@ -240,8 +240,9 @@ def create_app(db: DB | None = None, worker: Worker | None = None, start_worker:
             ("antes", "Antes de começar", "ok" if sessions else "todo"),
             ("pc-acordado", "PC acordado na hora do post", "ok" if st.installed or not st.supported else "todo"),
             ("danbooru", "Conectar o Danbooru", site_state("danbooru")),
-            ("gelbooru", "Gelbooru, paheal e rule34.us", site_state("gelbooru", "paheal", "rule34us")),
-            ("rule34xxx", "Conectar o rule34.xxx", site_state("rule34xxx")),
+            ("paheal", "Conectar o paheal", site_state("paheal")),
+            ("rule34xxx", "Enviar à mão no rule34.xxx" if db.assisted("rule34xxx") else "Conectar o rule34.xxx",
+             "ok" if db.assisted("rule34xxx") else site_state("rule34xxx")),
             ("teste", "Testar um post", "ok" if db.test_runs() else "todo"),
             ("valendo", "Postar de verdade", "todo" if db.test_mode else "ok"),
         ]

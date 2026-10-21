@@ -19,7 +19,7 @@
     const f = Object.assign(document.createElement("form"), { method: "post", action: url });
     document.body.append(f); f.submit();
   };
-  const SITES = { danbooru: "Danbooru", gelbooru: "Gelbooru", paheal: "rule34.paheal", rule34us: "rule34.us", rule34xxx: "rule34.xxx" };
+  const SITES = { danbooru: "Danbooru", paheal: "rule34.paheal", rule34xxx: "rule34.xxx" };
   const ACTIONS = [
     { title: "Nova arte", keys: "subir upload imagem", icon: PLUS, run: () => { dialog.close(); document.querySelector("[data-new-art]")?.click(); } },
     { title: "Atualizar métricas", keys: "favoritos score danbooru", icon: GO, run: post("/metricas/atualizar") },
@@ -35,9 +35,9 @@
   ].map(([title, url, keys]) => ({ title, keys, icon: PAGE, run: go(url) }));
   const GUIDE = [
     ["antes", "Antes de começar"], ["pc-acordado", "O PC precisa estar acordado"], ["danbooru", "Conectar o Danbooru"],
-    ["gelbooru", "Conectar Gelbooru, paheal e rule34.us"], ["rule34xxx", "Conectar o rule34.xxx"], ["teste", "Testar um post"],
+    ["paheal", "Conectar o paheal"], ["rule34xxx", "Enviar à mão no rule34.xxx"], ["teste", "Testar um post"],
     ["valendo", "Começar a postar de verdade"], ["dia-a-dia", "O dia a dia"], ["regras", "Regras dos sites"],
-    ["gelbooru", "Como o paheal trata OC"], ["seguranca", "Segurança das contas"], ["problemas", "Algo deu errado?"],
+    ["paheal", "Tags e OC no paheal"], ["seguranca", "Segurança das contas"], ["problemas", "Algo deu errado?"],
   ].map(([id, title]) => ({ title: "Guia: " + title, keys: "ajuda " + id, icon: PAGE, run: go(`/guia?passo=${id}#${id}`) }));
 
   let arts = [];
