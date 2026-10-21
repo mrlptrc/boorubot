@@ -66,6 +66,7 @@ def test_sites_page_has_only_the_accounts(env):
 
 def test_waiting_for_login_and_cancel(env):
     c, db, w, _ = env
+    db.set_setting("assisted_rule34xxx", "")  # aqui o rule34.xxx é enviado pelo robô
     c.post("/sites/rule34xxx/login")
     page = c.get("/sites").text
     assert "Faça login na janela que abriu. Eu espero aqui." in page and "nunca mexe no captcha" in page
