@@ -144,7 +144,9 @@
               <span class="bb-site__name" id="site-{{ r.site }}">{{ r.label }}</span>
               <span class="bb-site__note">
                 <span class="site-row-state">
-                  {%- if r.done %}<span class="ok">já saiu</span>
+                  {%- if r.done and r.manual_mark %}{{ 'enviado à mão' if r.manual_mark.status == 'ok' else 'você decidiu não enviar' }}
+                    · <a href="#marcado-a-mao">desfazer</a>
+                  {%- elif r.done %}<span class="ok">já saiu</span>
                   {%- elif r.off %}site desligado no <a href="/calendario">Calendário</a>
                   {%- else %}
                     {%- if r.site == 'paheal' %}<span data-oc-only {{ 'hidden' if not post.original_character }}>fica de fora: não aceita personagem original</span>{% endif %}
@@ -297,6 +299,22 @@
           </form></li>
       </ol>
     </div>
+    {% endfor %}
+  </section>
+  {% endif %}
+
+  {# o que ela marcou à mão, com desfazer (fora do formulário: arte publicada tem os campos travados) #}
+  {% set marked = site_rows|selectattr("manual_mark")|list %}
+  {% if marked %}
+  <section class="ed-section" id="marcado-a-mao" aria-labelledby="marcado-t">
+    <h2 id="marcado-t">Marcado à mão</h2>
+    {% for r in marked %}
+    <form method="post" action="/envios/{{ r.manual_mark.id }}/desfazer" class="pin-form">
+      <p><b>{{ r.label }}:</b> {{ 'enviado à mão' if r.manual_mark.status == 'ok' else 'você decidiu não enviar' }}
+        em {{ r.manual_mark.created_at[8:10] }}/{{ r.manual_mark.created_at[5:7] }} às {{ r.manual_mark.created_at[11:16] }}
+        {%- if r.manual_mark.url %} · <a href="{{ r.manual_mark.url }}" target="_blank" rel="noopener noreferrer">link</a>{% endif %}</p>
+      {{ ui.button("Desfazer", tipo="secundario", type="submit", size="sm", attrs={"data-confirm": "A arte volta a esperar o envio à mão no " ~ r.label ~ "."}) }}
+    </form>
     {% endfor %}
   </section>
   {% endif %}

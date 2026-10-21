@@ -123,3 +123,33 @@ def test_switched_off_site_is_not_a_login_alert(db):
     db.set_session("paheal", False, "pediu login")
     db.set_setting("rhythm_paheal", "desligado")
     assert "session" not in [a.kind for a in dashboard.alerts(db, ["danbooru", "paheal"], db.get_post(pid))]
+
+
+def test_she_can_undo_a_manual_mark(client, db):
+    pid = approved(db)
+    db.add_publication(pid, "danbooru", "ok", "https://danbooru.donmai.us/posts/1")
+    r = client.post(f"/posts/{pid}/manual", data={"site": "rule34xxx", "action": "saiu"}, follow_redirects=False)
+    assert "desfazer_envio=" in r.headers["location"]
+    assert db.get_post(pid)["status"] == "done"
+    page = client.get(r.headers["location"]).text
+    mark = db.manual_mark(pid, "rule34xxx")
+    assert f'action="/envios/{mark["id"]}/desfazer"' in page          # no aviso e na seção "Marcado à mão"
+    assert 'id="marcado-a-mao"' in page and "<fieldset" in page
+
+    client.post(f"/envios/{mark['id']}/desfazer")
+    row = db.get_post(pid)
+    assert row["status"] == "approved" and db.pending_sites(row) == ["rule34xxx"]
+    assert pid in [p["id"] for p in db.queue()]                        # voltou para a fila
+    assert 'id="manual"' in client.get(f"/posts/{pid}").text
+
+
+def test_undo_only_touches_her_own_last_mark(client, db):
+    pid = approved(db)
+    db.add_publication(pid, "danbooru", "ok", "https://danbooru.donmai.us/posts/1")   # envio do robô
+    robot = db.publications(pid)[0]["id"]
+    assert db.undo_manual_mark(robot) is None
+    client.post(f"/posts/{pid}/manual", data={"site": "rule34xxx", "action": "pular"})
+    skip = db.manual_mark(pid, "rule34xxx")["id"]
+    client.post(f"/envios/{skip}/desfazer")
+    assert db.undo_manual_mark(skip) is None                           # já desfeito: nada a fazer
+    assert [p["site"] for p in db.publications(pid)] == ["danbooru"]  # o envio do robô ficou

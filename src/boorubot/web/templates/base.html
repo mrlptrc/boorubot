@@ -115,11 +115,14 @@
     </div>
   </dialog>
 
-  {# aviso de uma ação ("Aprovada! Faltam 2", "Arte apagada · desfazer"): ?aviso=…&desfazer=<id>&tipo=sucesso|erro #}
+  {# aviso de uma ação ("Aprovada! Faltam 2", "Arte apagada · desfazer"): ?aviso=…&desfazer=<id>&tipo=sucesso|erro;
+     &desfazer_envio=<id> desfaz um "Saiu" / "Não vou enviar" marcado à mão #}
   {% set aviso = request.query_params.get('aviso', '') %}
   {% set undo = request.query_params.get('desfazer', '') %}
+  {% set undo_send = request.query_params.get('desfazer_envio', '') %}
+  {% set undo_form = "/posts/" ~ undo ~ "/desfazer" if undo.isdigit() else "/envios/" ~ undo_send ~ "/desfazer" if undo_send.isdigit() else None %}
   <div id="toasts" class="bb-toasts" aria-live="polite">
-    {%- if aviso %}{{ ui.toast(aviso, request.query_params.get('tipo', 'neutro'), action="desfazer" if undo.isdigit() else None, action_form="/posts/" ~ undo ~ "/desfazer" if undo.isdigit() else None) }}{% endif -%}
+    {%- if aviso %}{{ ui.toast(aviso, request.query_params.get('tipo', 'neutro'), action="desfazer" if undo_form else None, action_form=undo_form) }}{% endif -%}
   </div>
 
   <script src="/static/app.js" defer></script>

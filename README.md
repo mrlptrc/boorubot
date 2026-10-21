@@ -21,19 +21,19 @@ Regras centrais do código:
 
 ## Instalação no PC dela (Windows)
 
-1. Instalar o [uv](https://docs.astral.sh/uv/) e clonar este repositório (ex.: `C:\boorubot`).
-2. Na pasta do projeto:
+1. Copiar a pasta do boorubot para o PC dela (ex.: `C:\boorubot`). Se vier do pacote de entrega, a pasta
+   `data\` já traz a fila, o histórico e a chave do Danbooru.
+2. Na pasta, no PowerShell:
    ```powershell
-   uv sync
-   uv run playwright install chromium
-   uv run boorubot startup install   # painel abre escondido quando o Windows liga
-   uv run boorubot panel             # abre agora, em http://127.0.0.1:8765
+   powershell -ExecutionPolicy Bypass -File scripts\instalar-windows.ps1
    ```
-3. Ajustar a energia do Windows para o PC **não dormir na tomada** (o guia do painel explica, seção
+   Instala o uv (se faltar), as dependências e o navegador do robô, deixa o painel abrindo escondido com o
+   Windows e abre o painel em http://127.0.0.1:8765.
+3. **Desligar o painel do computador antigo** antes de ligar o dela: dois painéis com a mesma conta postam em dobro.
+4. Ajustar a energia do Windows para o PC **não dormir na tomada** (o guia do painel explica, seção
    "O PC precisa estar acordado"). PC dormindo = post atrasado até ele acordar.
-4. No painel, seguir o **Guia** (menu Guia) com ela: conectar o Danbooru (chave de API) e entrar em cada site,
-   fazer um "Testar este post", e só então desligar o modo teste.
-5. Em Sites → Backup diário, apontar para uma pasta do OneDrive dela.
+5. No painel: **Sites → Entrar** no paheal (o login fica salvo no computador onde o painel roda, não vai junto),
+   escolher o **horário do post** e a **pasta do backup** (OneDrive/Google Drive) em Ajustes.
 6. Instalar um acesso remoto (Chrome Remote Desktop, AnyDesk ou Tailscale) para a supervisão.
 
 O que fica no PC (tudo fora do git):

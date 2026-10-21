@@ -26,6 +26,8 @@ DB_PATH = DATA_DIR / "boorubot.db"
 # fila, e cada site pega a próxima arte dele, 1 por dia, >= MIN_GAP entre posts do site, sem
 # acumular atraso. Dias fixados no calendário (site_pins) passam na frente.
 MIN_GAP = timedelta(hours=12)
+# o que ela marca à mão no envio assistido (o "desfazer" só apaga estes)
+MANUAL_MARKS = ("enviado à mão", "envio à mão: ela decidiu não enviar")
 
 # Ritmo por site: diário (padrão), dia sim/dia não ou desligado, e atraso em dias contado a
 # partir do 1º site em que a arte saiu.
@@ -453,6 +455,27 @@ class DB:
             return self._all("SELECT * FROM publications WHERE post_id = ? ORDER BY id DESC", (post_id,))
         return self._all("SELECT p.*, posts.title, posts.image, posts.status AS post_status FROM publications p "
                          "JOIN posts ON posts.id = p.post_id ORDER BY p.id DESC LIMIT ?", (limit,))
+
+    def manual_mark(self, post_id: int, site: str) -> dict | None:
+        """O último registro desse site nesta arte, se foi ela que marcou à mão (Saiu / Não vou enviar)."""
+        rows = self._all("SELECT * FROM publications WHERE post_id = ? AND site = ? ORDER BY id DESC LIMIT 1",
+                         (post_id, site))
+        return rows[0] if rows and rows[0]["message"] in MANUAL_MARKS else None
+
+    def undo_manual_mark(self, publication_id: int) -> int | None:
+        """Desfaz um "Saiu" ou "Não vou enviar" marcado à mão (só o último daquele site): a arte volta
+        a esperar o envio à mão. Retorna a arte, ou None se não havia o que desfazer."""
+        rows = self._all("SELECT * FROM publications WHERE id = ?", (publication_id,))
+        if not rows or self.manual_mark(rows[0]["post_id"], rows[0]["site"]) != rows[0]:
+            return None
+        post_id = rows[0]["post_id"]
+        self._exec("DELETE FROM publications WHERE id = ?", (publication_id,))
+        post = self.get_post(post_id)
+        if post and post["status"] in ("done", "partial"):
+            # volta para o começo da fila: era a vez dela nesse site
+            first = self._all("SELECT MIN(queue_pos) AS m FROM posts WHERE status = 'approved'")[0]["m"]
+            self.update_post(post_id, status="approved", queue_pos=(first or 1) - 1)
+        return post_id
 
     def all_publications(self) -> list[dict]:
         """Todas as publicações, da mais antiga para a mais nova (tela Artes: uma consulta só)."""
