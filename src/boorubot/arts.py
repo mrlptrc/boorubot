@@ -34,7 +34,7 @@ def site_marks(post: dict, pubs: list[dict], down: set[str], off: set[str]) -> d
         last = latest.get(site)
         if site in ok:
             mark, why = "saiu", ""
-        elif last and last["status"] in ("failed", "uncertain"):
+        elif last and last["status"] in ("failed", "uncertain", "refused"):
             mark, why = "falhou", "conferir no site" if last["status"] == "uncertain" else last["message"]
         elif last and last["status"] == "skipped":
             mark, why = "fora", last["message"]

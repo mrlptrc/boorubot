@@ -124,6 +124,9 @@ NEW_POST_COLUMNS = (
     ("deleted_at", "TEXT"),                                  # quando foi apagada (status 'deleted')
     ("status_before_delete", "TEXT NOT NULL DEFAULT ''"),    # para o "desfazer"
     ("image_md5", "TEXT NOT NULL DEFAULT ''"),             # identifica upload repetido sem bloquear repost
+    # paheal só aceita série/personagem/artista: lista própria, montada sozinha até ela editar
+    ("paheal_tags", "TEXT NOT NULL DEFAULT ''"),
+    ("paheal_tags_manual", "INTEGER NOT NULL DEFAULT 0"),
 )
 SUGGEST_STATES = ("pendente", "analisando", "pronta", "falhou")
 
@@ -427,11 +430,19 @@ class DB:
 
     def published_sites(self, post_id: int) -> set[str]:
         """Sites que NÃO recebem mais esta arte automaticamente: já saiu, foi pulada pela regra,
-        ou o último envio ficou incerto (pode ter saído: só uma pessoa decide, para não duplicar)."""
+        o último envio ficou incerto (pode ter saído: só uma pessoa decide, para não duplicar)
+        ou o site recusou o conteúdo (reenviar igual daria o mesmo erro: espera ela corrigir)."""
         rows = self._all("SELECT site, status FROM publications WHERE post_id = ? ORDER BY id", (post_id,))
         latest = {r["site"]: r["status"] for r in rows}
         ever = {r["site"] for r in rows if r["status"] in ("ok", "skipped")}
-        return ever | {site for site, status in latest.items() if status == "uncertain"}
+        return ever | {site for site, status in latest.items() if status in ("uncertain", "refused")}
+
+    def refused_sites(self, post_id: int) -> dict[str, str]:
+        """Sites que recusaram esta arte no último envio (ex.: paheal "Invalid tag used"): {site: motivo}."""
+        rows = self._all("SELECT site, status, message FROM publications WHERE post_id = ? ORDER BY id", (post_id,))
+        latest = {r["site"]: r for r in rows}
+        ok = {r["site"] for r in rows if r["status"] == "ok"}
+        return {s: r["message"] for s, r in latest.items() if r["status"] == "refused" and s not in ok}
 
     def uncertain_sites(self, post_id: int) -> list[str]:
         """Sites em que o último envio desta arte ficou incerto e ninguém conferiu ainda."""
@@ -514,6 +525,7 @@ def _decode(row: dict) -> dict:
     row["approved_in_test"] = bool(row.get("approved_in_test"))
     row["oc_touched"] = bool(row.get("oc_touched"))
     row["oc_auto"] = bool(row.get("oc_auto"))
+    row["paheal_tags_manual"] = bool(row.get("paheal_tags_manual"))
     row["tag_list"] = row["tags"].split()
     return row
 
@@ -532,4 +544,5 @@ def to_post(row: dict) -> Post:
         original_character=row["original_character"],
         sites=row["sites"],
         site_tags=row["site_tags"],
+        only_tags={"paheal": row["paheal_tags"].split()} if row.get("paheal_tags", "").strip() else {},
     )

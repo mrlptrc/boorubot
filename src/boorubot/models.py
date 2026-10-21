@@ -27,9 +27,13 @@ class Post:
     original_character: bool = False
     sites: list[str] = field(default_factory=list)
     site_tags: dict[str, list[str]] = field(default_factory=dict)
+    # lista que SUBSTITUI as tags num site (paheal: só série, personagem e artista)
+    only_tags: dict[str, list[str]] = field(default_factory=dict)
 
     def tags_for(self, site: str) -> list[str]:
-        """Tags base + extras específicas do site, sem duplicar."""
+        """Tags base + extras específicas do site, sem duplicar (ou a lista própria do site, se houver)."""
+        if self.only_tags.get(site):
+            return list(self.only_tags[site])
         merged = list(self.tags)
         for tag in self.site_tags.get(site, []):
             if tag not in merged:

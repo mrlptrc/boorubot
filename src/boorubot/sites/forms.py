@@ -16,7 +16,7 @@ from playwright.sync_api import Error as PlaywrightError
 from playwright.sync_api import Page
 
 from boorubot.models import Post
-from boorubot.sites.base import AccountRefused, Result, Site, SiteUnavailable, SkipPost
+from boorubot.sites.base import AccountRefused, ContentRefused, Result, Site, SiteUnavailable, SkipPost
 from boorubot.sites.browser import (
     BROWSER_MODES, captcha_present, dump_forms, open_page, reveal_window, run_dir, screenshot,
 )
@@ -118,6 +118,10 @@ class FormSite(Site):
             return ""
         line = next((ln.strip() for ln in text.splitlines() if m.group(0).lower() in ln.lower()), m.group(0))
         return line[:200]
+
+    def _content_refused(self, page: Page) -> str:
+        """O site recusou esta arte (e não a conta)? Frase para ela entender, ou ""."""
+        return ""
 
     def _logged_in(self, page: Page) -> bool:
         names = {c["name"] for c in page.context.cookies()}
@@ -230,6 +234,9 @@ class FormSite(Site):
             if self.success_url.search(page.url):
                 return Result(self.name, ok=True, dry_run=False, message="post criado", url=page.url,
                               artifacts=[filled, done])
+            refused = self._content_refused(page)
+            if refused:
+                raise ContentRefused(f"{refused}. Nada foi publicado. print: {done}")
             return Result(self.name, ok=False, dry_run=False, artifacts=[filled, done], info={"uncertain": True},
                           message=f"enviado, mas não reconheci a página de sucesso ({page.url}); confira no site")
 
@@ -330,6 +337,17 @@ class Paheal(FormSite):
     login_cookies = ("user", "session")  # Shimmie: shm_user / shm_session
     success_url = re.compile(r"/post/view/\d+")
 
+    def _content_refused(self, page: Page) -> str:
+        try:
+            text = page.inner_text("body")
+        except Exception:
+            return ""
+        m = re.search(r"Invalid tag used:\s*([^\s,]+)", text)
+        if m:
+            return (f"o paheal recusou a tag \"{m.group(1)}\": ele só aceita série, personagem e artista. "
+                    f"Corrija as tags do paheal no editor")
+        return ""
+
     def check_rules(self, post: Post) -> None:
         # Regra 18 do paheal: proibido imagem só com personagem original/OC.
         if post.original_character:
@@ -350,6 +368,18 @@ class Rule34us(FormSite):
         "explicit": ["explicit", "e"],
     }
     success_url = re.compile(r"r=posts/view&id=\d+")
+
+    def _content_refused(self, page: Page) -> str:
+        # depois do envio o site às vezes volta para o formulário vazio, sem mensagem e sem criar o post
+        try:
+            empty_form = "posts/create" in page.url and page.locator("form input[type=file]").count() > 0 \
+                and not page.locator("form input[type=file]").first.input_value()
+        except Exception:
+            return ""
+        if empty_form:
+            return ("o rule34.us voltou para o formulário vazio, sem criar o post e sem dizer o motivo. "
+                    "Tente subir uma arte à mão no site para ver se a conta consegue enviar")
+        return ""
 
 
 FORM_SITES: dict[str, type[FormSite]] = {
