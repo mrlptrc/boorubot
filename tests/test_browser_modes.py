@@ -8,21 +8,19 @@ import pytest
 from boorubot.models import Post
 from boorubot.sites import forms
 from boorubot.sites.browser import launch_options
-from boorubot.sites.forms import FormSiteError, Gelbooru, Paheal, Rule34us, Rule34xxx
+from boorubot.sites.forms import FormSiteError, Paheal, Rule34xxx
 
 EXAMPLE = Path(__file__).resolve().parents[1] / "queue" / "exemplo-001"
 
 
 @pytest.mark.parametrize("site, purpose, expected", [
-    (Gelbooru(), "send", "headless"),
     (Paheal(), "send", "headless"),
-    (Rule34us(), "send", "headless"),
     (Rule34xxx(), "send", "hidden"),        # Cloudflare: navegador real, janela fora da tela
-    (Gelbooru(), "dry_run", "headless"),
+    (Paheal(), "dry_run", "headless"),
     (Rule34xxx(), "dry_run", "hidden"),
     (Rule34xxx(), "session", "hidden"),
-    (Gelbooru(), "session", "headless"),
-    (Gelbooru(), "login", "visible"),       # login sempre na tela
+    (Paheal(), "session", "headless"),
+    (Paheal(), "login", "visible"),       # login sempre na tela
     (Rule34xxx(), "login", "visible"),
 ])
 def test_mode_per_site_and_purpose(site, purpose, expected):
@@ -30,14 +28,14 @@ def test_mode_per_site_and_purpose(site, purpose, expected):
 
 
 def test_override_from_settings():
-    assert Gelbooru(send_mode="visible").browser_mode("send") == "visible"
-    assert Gelbooru(send_mode="hidden").browser_mode("send") == "hidden"
+    assert Paheal(send_mode="visible").browser_mode("send") == "visible"
+    assert Paheal(send_mode="hidden").browser_mode("send") == "hidden"
     # rule34.xxx nunca vai para headless, mesmo se alguém configurar
     assert Rule34xxx(send_mode="headless").browser_mode("send") == "hidden"
     # valor inválido é ignorado
-    assert Gelbooru(send_mode="qualquer").browser_mode("send") == "headless"
+    assert Paheal(send_mode="qualquer").browser_mode("send") == "headless"
     # override vale só para o envio real
-    assert Gelbooru(send_mode="visible").browser_mode("dry_run") == "headless"
+    assert Paheal(send_mode="visible").browser_mode("dry_run") == "headless"
 
 
 def test_build_site_reads_override(tmp_path):
@@ -45,9 +43,9 @@ def test_build_site_reads_override(tmp_path):
     from boorubot.db import DB
 
     db = DB(tmp_path / "t.db")
-    assert build_site("gelbooru", db).browser_mode("send") == "headless"
-    db.set_setting("browser_mode_gelbooru", "visible")
-    assert build_site("gelbooru", db).browser_mode("send") == "visible"
+    assert build_site("paheal", db).browser_mode("send") == "headless"
+    db.set_setting("browser_mode_paheal", "visible")
+    assert build_site("paheal", db).browser_mode("send") == "visible"
 
 
 def test_launch_options():
@@ -100,7 +98,7 @@ def fake_browser(monkeypatch, tmp_path):
 
 def test_captcha_in_headless_send_fails_clearly(fake_browser):
     with pytest.raises(FormSiteError, match="o site pediu captcha: entre de novo em Sites → Entrar"):
-        Gelbooru().publish(Post.load(EXAMPLE), dry_run=False)
+        Paheal().publish(Post.load(EXAMPLE), dry_run=False)
     assert fake_browser["modes"] == ["headless"] and fake_browser["revealed"] == 0
 
 
@@ -133,7 +131,7 @@ def test_headless_uses_the_full_chromium():
 
 
 def test_login_cookies_visible_to_headless_sends(tmp_path, monkeypatch):
-    """Regressão: logar no Gelbooru pela janela e o teste de sessão (invisível) não ver o login."""
+    """Regressão: logar no site pela janela e o teste de sessão (invisível) não ver o login."""
     import threading
     from http.server import BaseHTTPRequestHandler, HTTPServer
 
@@ -198,18 +196,18 @@ def submit_page(monkeypatch, tmp_path):
 
 
 def test_success_page_recognized(submit_page):
-    submit_page["url"] = "https://gelbooru.com/index.php?page=post&s=view&id=123"
-    r = Gelbooru().publish(Post.load(EXAMPLE), dry_run=False)
-    assert r.ok and not r.info.get("uncertain") and r.url.endswith("id=123")
+    submit_page["url"] = "https://rule34.paheal.net/post/view/123"
+    r = Paheal().publish(Post.load(EXAMPLE), dry_run=False)
+    assert r.ok and not r.info.get("uncertain") and r.url.endswith("/view/123")
 
 
 def test_unknown_page_after_submit_is_uncertain(submit_page):
-    submit_page["url"] = "https://gelbooru.com/index.php?page=post&s=add"
-    r = Gelbooru().publish(Post.load(EXAMPLE), dry_run=False)
+    submit_page["url"] = "https://rule34.paheal.net/upload"
+    r = Paheal().publish(Post.load(EXAMPLE), dry_run=False)
     assert not r.ok and r.info["uncertain"] and "confira no site" in r.message
 
 
 def test_error_after_submit_is_uncertain(submit_page):
     submit_page["raise"] = TimeoutError("demorou")
-    r = Gelbooru().publish(Post.load(EXAMPLE), dry_run=False)
+    r = Paheal().publish(Post.load(EXAMPLE), dry_run=False)
     assert not r.ok and r.info["uncertain"]

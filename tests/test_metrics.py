@@ -29,7 +29,7 @@ def live_client(handler):
 def test_post_id_only_from_live_danbooru():
     assert danbooru_post_id("https://danbooru.donmai.us/posts/123") == 123
     assert danbooru_post_id("https://testbooru.donmai.us/posts/123") is None
-    assert danbooru_post_id("https://gelbooru.com/index.php?page=post&s=view&id=5") is None
+    assert danbooru_post_id("https://rule34.xxx/index.php?page=post&s=view&id=5") is None
     assert danbooru_post_id("") is None
 
 
@@ -38,7 +38,7 @@ def test_collects_only_real_danbooru_publications(db):
     db.add_publication(post_id, "danbooru", "ok", "https://danbooru.donmai.us/posts/11")
     db.add_publication(post_id, "danbooru", "ok", "https://danbooru.donmai.us/posts/22")
     db.add_publication(post_id, "danbooru", "failed", message="caiu")
-    db.add_publication(post_id, "gelbooru", "ok", "https://gelbooru.com/index.php?page=post&s=view&id=9")
+    db.add_publication(post_id, "rule34xxx", "ok", "https://rule34.xxx/index.php?page=post&s=view&id=9")
     db.add_publication(post_id, "danbooru", "ok", "https://testbooru.donmai.us/posts/33")  # defensivo
     db.add_test_run(post_id, "danbooru", "test_upload", "https://testbooru.donmai.us/posts/44")
     calls = []

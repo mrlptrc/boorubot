@@ -26,8 +26,8 @@ def test_each_setting_saves_by_itself_and_persists(env):
     assert db.setting("default_tags") == ""                      # só o campo enviado muda
     c.patch("/ajustes", json={"default_tags": ["Nome Artista", "commission"]})
     assert db.setting("default_tags") == "nome_artista commission"
-    c.patch("/ajustes", json={"default_sites": ["gelbooru", "hackeado", "danbooru"]})
-    assert db.setting("default_sites") == '["danbooru", "gelbooru"]'
+    c.patch("/ajustes", json={"default_sites": ["rule34xxx", "hackeado", "danbooru"]})
+    assert db.setting("default_sites") == '["danbooru", "rule34xxx"]'
     c.patch("/ajustes", json={"test_mode": False})
     assert not db.test_mode
     page = c.get("/ajustes").text
@@ -60,7 +60,7 @@ def test_sites_page_has_only_the_accounts(env):
     page = c.get("/sites").text
     for gone in ('name="daily_time"', 'name="default_tags"', 'name="backup_dir"', 'name="rhythm_', 'name="test_mode"'):
         assert gone not in page, gone
-    assert page.count('class="bb-drawer"') == 5 and "Salvar e testar" in page
+    assert page.count('class="bb-drawer"') == 3 and "Salvar e testar" in page
     assert "/ajustes" in page and "location.replace" in page     # links antigos (#backup, #config, #ritmo)
 
 
@@ -78,10 +78,10 @@ def test_waiting_for_login_and_cancel(env):
 
 def test_waiting_state_goes_away_when_the_session_is_ok(env):
     c, db, w, _ = env
-    w.submit("login", "gelbooru", "login Gelbooru")
+    w.submit("login", "paheal", "login paheal")
     assert c.get("/sites/status.json").json()["rows"][1]["state"] == "login"
     w.jobs.queue.clear()                                          # o worker terminou o login
-    db.set_session("gelbooru", True, "logado")
+    db.set_session("paheal", True, "logado")
     assert c.get("/sites/status.json").json()["rows"][1]["state"] == "ok"
 
 

@@ -16,7 +16,7 @@ class SiteUnavailable(Exception):
 
 
 class AccountRefused(SiteUnavailable):
-    """O site recusou o envio por causa da CONTA (ex.: Gelbooru "not enough reputation").
+    """O site recusou o envio por causa da CONTA (ex.: "not enough reputation").
     Nada foi publicado. O site fica bloqueado até uma pessoa clicar em Testar/Entrar:
     o re-teste automático não insiste, para o robô não ficar batendo na conta."""
 

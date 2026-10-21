@@ -26,13 +26,14 @@ def db(tmp_path, monkeypatch):
     monkeypatch.setattr("boorubot.db.IMAGES_DIR", images)
     d = DB(tmp_path / "d.db")
     d.set_setting("daily_time", "18:00")
+    d.set_setting("assisted_rule34xxx", "")  # aqui o rule34.xxx é enviado pelo robô
     return d
 
 
 def approve_n(db, n):
     ids = []
     for i in range(n):
-        pid = db.create_post(f"{i}.png", title=f"arte {i}", tags="x", sites=["danbooru", "gelbooru"])
+        pid = db.create_post(f"{i}.png", title=f"arte {i}", tags="x", sites=["danbooru", "rule34xxx"])
         db.approve(pid)
         ids.append(pid)
     return ids
@@ -50,7 +51,7 @@ def test_runway_counts_consecutive_days_from_today():
 def test_covered_days_any_site():
     from boorubot.scheduler import Cell
     plans = {"danbooru": {TODAY: Cell("published"), TODAY + timedelta(1): Cell("empty")},
-             "gelbooru": {TODAY: Cell("empty"), TODAY + timedelta(1): Cell("post"), TODAY + timedelta(2): Cell("rest")}}
+             "rule34xxx": {TODAY: Cell("empty"), TODAY + timedelta(1): Cell("post"), TODAY + timedelta(2): Cell("rest")}}
     assert covered_days(plans) == {TODAY, TODAY + timedelta(1)}
     assert queue_runway(covered_days(plans), TODAY) == 2
 
@@ -135,15 +136,15 @@ def test_no_metrics_yet(db):
 
 def test_session_down_is_the_first_alert(db):
     ids = approve_n(db, 1)
-    db.set_setting("assisted_rule34xxx", "")  # aqui o rule34.xxx é enviado pelo robô
-    db.set_session("gelbooru", True, "ok")
+    db.update_post(ids[0], sites=["danbooru", "paheal", "rule34xxx"])
+    db.set_session("paheal", True, "ok")
     db.set_session("rule34xxx", False, "sem sessão")
     db.set_setting("backup_dir", r"C:\bk")
     db.set_setting("last_backup_ok", "0")
-    found = dashboard.alerts(db, ["danbooru", "gelbooru", "rule34xxx"], db.get_post(ids[0]))
+    found = dashboard.alerts(db, ["danbooru", "paheal", "rule34xxx"], db.get_post(ids[0]))
     assert [a.kind for a in found] == ["session", "backup", "test_mode"]
     assert found[0].site == "rule34xxx" and found[0].label == "rule34.xxx"
-    assert found[0].others == 2                     # o próximo post ainda sai no Danbooru e no Gelbooru
+    assert found[0].others == 2                     # o próximo post ainda sai no Danbooru e no paheal
 
 
 def test_session_of_unused_site_is_not_an_alert(db):
@@ -185,13 +186,13 @@ def test_home_empty_state(db):
 
 def test_home_with_queue_and_session_alert(db):
     approve_n(db, 2)
-    db.set_session("gelbooru", False, "sem sessão")
+    db.set_session("rule34xxx", False, "sem sessão")
     draft = db.create_post("d.png", title="rascunho-x", tags="a b c")
     failed = db.create_post("f.png", title="falhou-x", status="failed")
     db.add_publication(failed, "paheal", "failed", message="caiu")
     page = client(db).get("/").text
     assert "Próximos dias" in page and "1º na fila" in page and "2º na fila" in page
-    assert "pediu login de novo" in page and "/sites#gelbooru" in page
+    assert "pediu login de novo" in page and "/sites#rule34xxx" in page
     assert "rascunho-x" in page and "3 tags" in page
     assert "falhou no rule34.paheal" in page and "falhou-x" in page
 
@@ -204,15 +205,15 @@ def test_titles_are_escaped(db):
 
 
 def test_week_lists_each_art_with_its_sites(db):
-    a, b = approve_n(db, 2)                                   # as duas vão para Danbooru e Gelbooru
+    a, b = approve_n(db, 2)                                   # as duas vão para Danbooru e rule34.xxx
     c = db.create_post("c.png", title="só paheal", tags="x", sites=["paheal"])
     db.approve(c)
     day0 = dashboard.build(db, at(14))["week"][0]["entries"]
-    assert [(e["post"]["id"], e["sites"]) for e in day0] == [(a, ["danbooru", "gelbooru"]), (c, ["paheal"])]
-    assert not day0[0]["all_sites"] and day0[0]["site_names"] == ["Dan", "Gel"]
-    db.set_setting("delay_gelbooru", "1")                     # Gelbooru um dia depois: dia 2 tem b no Dan e a no Gel
+    assert [(e["post"]["id"], e["sites"]) for e in day0] == [(a, ["danbooru", "rule34xxx"]), (c, ["paheal"])]
+    assert not day0[0]["all_sites"] and day0[0]["site_names"] == ["Dan", "r34.xxx"]
+    db.set_setting("delay_rule34xxx", "1")                     # rule34.xxx um dia depois: dia 2 tem b no Dan e a no .xxx
     day1 = dashboard.build(db, at(14))["week"][1]["entries"]
-    assert {e["post"]["id"]: e["sites"] for e in day1} == {b: ["danbooru"], a: ["gelbooru"]}
+    assert {e["post"]["id"]: e["sites"] for e in day1} == {b: ["danbooru"], a: ["rule34xxx"]}
     page = TestClient(app_mod.create_app(db, Worker(db), start_worker=False)).get("/").text
     assert 'class="site-tag">Dan<' in page and 'class="site-tag">paheal<' in page
 
@@ -225,8 +226,8 @@ def test_week_says_all_sites_when_the_art_goes_everywhere(db):
 
 def test_week_marks_site_waiting_for_login(db):
     approve_n(db, 1)
-    db.set_session("gelbooru", False, "sem sessão")
+    db.set_session("rule34xxx", False, "sem sessão")
     entry = dashboard.build(db, at(14))["week"][0]["entries"][0]
     assert not entry["all_sites"] and [t["down"] for t in entry["tags"]] == [False, True]
     page = TestClient(app_mod.create_app(db, Worker(db), start_worker=False)).get("/").text
-    assert 'class="site-tag down">Gel' in page and "esperando login" in page
+    assert 'class="site-tag down">r34.xxx' in page and "esperando login" in page

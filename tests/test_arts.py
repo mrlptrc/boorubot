@@ -10,7 +10,7 @@ from boorubot.db import DB
 from boorubot.web import app as app_mod
 from boorubot.worker import Worker
 
-ALL = ["danbooru", "gelbooru", "paheal", "rule34us", "rule34xxx"]
+ALL = ["danbooru", "paheal", "rule34xxx"]
 
 
 @pytest.fixture
@@ -69,8 +69,12 @@ def test_site_marks_cover_saiu_falhou_fora_and_login(seeded):
     assert failed["situation"] == ("falhou em 1 site", "falhou")
     assert failed["detail"] == "paheal recusou: tag picnic_basket"
     oc = rows[ids["oc"]]
-    assert oc["marks"]["paheal"]["mark"] == "fora" and oc["marks"]["rule34xxx"]["mark"] == "login"
-    assert oc["marks"]["gelbooru"]["mark"] == "vai"
+    assert oc["marks"]["paheal"]["mark"] == "fora" and oc["marks"]["danbooru"]["mark"] == "vai"
+    # rule34.xxx à mão: a sessão do robô não importa; enviado pelo robô, "pediu login" aparece
+    assert oc["marks"]["rule34xxx"]["mark"] == "vai"
+    db.set_setting("assisted_rule34xxx", "")
+    oc = {r["post"]["id"]: r for r in arts.build(db)["rows"]}[ids["oc"]]
+    assert oc["marks"]["rule34xxx"]["mark"] == "login"
     assert rows[ids["rascunho"]]["when"] == "falta o rating" and rows[ids["rascunho"]]["situation"][0] == "precisa de você"
     assert rows[ids["fila"]]["detail"] == "1º da fila"
 

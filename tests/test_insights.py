@@ -43,7 +43,7 @@ def seeded(db):
     _, b = publish(db, "maid", "danbooru", NOW - timedelta(days=3))
     snap(db, b, NOW - timedelta(days=2, hours=1), 4, 2)  # ~23 h depois: score 4
     snap(db, b, NOW - timedelta(hours=2), 9, 7)
-    publish(db, "fada", "gelbooru", NOW - timedelta(days=2))
+    publish(db, "fada", "rule34xxx", NOW - timedelta(days=2))
     publish(db, "falha", "paheal", NOW - timedelta(days=1), status="failed")
     return db
 
@@ -95,7 +95,7 @@ def test_first_day_score_ignores_late_snapshots():
 def test_by_site_marks_sites_without_metrics(seeded):
     rows = {r["site"]: r for r in insights.build(seeded, "30", NOW)["by_site"]}
     assert rows["danbooru"]["has_metrics"] and rows["danbooru"]["favs"] == 35
-    assert rows["gelbooru"]["posts"] == 1 and not rows["gelbooru"]["has_metrics"]
+    assert rows["rule34xxx"]["posts"] == 1 and not rows["rule34xxx"]["has_metrics"]
     assert rows["paheal"]["posts"] == 0 and not rows["paheal"]["has_metrics"]
 
 
@@ -117,7 +117,7 @@ def test_page_renders_without_data(db):
     c, _ = client(db)
     page = c.get("/metricas").text
     assert "Métricas" in page and "As métricas aparecem depois do primeiro post no Danbooru" in page
-    assert page.count("não informa") == 5                  # nenhum site informou favoritos ainda
+    assert page.count("não informa") == 3                  # nenhum site informou favoritos ainda
 
 
 def test_page_with_data_and_period_links(seeded):

@@ -9,6 +9,7 @@ import threading
 from datetime import date, datetime, timedelta
 from pathlib import Path
 
+from boorubot.config import REMOVED_SITES
 from boorubot.models import Post
 from boorubot.sites.browser import ROOT
 
@@ -151,7 +152,7 @@ DEFAULT_SETTINGS = {
     "last_backup_ok": "",
     "last_backup_msg": "",
     "default_tags": "",      # entram em todo post novo (ex.: nome de artista, commission)
-    "default_sites": json.dumps(["danbooru", "gelbooru", "paheal", "rule34us", "rule34xxx"]),
+    "default_sites": json.dumps(["danbooru", "paheal", "rule34xxx"]),
 }
 
 _lock = threading.Lock()
@@ -199,6 +200,29 @@ class DB:
             self.conn.execute("UPDATE posts SET status = 'approved' WHERE status = 'publishing'")
             for key, value in DEFAULT_SETTINGS.items():
                 self.conn.execute("INSERT OR IGNORE INTO settings VALUES (?, ?)", (key, value))
+            self._drop_removed_sites()
+
+    def _drop_removed_sites(self) -> None:
+        """Gelbooru e rule34.us saíram do projeto (idempotente): saem das artes e dos sites padrão,
+        e o histórico só desses dois (tentativas que falharam ou foram recusadas) é apagado."""
+        marks = ",".join("?" * len(REMOVED_SITES))
+        for row in self.conn.execute("SELECT id, sites FROM posts").fetchall():
+            sites = json.loads(row["sites"] or "[]")
+            kept = [s for s in sites if s not in REMOVED_SITES]
+            if kept != sites:
+                self.conn.execute("UPDATE posts SET sites = ? WHERE id = ?", (json.dumps(kept), row["id"]))
+        default = self.conn.execute("SELECT value FROM settings WHERE key = 'default_sites'").fetchone()
+        if default:
+            sites = json.loads(default[0] or "[]")
+            kept = [s for s in sites if s not in REMOVED_SITES]
+            if kept != sites:
+                self.conn.execute("UPDATE settings SET value = ? WHERE key = 'default_sites'", (json.dumps(kept),))
+        for table in ("publications", "test_runs", "site_sessions", "site_pins", "site_schedule"):
+            self.conn.execute(f"DELETE FROM {table} WHERE site IN ({marks})", REMOVED_SITES)
+        # ritmo, atraso, pausa, espera… de cada um ("rhythm_gelbooru", "blocked_rule34us", …)
+        for (key,) in self.conn.execute("SELECT key FROM settings").fetchall():
+            if key.endswith(tuple(f"_{site}" for site in REMOVED_SITES)):
+                self.conn.execute("DELETE FROM settings WHERE key = ?", (key,))
 
     def backup_to(self, target: Path) -> None:
         """Cópia consistente do banco (API de backup do SQLite), segura com o painel rodando."""

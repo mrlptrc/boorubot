@@ -51,41 +51,42 @@ def db(tmp_path, monkeypatch):
     d = DB(tmp_path / "p.db")
     d.set_setting("test_mode", "0")
     d.set_setting("daily_time", "00:00")
+    d.set_setting("assisted_rule34xxx", "")  # aqui o rule34.xxx é enviado pelo robô
     return d
 
 
 def art(db, title):
-    pid = db.create_post("a.png", title=title, tags="x", sites=["gelbooru"])
+    pid = db.create_post("a.png", title=title, tags="x", sites=["paheal"])
     db.approve(pid)
     return pid
 
 
 def test_site_down_pauses_the_site_not_the_art(db):
     a, b = art(db, "a"), art(db, "b")
-    assert publish_site(db, a, "gelbooru") == "site_down"
-    assert db.failures_in_a_row(a, "gelbooru") == 0          # não gasta tentativa da arte
-    assert not db.sessions()["gelbooru"]["ok"]                # site fica desconectado
+    assert publish_site(db, a, "paheal") == "site_down"
+    assert db.failures_in_a_row(a, "paheal") == 0          # não gasta tentativa da arte
+    assert not db.sessions()["paheal"]["ok"]                # site fica desconectado
     assert db.get_post(a)["status"] == "approved"             # arte continua na fila
     later = datetime.now() + timedelta(days=2)
-    assert site_due(db, "gelbooru", later) is None            # site pausado: não tenta nada
-    db.set_session("gelbooru", True, "sessão ativa")          # Entrar / Testar deu certo
-    assert site_due(db, "gelbooru", later)["id"] == a         # retoma da MESMA arte
+    assert site_due(db, "paheal", later) is None            # site pausado: não tenta nada
+    db.set_session("paheal", True, "sessão ativa")          # Entrar / Testar deu certo
+    assert site_due(db, "paheal", later)["id"] == a         # retoma da MESMA arte
 
 
 def test_a_night_logged_out_does_not_drop_any_art(db):
     ids = [art(db, t) for t in "abcde"]
-    publish_site(db, ids[0], "gelbooru")
+    publish_site(db, ids[0], "paheal")
     w = Worker(db)
     for _ in range(10):                                       # várias rodadas do agendador
         w.tick()
         assert not any(j.kind == "publish_site" for j in w.jobs.queue)
     assert Fake.calls == 1
-    assert all(db.failures_in_a_row(i, "gelbooru") == 0 for i in ids)
+    assert all(db.failures_in_a_row(i, "paheal") == 0 for i in ids)
 
 
 def test_paused_site_is_rechecked_every_30_minutes(db):
     art(db, "a")
-    db.set_session("gelbooru", False, "sem sessão")
+    db.set_session("paheal", False, "sem sessão")
     w = Worker(db)
     w.tick()
     w.tick()
@@ -93,13 +94,13 @@ def test_paused_site_is_rechecked_every_30_minutes(db):
     w.jobs.get()
     w.tick()
     assert w.jobs.empty()                                     # só daqui a 30 min
-    db.set_setting("recheck_gelbooru", (datetime.now() - timedelta(minutes=31)).isoformat(timespec="seconds"))
+    db.set_setting("recheck_paheal", (datetime.now() - timedelta(minutes=31)).isoformat(timespec="seconds"))
     w.tick()
     assert [j.kind for j in w.jobs.queue] == ["session"]
 
 
 def test_no_recheck_in_test_mode_or_without_pending_art(db):
-    db.set_session("gelbooru", False, "sem sessão")
+    db.set_session("paheal", False, "sem sessão")
     w = Worker(db)
     w.tick()
     assert w.jobs.empty()                                     # nada na fila do site
@@ -116,8 +117,8 @@ def test_art_failure_still_counts(db, monkeypatch):
 
     monkeypatch.setattr(worker_mod, "build_site", lambda n, db=None, test=False: Broken(n))
     a = art(db, "a")
-    assert publish_site(db, a, "gelbooru") == "failed"
-    assert db.failures_in_a_row(a, "gelbooru") == 1 and db.sessions().get("gelbooru") is None
+    assert publish_site(db, a, "paheal") == "failed"
+    assert db.failures_in_a_row(a, "paheal") == 1 and db.sessions().get("paheal") is None
 
 
 # --- o que é "falha do site" -------------------------------------------------------------------
@@ -153,13 +154,13 @@ def form_env(monkeypatch, tmp_path):
 
 def test_form_without_session_is_site_down(form_env):
     with pytest.raises(SiteUnavailable, match="sem sessão"):
-        forms.Gelbooru().publish(Post.load(EXAMPLE), dry_run=False)
+        forms.Paheal().publish(Post.load(EXAMPLE), dry_run=False)
 
 
 def test_form_captcha_is_site_down(form_env):
     form_env["captcha"] = True
     with pytest.raises(SiteUnavailable, match="captcha"):
-        forms.Gelbooru().publish(Post.load(EXAMPLE), dry_run=False)
+        forms.Paheal().publish(Post.load(EXAMPLE), dry_run=False)
 
 
 def test_danbooru_without_key_or_rejected_key_is_site_down():
@@ -229,15 +230,11 @@ def test_login_cookie_detection_accepts_prefix():
 
     assert forms.Paheal()._logged_in(Pg(["shm_user", "shm_session", "_ga"]))
     assert not forms.Paheal()._logged_in(Pg(["shm_accepted_terms", "_ga"]))
-    assert forms.Rule34us()._logged_in(Pg(["user_id", "pass_hash"]))
+    assert forms.Rule34xxx()._logged_in(Pg(["user_id", "pass_hash"]))
     assert not forms.Rule34xxx()._logged_in(Pg(["cf_clearance"]))
 
 
-def test_rule34us_upload_page_is_posts_create():
-    assert forms.Rule34us.upload_url.endswith("r=posts/create")
-
-
-# --- conta recusada pelo site (ex.: Gelbooru sem reputação) ---------------------------------------
+# --- conta recusada pelo site (ex.: conta sem reputação) ---------------------------------------
 
 def test_account_refused_blocks_site_until_a_person_tests(db):
     from boorubot.sites.base import AccountRefused
@@ -249,16 +246,16 @@ def test_account_refused_blocks_site_until_a_person_tests(db):
 
     worker_mod.build_site = lambda n, db=None, test=False: Refused(n)
     a = art(db, "a")
-    assert publish_site(db, a, "gelbooru") == "site_down"
-    assert db.failures_in_a_row(a, "gelbooru") == 0 and db.get_post(a)["status"] == "approved"
-    assert db.setting("blocked_gelbooru") == "1"
-    db.set_setting("recheck_gelbooru", (datetime.now() - timedelta(hours=2)).isoformat(timespec="seconds"))
+    assert publish_site(db, a, "paheal") == "site_down"
+    assert db.failures_in_a_row(a, "paheal") == 0 and db.get_post(a)["status"] == "approved"
+    assert db.setting("blocked_paheal") == "1"
+    db.set_setting("recheck_paheal", (datetime.now() - timedelta(hours=2)).isoformat(timespec="seconds"))
     w = Worker(db)
     w.tick()
     assert w.jobs.empty()                                     # não re-testa sozinho
     client = TestClient(app_mod.create_app(db, w, start_worker=False))
-    client.post("/sites/gelbooru/session")                    # a pessoa clicou em Testar
-    assert db.setting("blocked_gelbooru") == "" and [j.kind for j in w.jobs.queue] == ["session"]
+    client.post("/sites/paheal/session")                    # a pessoa clicou em Testar
+    assert db.setting("blocked_paheal") == "" and [j.kind for j in w.jobs.queue] == ["session"]
 
 
 def test_refusal_text_is_recognized():

@@ -153,7 +153,7 @@
                     {%- elif down %}
                       pediu login de novo · <button type="submit" class="bb-btn bb-btn--link" formaction="/sites/{{ r.site }}/login" formnovalidate>entrar</button>
                     {%- elif r.site != 'danbooru' and r.session_ok is none %}
-                      ainda não conectado · <a href="/guia#{{ 'rule34xxx' if r.site == 'rule34xxx' else 'gelbooru' }}">como entrar</a>
+                      ainda não conectado · <a href="/guia?passo={{ r.site }}#{{ r.site }}">como entrar</a>
                     {%- elif r.site == 'danbooru' %}
                       {%- if danbooru_mode == 'direct' %}<span class="warn">sua conta tem aprovação automática: vai ao ar na hora, sem moderação.</span> Confira rating e tags.
                       {%- elif danbooru_mode == 'forced' %}vai para a fila de moderação (você escolheu isso em Sites)

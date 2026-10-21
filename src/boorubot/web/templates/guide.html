@@ -120,33 +120,38 @@
       {{ pager('danbooru', 'Abrir o Danbooru em Sites', '/sites?painel=danbooru#painel-danbooru') }}
     </section>
 
-    <section class="guide-step{{ ' is-active' if active == 'gelbooru' }}" id="gelbooru">
-      {{ head('gelbooru', 5) }}
-      {{ state_box('gelbooru', 'Gelbooru, paheal e rule34.us estão conectados.', 'Um desses sites pediu login de novo. Em Sites, clique em Entrar nele.') }}
-      <p class="guide-lead">Esses sites conectam pelo navegador, do mesmo jeito que você entra normalmente.</p>
+    <section class="guide-step{{ ' is-active' if active == 'paheal' }}" id="paheal">
+      {{ head('paheal', 3) }}
+      {{ state_box('paheal', 'O paheal está conectado.', 'O paheal pediu login de novo. Em Sites, clique em Entrar.') }}
+      <p class="guide-lead">O paheal conecta pelo navegador, do mesmo jeito que você entra normalmente.</p>
       <ol class="guide-steps">
-        <li>Em <a href="/sites">Sites</a>, clique em <b>Entrar</b> no site.</li>
+        <li>Em <a href="/sites">Sites</a>, clique em <b>Entrar</b> no rule34.paheal.</li>
         <li>Uma <b>janela do navegador abre</b> na página de login. Entre com seu usuário e senha.</li>
         <li>Depois de entrar, <b>feche a janela</b>. O painel testa sozinho e mostra "conectado".</li>
-        <li>Repita para cada site.</li>
       </ol>
-      <div class="guide-tip" id="paheal"><p class="title-3">rule34.paheal não aceita OC</p>
+      <div class="guide-tip"><p class="title-3">O paheal só aceita série, personagem e artista</p>
+        <p>Tags de conteúdo (1girl, roupa, atos) fazem o envio ser recusado. Por isso cada arte tem as <b>Tags do paheal</b>, que a Mochi monta
+          sozinha; você pode editar no editor.</p></div>
+      <div class="guide-tip"><p class="title-3">rule34.paheal não aceita OC</p>
         <p>Quando a Mochi não acha nenhum personagem conhecido, ela marca a arte como personagem original e o paheal fica de fora sozinho.
           Você pode desmarcar no editor se ela errou.</p></div>
-      <p class="small home-muted" id="rule34us">rule34.us: se aparecer um "não sou um robô" na hora de entrar, resolva na própria janela.</p>
-      {{ pager('gelbooru', 'Abrir Sites', '/sites') }}
+      {{ pager('paheal', 'Abrir Sites', '/sites') }}
     </section>
 
     <section class="guide-step{{ ' is-active' if active == 'rule34xxx' }}" id="rule34xxx">
       {{ head('rule34xxx', 3) }}
-      {{ state_box('rule34xxx', 'O rule34.xxx está conectado.', 'O rule34.xxx pediu login de novo. Em Sites, clique em Entrar.') }}
-      <p class="guide-lead">Igual aos anteriores, com dois detalhes:</p>
+      {{ state_box('rule34xxx', 'O rule34.xxx é enviado à mão: o painel prepara, você envia.', 'O rule34.xxx pediu login de novo. Em Sites, clique em Entrar.') }}
+      <p class="guide-lead">A verificação da Cloudflare do rule34.xxx não deixa o robô entrar. Então esse site é enviado <b>à mão, pelo seu navegador</b>,
+        e o painel deixa tudo pronto.</p>
       <ol class="guide-steps">
-        <li>Ao abrir, pode aparecer uma tela de <b>"verificando se você é humano"</b>. Espere alguns segundos.</li>
-        <li>O login tem <b>captcha</b>: é você quem resolve, antes de clicar em <i>Log in</i>. A Mochi nunca mexe no captcha.</li>
+        <li>No dia da arte, o Início avisa: <b>"Hoje é dia de enviar … à mão no rule34.xxx"</b>. Clique em <b>Enviar</b>.</li>
+        <li>No editor, em <b>Enviar à mão</b>: baixe a arte e abra a página de envio. A verificação e o captcha você resolve lá.</li>
+        <li>Copie as tags, o rating e o título com os botões <b>copiar</b> e cole no site.</li>
+        <li>Depois de enviar, cole o link do post e clique em <b>Saiu</b>. Se não for enviar, clique em <b>Não vou enviar</b>.</li>
       </ol>
-      <div class="guide-tip"><p class="title-3">A janela também abre na hora de postar</p>
-        <p>Esse site bloqueia o modo invisível, então a janela abre fora da tela no envio. É normal: não feche, ela fecha sozinha.</p></div>
+      <div class="guide-tip"><p class="title-3">Regras do rule34.xxx</p>
+        <p>Pelo menos 5 tags, rating só Explicit ou Questionable, e a aprovação pode levar até 30 dias. Eles avisam que removem arte de
+          artista novo e esboços.</p></div>
       {{ pager('rule34xxx', 'Abrir Sites', '/sites') }}
     </section>
 
@@ -198,8 +203,9 @@
         <li><b>Uma conta por site.</b> Danbooru e paheal proíbem contas extras.</li>
         <li><b>Personagens sempre adultos</b> e nada de pessoas reais. Vale para todos os sites e é lei.</li>
         <li><b>Danbooru</b>: estilo anime, boa qualidade, de 10 a 20 tags ou mais e o crédito da artista. Nada de conteúdo pago ou bloqueado.</li>
-        <li><b>Gelbooru</b>: estilo japonês, sem marca d'água, boa qualidade. Conta nova precisa ganhar reputação participando do site.</li>
-        <li><b>rule34.paheal</b>: não aceita OC e não deixa criar tags novas sem falar com a moderação.</li>
+        <li><b>rule34.paheal</b>: não aceita OC, só aceita tags de série, personagem e artista, e não deixa criar tags novas sem falar com a moderação.</li>
+        <li><b>rule34.xxx</b>: pelo menos 5 tags, aprovação de até 30 dias, e eles removem arte de artista novo e esboços.</li>
+        <li><b>Gelbooru</b>: não precisa enviar. Ele copia sozinho as artes que saem no Danbooru.</li>
         <li><b>Ritmo</b>: 1 post por dia é tranquilo. Postar em rajada parece spam.</li>
       </ol>
       {{ pager('regras') }}

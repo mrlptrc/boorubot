@@ -50,8 +50,9 @@ def build_site(name: str, db=None, test: bool = False):
     raise SystemExit(f"site desconhecido: {name}")
 
 
-ALL_SITES = ("danbooru", "gelbooru", "paheal", "rule34us", "rule34xxx")
+ALL_SITES = ("danbooru", "paheal", "rule34xxx")
+# saíram do projeto: o Gelbooru já copia sozinho os posts do Danbooru e o envio do rule34.us está quebrado no site
+REMOVED_SITES = ("gelbooru", "rule34us")
 SITE_LABELS = {
-    "danbooru": "Danbooru", "gelbooru": "Gelbooru", "paheal": "rule34.paheal",
-    "rule34us": "rule34.us", "rule34xxx": "rule34.xxx",
+    "danbooru": "Danbooru", "paheal": "rule34.paheal", "rule34xxx": "rule34.xxx",
 }

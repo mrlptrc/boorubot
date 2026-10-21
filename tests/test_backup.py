@@ -19,8 +19,8 @@ def env(tmp_path, monkeypatch):
     images.mkdir(parents=True)
     monkeypatch.setattr(app_mod, "IMAGES_DIR", images)
     monkeypatch.setattr("boorubot.backup.IMAGES_DIR", images)
-    (tmp_path / ".profiles" / "gelbooru").mkdir(parents=True)
-    (tmp_path / ".profiles" / "gelbooru" / "Cookies").write_text("segredo")
+    (tmp_path / ".profiles" / "paheal").mkdir(parents=True)
+    (tmp_path / ".profiles" / "paheal" / "Cookies").write_text("segredo")
     db = DB(tmp_path / "data" / "boorubot.db")
     return db, images, tmp_path
 

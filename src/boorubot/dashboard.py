@@ -14,7 +14,7 @@ from boorubot.config import ALL_SITES, SITE_LABELS
 from boorubot.db import DB
 
 # nomes curtos para caber no cartão do dia (o nome completo vai no title)
-SITE_SHORT = {"danbooru": "Dan", "gelbooru": "Gel", "paheal": "paheal", "rule34us": "r34.us", "rule34xxx": "r34.xxx"}
+SITE_SHORT = {"danbooru": "Dan", "paheal": "paheal", "rule34xxx": "r34.xxx"}
 WEEKDAYS = ("seg", "ter", "qua", "qui", "sex", "sáb", "dom")
 LOW_RUNWAY_DAYS = 3
 

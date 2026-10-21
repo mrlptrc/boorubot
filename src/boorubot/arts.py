@@ -15,7 +15,7 @@ FILTERS = {"todas": "Todas", "revisar": "Para revisar", "fila": "Na fila", "publ
            "falha": "Com falha"}
 PAGE = 30
 WEEKDAYS = ("seg", "ter", "qua", "qui", "sex", "sáb", "dom")
-SITE_COLUMNS = {"danbooru": "Dan", "gelbooru": "Gel", "paheal": "pah", "rule34us": ".us", "rule34xxx": ".xxx"}
+SITE_COLUMNS = {"danbooru": "Dan", "paheal": "pah", "rule34xxx": ".xxx"}
 # marca de cada site na linha: saiu | vai (vai sair) | login (esperando login) | falhou | fora (fica de fora)
 MARK_TEXT = {"saiu": "saiu", "vai": "vai sair", "login": "esperando login", "falhou": "falhou", "fora": "fica de fora"}
 
@@ -65,7 +65,8 @@ def build(db: DB, filtro: str = "todas", q: str = "", limit: int = PAGE, now: da
         pubs_by_post.setdefault(p["post_id"], []).append(p)
     metrics = db.latest_metrics()
     sessions = db.sessions()
-    down = {s for s, sess in sessions.items() if not sess["ok"]}
+    # envio à mão não depende da sessão do robô
+    down = {s for s, sess in sessions.items() if not sess["ok"] and not db.assisted(s)}
     off = {s for s in ALL_SITES if db.site_rhythm(s) == "desligado"}
     queue_ids = [p["id"] for p in db.queue()]
     next_when: dict[int, datetime] = {}

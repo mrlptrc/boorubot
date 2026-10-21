@@ -28,7 +28,7 @@ def panel(tmp_path_factory):
     mp.setattr(app_mod, "IMAGES_DIR", images)
     mp.setattr("boorubot.db.IMAGES_DIR", images)
     db = DB(tmp / "test.db")
-    pid = db.create_post("a.png", title="bruxinha", tags=TAGS, sites=["danbooru", "gelbooru", "paheal"])
+    pid = db.create_post("a.png", title="bruxinha", tags=TAGS, sites=["danbooru", "rule34xxx", "paheal"])
     app = app_mod.create_app(db, Worker(db), start_worker=False)
     with socket.socket() as s:
         s.bind(("127.0.0.1", 0))
@@ -137,7 +137,7 @@ def test_editor_on_a_phone_summarizes_tags_and_sites_in_sheets(panel, browser):
     page.click(".ed-sites-open")
     assert page.is_visible("#sites-sheet")
     focus_stays_in(page, "#sites-sheet")
-    page.click('#sites-sheet .bb-site[data-site="gelbooru"] .bb-switch, #sites-sheet .bb-site[data-site="gelbooru"] label')
+    page.click('#sites-sheet .bb-site[data-site="rule34xxx"] .bb-switch, #sites-sheet .bb-site[data-site="rule34xxx"] label')
     assert page.inner_text("[data-sites-summary]").startswith("2 de ")
     page.keyboard.press("Escape")
 
