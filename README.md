@@ -101,3 +101,7 @@ nos sites e desligue o painel do computador antigo.
 - Design system em [`docs/design-system/`](docs/design-system/BRAND-BOOK.md): tokens em `tokens.css`,
   componentes `bb-*`; a tela `/_ui` mostra o catálogo. Cores sempre por token.
 - Sites novos: `src/boorubot/sites/` (`FormSite` para formulários; `Gelbooru02` cobre o motor Gelbooru 0.2).
+
+## Licença
+
+[MIT](LICENSE).

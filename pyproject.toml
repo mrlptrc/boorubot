@@ -5,6 +5,7 @@ description = "Painel local que publica artes em imageboards (Danbooru, rule34.p
 authors = [
     { name = "mrlptrc", email = "murilopatricio@gmail.com" }
 ]
+license = "MIT"
 requires-python = ">=3.13"
 dependencies = [
     "fastapi>=0.143.1",
