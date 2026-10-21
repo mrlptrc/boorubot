@@ -20,7 +20,7 @@ class DanbooruTagAPI:
         self.transport = transport
         self.ttl = ttl
         self.autocomplete_cache: dict[str, tuple[float, list[dict]]] = {}
-        self.exists_cache: dict[str, tuple[float, bool]] = {}
+        self.exists_cache: dict[str, tuple[float, bool, int | None]] = {}
 
     def _get(self, path: str, params, login: str, api_key: str):
         auth = (login, api_key) if login and api_key else None
@@ -61,7 +61,8 @@ class DanbooruTagAPI:
         self._trim(self.autocomplete_cache)
         return suggestions
 
-    def unknown(self, tags: Iterable[str], login: str = "", api_key: str = "") -> list[str]:
+    def _lookup(self, tags: Iterable[str], login: str, api_key: str) -> list[str]:
+        """Consulta /tags.json só das que não estão no cache; guarda se existe e a categoria."""
         names = list(dict.fromkeys(str(tag).strip().lower() for tag in tags if str(tag).strip()))[:200]
         now = time.monotonic()
         missing = [tag for tag in names if not self._fresh(self.exists_cache.get(tag), now)]
@@ -70,13 +71,22 @@ class DanbooruTagAPI:
             params = [("search[name_array][]", tag) for tag in batch]
             params.extend((("search[hide_empty]", "false"), ("limit", "100")))
             result = self._get("/tags.json", params, login, api_key)
-            found = {str(row.get("name", "")).lower() for row in result if isinstance(row, dict)} \
-                if isinstance(result, list) else set()
+            found = {str(row.get("name", "")).lower(): row.get("category")
+                     for row in result if isinstance(row, dict)} if isinstance(result, list) else {}
             saved_at = time.monotonic() + self.ttl
             for tag in batch:
-                self.exists_cache[tag] = (saved_at, tag in found)
+                self.exists_cache[tag] = (saved_at, tag in found, found.get(tag))
         self._trim(self.exists_cache)
+        return names
+
+    def unknown(self, tags: Iterable[str], login: str = "", api_key: str = "") -> list[str]:
+        names = self._lookup(tags, login, api_key)
         return [tag for tag in names if not self.exists_cache[tag][1]]
+
+    def categories(self, tags: Iterable[str], login: str = "", api_key: str = "") -> dict[str, int]:
+        """Categoria de cada tag no Danbooru (0 geral, 1 artista, 3 série, 4 personagem, 5 meta)."""
+        names = self._lookup(tags, login, api_key)
+        return {tag: self.exists_cache[tag][2] for tag in names if self.exists_cache[tag][2] is not None}
 
     @staticmethod
     def _trim(cache: dict, max_entries: int = 256) -> None:
