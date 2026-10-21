@@ -30,6 +30,9 @@
     <span><b>{{ a.others }} arte{{ 's' if a.others != 1 }}</b> aprovada{{ 's' if a.others != 1 }} no modo teste
       esperando confirmação. Elas não vão ao ar sozinhas.</span>
     <a href="#confirmar">Revisar</a>
+  {% elif a.kind == 'manual' %}
+    <span>Hoje é dia de enviar <b>{{ a.post.title or ('#' ~ a.post.id) }}</b> à mão no <b>{{ a.label }}</b>. O painel já deixou tudo pronto para copiar.</span>
+    <a href="/posts/{{ a.post.id }}#manual">Enviar</a>
   {% elif a.kind == 'session' %}
     <span>O <b>{{ a.label }}</b> pediu login de novo.{% if a.others %} Até lá, os posts saem só nos outros {{ a.others }} site{{ 's' if a.others != 1 }}.{% endif %}</span>
     <a href="/sites#{{ a.site }}">Entrar</a>

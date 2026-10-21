@@ -381,7 +381,7 @@ def create_app(db: DB | None = None, worker: Worker | None = None, start_worker:
         days_by_site = {s["site"]: s for s in site_days}
         site_rows = [{
             "site": s, "label": SITE_LABELS[s], "checked": s in row["sites"],
-            "off": db.site_rhythm(s) == "desligado", "done": s in done,
+            "off": db.site_rhythm(s) == "desligado", "done": s in done, "assisted": db.assisted(s),
             "when": days_by_site.get(s, {}).get("when"), "pinned": pins.get(s),
             # None = nunca testado; False = sessão caiu (pediu login de novo)
             "session_ok": bool(sessions[s]["ok"]) if s in sessions else None,
@@ -402,10 +402,53 @@ def create_app(db: DB | None = None, worker: Worker | None = None, start_worker:
             projected=min(planned) if planned else None, site_days=site_days, today=today.isoformat(),
             uncertain=[(s, SITE_LABELS[s]) for s in db.uncertain_sites(post_id)],
             refused=[(s, SITE_LABELS[s], why) for s, why in db.refused_sites(post_id).items()],
+            manual=manual_sends(row),
             queue_pos=queue_ids.index(post_id) + 1 if post_id in queue_ids else None, queue_len=len(queue_ids),
             published_today=any(db.site_last_published(s) and db.site_last_published(s).date() == today
                                 for s in row["sites"]),
         )
+
+    def manual_sends(row: dict) -> list[dict]:
+        """Envio assistido: o que ela precisa para enviar à mão em cada site que ainda falta.
+        Nada no modo teste: teste e produção nunca se misturam."""
+        from boorubot.db import to_post
+        from boorubot.sites.forms import FORM_SITES
+
+        if db.test_mode or row["status"] not in ("approved", "partial"):
+            return []
+        sites = [s for s in db.pending_sites(row) if db.assisted(s) and s in FORM_SITES]
+        if not sites:
+            return []
+        post = to_post(row)
+        return [{
+            "site": s, "label": SITE_LABELS[s], "upload_url": FORM_SITES[s].upload_url,
+            "tags": " ".join(post.tags_for(s)), "tag_count": len(post.tags_for(s)),
+            "rating": FORM_SITES[s].rating_values.get(row["rating"], [row["rating"]])[0].capitalize(),
+            "source": row["source"], "title": row["title"],
+        } for s in sites]
+
+    @app.post("/posts/{post_id}/manual")
+    def manual_send(post_id: int, site: str = Form(...), action: str = Form(...), url: str = Form("")):
+        """Ela enviou à mão (Saiu) ou decidiu não enviar (Pular) num site de envio assistido."""
+        from boorubot.worker import refresh_post_status
+
+        row = post_or_404(post_id)
+        if db.test_mode:
+            return see_other(f"/posts/{post_id}?erro=" + quote("modo teste ligado: nada vai ao ar, nem à mão"))
+        if not db.assisted(site) or site not in db.pending_sites(row):
+            return see_other(f"/posts/{post_id}")
+        if action == "saiu":
+            link = url.strip() if url.strip().startswith("http") else ""
+            db.add_publication(post_id, site, "ok", link, "enviado à mão")
+            db.mark_post_published_at(post_id)
+            aviso = f"Marcado como enviado no {SITE_LABELS[site]}."
+        elif action == "pular":
+            db.add_publication(post_id, site, "skipped", message="envio à mão: ela decidiu não enviar")
+            aviso = f"{SITE_LABELS[site]} pulado nesta arte."
+        else:
+            return see_other(f"/posts/{post_id}")
+        refresh_post_status(db, post_id)
+        return see_other(f"/posts/{post_id}?aviso=" + quote(aviso) + "&tipo=sucesso")
 
     def paheal_lookup(tags: list[str]) -> dict[str, int]:
         return tag_api.categories(tags, db.setting("danbooru_login"), db.setting("danbooru_api_key"))
@@ -645,7 +688,9 @@ def create_app(db: DB | None = None, worker: Worker | None = None, start_worker:
         for site in ALL_SITES:
             sess = sessions.get(site)
             checked = short_when(datetime.fromisoformat(sess["checked_at"])) if sess else ""
-            if site in logins:
+            if db.assisted(site):
+                state, text = "manual", "envio à mão: o painel prepara a arte e as tags, você envia pelo seu navegador"
+            elif site in logins:
                 state, text = "login", "esperando você entrar na janela que abriu"
             elif not sess:
                 state, text = "none", ("conecte com a chave de API" if site == "danbooru" else "ainda não conectado")
@@ -675,6 +720,16 @@ def create_app(db: DB | None = None, worker: Worker | None = None, start_worker:
     def sites_status():
         """A tela de Sites acompanha o login (fecha o "esperando login" sozinha quando a sessão fica ok)."""
         return {"rows": session_rows()}
+
+    @app.post("/sites/{name}/assistido")
+    def site_assisted(name: str, ligar: str = Form("1")):
+        """Envio assistido liga/desliga por site (só os de formulário; o Danbooru é por API)."""
+        from boorubot.sites.forms import FORM_SITES
+
+        if name not in FORM_SITES:
+            raise HTTPException(404)
+        db.set_setting(f"assisted_{name}", "1" if ligar == "1" else "")
+        return see_other(f"/sites#{name}")
 
     @app.post("/sites/{name}/cancelar")
     def cancel_login(name: str):

@@ -135,6 +135,7 @@ def test_no_metrics_yet(db):
 
 def test_session_down_is_the_first_alert(db):
     ids = approve_n(db, 1)
+    db.set_setting("assisted_rule34xxx", "")  # aqui o rule34.xxx é enviado pelo robô
     db.set_session("gelbooru", True, "ok")
     db.set_session("rule34xxx", False, "sem sessão")
     db.set_setting("backup_dir", r"C:\bk")

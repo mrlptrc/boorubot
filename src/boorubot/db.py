@@ -140,6 +140,8 @@ DEFAULT_SETTINGS = {
     "danbooru_level": "",          # preenchido pelo teste de conexão (nível real da conta)
     "danbooru_level_string": "",
     "danbooru_force_pending": "0",  # 1 = mesmo Contributor, manda para a fila de moderação
+    # envio assistido: o robô prepara, ela envia pelo navegador dela (a Cloudflare do rule34.xxx barra o robô)
+    "assisted_rule34xxx": "1",
     "last_published_at": "",  # último post real: base do limitador de ritmo
     "metrics_last_run": "",   # última coleta de métricas bem-sucedida
     "metrics_last_attempt": "",  # data da última tentativa: evita repetir a cada 30 s se a API cair
@@ -216,6 +218,10 @@ class DB:
             return [dict(r) for r in self.conn.execute(sql, params).fetchall()]
 
     # --- settings ----------------------------------------------------------------
+
+    def assisted(self, site: str) -> bool:
+        """Site de envio assistido: o robô não abre o site; ela envia à mão e marca no painel."""
+        return self.setting(f"assisted_{site}") == "1"
 
     def setting(self, key: str) -> str:
         rows = self._all("SELECT value FROM settings WHERE key = ?", (key,))

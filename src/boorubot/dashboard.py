@@ -120,21 +120,31 @@ def week_favorites(db: DB, now: datetime) -> dict:
 
 @dataclass
 class Alert:
-    kind: str           # confirm | session | backup | test_mode
+    kind: str           # confirm | manual | session | backup | test_mode
     site: str = ""
     label: str = ""
     others: int = 0     # quantos sites do próximo post continuam funcionando
+    post: dict | None = None  # manual: a arte que é para ela enviar hoje
 
 
 def alerts(db: DB, sites_in_use: list[str], next_post: dict | None) -> list[Alert]:
-    """Do mais importante para o menos: sessão caída (trava publicação), backup falhando, modo teste."""
+    """Do mais importante para o menos: confirmar o teste, envio à mão do dia, sessão caída (trava
+    publicação), backup falhando, modo teste."""
     found: list[Alert] = []
     if not db.test_mode and db.needs_confirmation():
         found.append(Alert("confirm", others=len(db.needs_confirmation())))
+    if not db.test_mode:
+        from boorubot.scheduler import turn_now
+
+        for site in ALL_SITES:  # envio assistido: chegou a vez de uma arte, quem envia é ela
+            post = turn_now(db, site) if db.assisted(site) and db.site_rhythm(site) != "desligado" else None
+            if post:
+                found.append(Alert("manual", site, SITE_LABELS[site], post=post))
     sessions = db.sessions()
     for site in ALL_SITES:
         sess = sessions.get(site)
-        if site in sites_in_use and sess and not sess["ok"]:
+        if (site in sites_in_use and sess and not sess["ok"] and not db.assisted(site)
+                and db.site_rhythm(site) != "desligado"):
             others = len([s for s in (next_post or {}).get("sites", []) if s != site
                           and (sessions.get(s) or {}).get("ok", 1)])
             found.append(Alert("session", site, SITE_LABELS[site], others))

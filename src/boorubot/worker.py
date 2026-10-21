@@ -102,6 +102,8 @@ def publish_post(db: DB, post_id: int) -> str:
     post = _ready_post(db, row)
     results = []
     for site in db.pending_sites(row):
+        if db.assisted(site):
+            continue  # envio assistido: ela envia pelo navegador dela
         status = _send(db, post, post_id, site)
         _after_send(db, post_id, site, status)
         results.append(status)
@@ -151,6 +153,10 @@ def run_post_test(db: DB, post_id: int) -> list[str]:
     results = []
     for name in row["sites"]:
         upload = name == "danbooru" and has_test_account
+        if db.assisted(name):
+            db.add_test_run(post_id, name, "skipped", message="envio à mão: o robô não abre este site")
+            results.append("skipped")
+            continue
         try:
             result = build_site(name, db, test=True).publish(post, dry_run=not upload)
             status = ("test_upload" if upload else "dry_run") if result.ok else "failed"
@@ -310,7 +316,7 @@ class Worker:
             return
         now = datetime.now()
         for site, sess in self.db.sessions().items():
-            if site not in ALL_SITES or sess["ok"] or not pending_posts(self.db, site):
+            if site not in ALL_SITES or sess["ok"] or not pending_posts(self.db, site) or self.db.assisted(site):
                 continue
             if self.db.setting(f"blocked_{site}") == "1":
                 continue  # conta recusada pelo site: re-testar sozinho não resolve e pode piorar

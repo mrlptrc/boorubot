@@ -138,6 +138,22 @@
     });
   }, true);
 
+  // ------------------------------------------------------ copiar campo
+  // botão com data-copy="#id": copia o valor do campo (envio à mão)
+  document.addEventListener("click", async (ev) => {
+    const btn = ev.target.closest("[data-copy]");
+    if (!btn) return;
+    const field = document.querySelector(btn.dataset.copy);
+    if (!field) return;
+    try {
+      await navigator.clipboard.writeText(field.value);
+    } catch (e) {  // sem permissão de área de transferência: seleciona para ela copiar com Ctrl+C
+      field.select();
+      document.execCommand && document.execCommand("copy");
+    }
+    toast("Copiado.", { kind: "sucesso", duration: 2500 });
+  });
+
   // --------------------------------------------------- folhas no celular
   // clique no véu fecha; arrastar a folha para baixo (pela alça ou pelo topo) também
   document.querySelectorAll("dialog.bb-sheet").forEach((sheet) => {
