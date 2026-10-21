@@ -247,7 +247,7 @@ class FormSite(Site):
         self._fill_text(form, "source", post.source)
         self._fill_text(form, "title", post.title)
         self._set_rating(form, post.rating)
-        # rule34.us só mostra source/tags (com animação) depois de escolher o arquivo:
+        # alguns formulários só mostram source/tags (com animação) depois de escolher o arquivo:
         # espera terminar para o print mostrar o que foi preenchido
         page.wait_for_timeout(1000)
 
@@ -297,22 +297,13 @@ class FormSite(Site):
         button.first.click()
 
 
-class Gelbooru(FormSite):
-    name = "gelbooru"
-    home_url = "https://gelbooru.com/"
-    login_url = "https://gelbooru.com/index.php?page=account&s=login&code=00"
-    upload_url = "https://gelbooru.com/index.php?page=post&s=add"
-    # formulário real (conferido logado): g / s / q / e. Aqui "s" é SENSÍVEL, não "safe".
-    rating_values = {
-        "general": ["general", "g"],
-        "sensitive": ["sensitive", "s"],
-        "questionable": ["questionable", "q"],
-        "explicit": ["explicit", "e"],
-    }
+class Gelbooru02(FormSite):
+    """Motor Gelbooru 0.2 (page=post&s=add). O Gelbooru em si saiu do projeto: ele copia sozinho os
+    posts do Danbooru. Fica a base do rule34.xxx, que usa o mesmo motor."""
     success_url = re.compile(r"page=post&s=view&id=\d+")
 
 
-class Rule34xxx(Gelbooru):
+class Rule34xxx(Gelbooru02):
     """Mesmo engine do Gelbooru 0.2, mas com captcha próprio + Cloudflare na frente."""
     name = "rule34xxx"
     needs_headed = True
@@ -354,34 +345,6 @@ class Paheal(FormSite):
             raise SkipPost("paheal proíbe imagens só com personagem original (regra 18)")
 
 
-class Rule34us(FormSite):
-    name = "rule34us"
-    home_url = "https://rule34.us/"
-    login_url = "https://rule34.us/index.php?r=account/login"
-    # conferido logado: não há link no menu; o formulário fica em posts/create
-    # (arquivo; source e tags aparecem depois de escolher o arquivo; não tem campo de rating)
-    upload_url = "https://rule34.us/index.php?r=posts/create"
-    rating_values = {
-        "general": ["safe", "s", "general"],
-        "sensitive": ["questionable", "q"],
-        "questionable": ["questionable", "q"],
-        "explicit": ["explicit", "e"],
-    }
-    success_url = re.compile(r"r=posts/view&id=\d+")
-
-    def _content_refused(self, page: Page) -> str:
-        # depois do envio o site às vezes volta para o formulário vazio, sem mensagem e sem criar o post
-        try:
-            empty_form = "posts/create" in page.url and page.locator("form input[type=file]").count() > 0 \
-                and not page.locator("form input[type=file]").first.input_value()
-        except Exception:
-            return ""
-        if empty_form:
-            return ("o rule34.us voltou para o formulário vazio, sem criar o post e sem dizer o motivo. "
-                    "Tente subir uma arte à mão no site para ver se a conta consegue enviar")
-        return ""
-
-
 FORM_SITES: dict[str, type[FormSite]] = {
-    cls.name: cls for cls in (Gelbooru, Rule34xxx, Paheal, Rule34us)
+    cls.name: cls for cls in (Rule34xxx, Paheal)
 }
