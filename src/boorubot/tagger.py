@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import csv
 import threading
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 import numpy as np
@@ -17,6 +17,7 @@ from PIL import Image
 
 MODEL_REPO = "SmilingWolf/wd-vit-tagger-v3"
 GENERAL_THRESHOLD = 0.35
+WEAK_THRESHOLD = 0.25  # entre este e o GENERAL_THRESHOLD: "a IA também viu" (nunca entra sozinha)
 CHARACTER_THRESHOLD = 0.85
 RATING_CATEGORY, GENERAL_CATEGORY, CHARACTER_CATEGORY = "9", "0", "4"
 
@@ -27,10 +28,15 @@ class Suggestion:
     rating_scores: dict[str, float]
     general: list[tuple[str, float]]
     characters: list[tuple[str, float]]
+    weak: list[tuple[str, float]] = field(default_factory=list)
 
     @property
     def tags(self) -> list[str]:
         return [t for t, _ in self.characters] + [t for t, _ in self.general]
+
+    @property
+    def scores(self) -> dict[str, float]:
+        return {t: round(float(v), 3) for t, v in self.characters + self.general}
 
 
 class Tagger:
@@ -39,6 +45,18 @@ class Tagger:
         self._session = None
         self._labels: list[tuple[str, str]] = []
         self._lock = threading.Lock()
+
+    @property
+    def model_ready(self) -> bool:
+        """Modelo já está no PC (carregado ou no cache)? Se não, a próxima análise baixa ~380 MB."""
+        if self._session is not None:
+            return True
+        try:
+            from huggingface_hub import try_to_load_from_cache
+
+            return isinstance(try_to_load_from_cache(self.repo, "model.onnx"), str)
+        except Exception:
+            return False
 
     def _load(self) -> None:
         if self._session is not None:
@@ -72,7 +90,7 @@ class Tagger:
             inputs = {self._session.get_inputs()[0].name: self._prepare(path)}
             scores = self._session.run(None, inputs)[0][0].astype(float)
 
-        ratings, general, characters = {}, [], []
+        ratings, general, characters, weak = {}, [], [], []
         for (name, category), score in zip(self._labels, scores):
             if category == RATING_CATEGORY:
                 ratings[name] = score
@@ -80,11 +98,14 @@ class Tagger:
                 characters.append((name, score))
             elif category == GENERAL_CATEGORY and score > GENERAL_THRESHOLD:
                 general.append((name, score))
+            elif category == GENERAL_CATEGORY and score > WEAK_THRESHOLD:
+                weak.append((name, score))
         return Suggestion(
             rating=max(ratings, key=ratings.get),
             rating_scores=ratings,
             general=sorted(general, key=lambda x: -x[1]),
             characters=sorted(characters, key=lambda x: -x[1]),
+            weak=sorted(weak, key=lambda x: -x[1]),
         )
 
 

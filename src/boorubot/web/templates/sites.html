@@ -1,203 +1,170 @@
 {% extends "base.html" %}
+{% import "_ui.html" as ui %}
 {% block title %}Sites · boorubot{% endblock %}
 {% block content %}
-{% if error %}<div class="alert">{{ error }}</div>{% endif %}
-<h2>Contas conectadas</h2>
-<p class="muted">Primeira vez? Siga o <a href="/guia">guia de conexão</a>, que leva uns 10 minutos.</p>
-
-<div class="site-list">
-  {% set sess = sessions.get('danbooru') %}
-  <div class="card site site-danbooru" id="danbooru">
-    <div class="site-head">
-      <div>
-        <strong>Danbooru</strong> <small class="muted">conta real</small>
-        {% if sess %}<span class="pill {{ 's-ok' if sess.ok else 's-failed' }}">{{ 'conectado' if sess.ok else 'desconectado' }}</span>
-        {% else %}<span class="pill">não conectado</span>{% endif %}
-        <div class="muted small">{% if sess %}{{ sess.message }} · checado {{ sess.checked_at[8:10] }}/{{ sess.checked_at[5:7] }} {{ sess.checked_at[11:16] }}{% else %}conecta por chave de API (sem abrir navegador){% endif %}</div>
-      </div>
-      <a class="small" href="/guia#danbooru">Como conectar?</a>
-    </div>
-    <form method="post" action="/settings/danbooru" class="inline-form">
-      <label>Usuário do Danbooru <input name="login" value="{{ danbooru_login }}" autocomplete="off" placeholder="seu_nome_de_usuario"></label>
-      <label>Chave de API <input name="api_key" type="password" autocomplete="new-password"
-        placeholder="{{ 'salva (' ~ danbooru_key_hint ~ '). Deixe vazio para manter' if danbooru_key_hint else 'cole a chave aqui' }}"></label>
-      <div class="level-box">
-        {% if danbooru_mode == 'unknown' %}
-          <p class="muted small">Ao conectar, o painel lê o <b>nível da sua conta</b> e mostra como os posts vão entrar no Danbooru.</p>
-        {% elif danbooru_mode == 'moderated' %}
-          <p><span class="pill s-approved">{{ danbooru_level }}</span> Seus posts vão para a <b>fila de moderação</b>:
-          a staff tem até 3 dias para aprovar, e contas desse nível têm um limite de uploads pendentes ao mesmo tempo.</p>
-        {% else %}
-          <p><span class="pill s-ok">{{ danbooru_level }}</span> Sua conta tem <b>aprovação automática</b>: o post vai ao ar na hora,
-          <b>sem ninguém conferir antes</b>. Tag ou rating errado fica publicado na sua conta.</p>
-        {% endif %}
-        {% if danbooru_mode in ('direct', 'forced') %}
-        <label class="check">
-          <input type="checkbox" name="force_pending" value="true" {{ 'checked' if force_pending }}>
-          Mandar meus posts para a fila de moderação mesmo assim
-          <small>mais seguro no começo: a staff confere antes de ir ao ar</small>
-        </label>
-        {% elif force_pending %}<input type="hidden" name="force_pending" value="true">{% endif %}
-      </div>
-      <div class="actions">
-        <button class="primary">Salvar e testar</button>
-        <button class="ghost" formaction="/sites/danbooru/session">Testar</button>
-        {% if danbooru_key_hint %}<button class="danger" formaction="/settings/danbooru/remove" data-confirm="Remover a chave do painel?">Remover chave</button>{% endif %}
-      </div>
-    </form>
-
-    {% set tsess = sessions.get('danbooru_test') %}
-    <details class="test-account" id="danbooru-test" {{ 'open' if danbooru_test_key_hint }}>
-      <summary>Conta de teste (testbooru) <small class="muted">opcional, para o técnico</small>
-        {% if tsess %}<span class="pill {{ 's-ok' if tsess.ok else 's-failed' }}">{{ 'conectada' if tsess.ok else 'desconectada' }}</span>{% endif %}
-      </summary>
-      <p class="muted small">Usada <b>só</b> pelo botão "Testar este post": com ela, o teste envia de verdade para o
-        <a href="https://testbooru.donmai.us" target="_blank">testbooru</a> (site de testes do Danbooru, separado do real).
-        Sem ela, o teste do Danbooru só simula. <b>Nunca</b> é usada na publicação real.
-        {% if tsess %}<br>{{ tsess.message }}{% endif %}</p>
-      <form method="post" action="/settings/danbooru-test" class="inline-form">
-        <label>Usuário no testbooru <input name="login" value="{{ danbooru_test_login }}" autocomplete="off"></label>
-        <label>Chave de API do testbooru <input name="api_key" type="password" autocomplete="new-password"
-          placeholder="{{ 'salva (' ~ danbooru_test_key_hint ~ '). Deixe vazio para manter' if danbooru_test_key_hint else 'cole a chave aqui' }}"></label>
-        <div class="actions">
-          <button class="ghost">Salvar e testar</button>
-          {% if danbooru_test_key_hint %}<button class="danger" name="remove" value="true">Remover</button>{% endif %}
-        </div>
-      </form>
-    </details>
+<header class="page-head page-head--row page-head--pet">
+  <div>
+    <h1 class="display">Sites</h1>
+    <p class="body-lg">Suas contas em cada booru. A senha é digitada no próprio site e não fica salva aqui.</p>
   </div>
+  {{ ui.pet("puppy", 88) }}
+</header>
+{% if error %}<div class="ed-alert" role="alert">{{ error }}</div>{% endif %}
 
-  {% for s in ALL_SITES if s != 'danbooru' %}
-  {% set sess = sessions.get(s) %}
-  <div class="card site" id="{{ s }}">
-    <div class="site-head">
-      <div>
-        <strong>{{ SITE_LABELS[s] }}</strong>
-        {% if sess %}<span class="pill {{ 's-ok' if sess.ok else 's-failed' }}">{{ 'conectado' if sess.ok else 'desconectado' }}</span>
-        {% else %}<span class="pill">não conectado</span>{% endif %}
-        <div class="muted small">
-          {% if sess %}{{ sess.message }} · checado {{ sess.checked_at[8:10] }}/{{ sess.checked_at[5:7] }} {{ sess.checked_at[11:16] }}
-          {% else %}"Entrar" abre o site numa janela: faça login e feche a janela{% endif %}
-          {% if s == 'rule34xxx' %}<br>tem captcha no login, resolva na janela{% endif %}
-        </div>
+<ul class="site-list" data-site-list>
+  {% for r in rows %}
+  {% set s = r.site %}
+  <li class="bb-card site-card site-card--{{ r.state }}" id="{{ s }}" data-site-row="{{ s }}">
+    <div class="site-card__main">
+      <span class="site-card__dot" aria-hidden="true"></span>
+      <div class="site-card__text">
+        <h2 class="title-3">{{ r.label }}</h2>
+        <p class="site-card__state" data-site-text>
+          {%- if s == 'danbooru' and r.state == 'ok' %}conectado por chave de API{% if danbooru_level %} · conta {{ danbooru_level }}{% endif %}
+            {%- if danbooru_mode in ('moderated', 'forced') %} · posts vão para moderação{% elif danbooru_mode == 'direct' %} · posts vão direto ao ar{% endif %}
+          {%- else %}{{ r.text }}{% endif %}
+          {%- if s == 'paheal' %} · não aceita OC{% endif %}
+        </p>
       </div>
-      <div class="actions">
-        <a class="small" href="/guia#{{ s }}">Como conectar?</a>
-        <form method="post" action="/sites/{{ s }}/login"><button class="primary">Entrar</button></form>
-        <form method="post" action="/sites/{{ s }}/session"><button class="ghost">Testar</button></form>
+      <div class="site-card__actions">
+        {% if r.state == 'login' %}
+          <form method="post" action="/sites/{{ s }}/cancelar">{{ ui.button("Cancelar", tipo="secundario", size="sm", type="submit") }}</form>
+        {% else %}
+          {% if s != 'danbooru' and r.state in ('down', 'none') %}
+          <form method="post" action="/sites/{{ s }}/login" data-login-form>{{ ui.button("Entrar", size="sm", type="submit") }}</form>
+          {% endif %}
+          {% if r.state != 'none' or s == 'danbooru' %}
+          <form method="post" action="/sites/{{ s }}/session">{{ ui.button("Testar", tipo="secundario", size="sm", type="submit") }}</form>
+          {% endif %}
+        {% endif %}
+        <a class="site-card__open" href="/sites?painel={{ s }}#painel-{{ s }}" data-dialog-open="painel-{{ s }}" aria-label="Abrir {{ r.label }}">›</a>
       </div>
     </div>
-    <details class="test-account">
-      <summary>Avançado <small class="muted">como o navegador aparece no envio real: {{ BROWSER_MODE_LABELS[send_modes[s]] }}</small></summary>
-      <form method="post" action="/settings/browser/{{ s }}" class="inline-form">
-        <label>Navegador no envio real
-          <select name="mode">
+    {% if r.state == 'login' %}
+    <div class="site-card__wait" role="status">
+      {{ ui.mochi_note("Faça login na janela que abriu. Eu espero aqui.",
+           ("Esse site tem captcha: é você quem resolve, a Mochi nunca mexe no captcha. " if s == 'rule34xxx' else "") ~ "Quando terminar, feche a janela: eu testo a conta sozinha.", "feliz") }}
+      <span class="site-card__spin" aria-hidden="true"></span>
+    </div>
+    {% endif %}
+  </li>
+  {% endfor %}
+</ul>
+<p class="site-foot">Horário do post, tags padrão, modo teste e backup ficam em <a href="/ajustes">Ajustes</a>.
+  Primeira vez? O <a href="/guia">Guia</a> mostra como conectar cada site em uns 10 minutos.</p>
+
+{# painéis laterais (gaveta à direita); sem JavaScript, ?painel=site deixa o painel aberto na página #}
+{% set sess = sessions.get('danbooru') %}
+<dialog class="bb-drawer" id="painel-danbooru" aria-labelledby="painel-danbooru-t" {{ 'open' if painel == 'danbooru' }}>
+  <form method="post" action="/settings/danbooru" class="bb-drawer__form">
+    <header class="bb-drawer__head">
+      <div>
+        <h2 class="title-1" id="painel-danbooru-t">Danbooru</h2>
+        <p class="site-card__state site-card--{{ 'ok' if sess and sess.ok else 'down' if sess else 'none' }}"><span class="site-card__dot" aria-hidden="true"></span>
+          {{ rows[0].text }}</p>
+      </div>
+      <a class="na-close" href="/sites" data-dialog-cancel aria-label="Fechar">{{ ui.icon("fechar") }}</a>
+    </header>
+    <div class="bb-drawer__body">
+      {{ ui.field("login", "Usuário", value=danbooru_login, placeholder="seu_nome_de_usuario", attrs={"autocomplete": "off", "id": "dan-login"}) }}
+      <div class="bb-field">
+        <div class="drawer-label-row"><label class="bb-field__label" for="dan-key">Chave de API</label>
+          <a class="small" href="/guia#danbooru">como pegar a chave?</a></div>
+        <input class="bb-input" id="dan-key" name="api_key" type="password" autocomplete="new-password"
+          placeholder="{{ 'salva (' ~ danbooru_key_hint ~ ') · deixe vazio para manter' if danbooru_key_hint else 'cole a chave aqui' }}">
+      </div>
+      <div class="drawer-level">
+        {% if danbooru_mode == 'unknown' %}
+          <p>Ao conectar, o painel lê o <b>nível da sua conta</b> e mostra como os posts entram no Danbooru.</p>
+        {% elif danbooru_mode == 'moderated' %}
+          <p class="drawer-level__title"><span class="drawer-level__chip">{{ danbooru_level }}</span> Posts vão para moderação</p>
+          <p>A staff do Danbooru tem até 3 dias para aprovar, e contas desse nível têm limite de envios pendentes ao mesmo tempo.</p>
+        {% else %}
+          <p class="drawer-level__title"><span class="drawer-level__chip">{{ danbooru_level }}</span> Aprovação automática</p>
+          <p>O post vai ao ar na hora, <b>sem ninguém conferir antes</b>. Tag ou rating errado fica publicado na sua conta.</p>
+        {% endif %}
+      </div>
+      {% if danbooru_mode in ('direct', 'forced') %}
+        {{ ui.toggle("force_pending", force_pending, "Mandar para moderação mesmo assim", value="true") }}
+        <p class="small home-muted">Mais seguro no começo: a staff confere antes de ir ao ar.</p>
+      {% elif force_pending %}<input type="hidden" name="force_pending" value="true">{% endif %}
+
+      {% set tsess = sessions.get('danbooru_test') %}
+      <details class="drawer-more" {{ 'open' if painel == 'danbooru' and danbooru_test_key_hint and not (tsess and tsess.ok) }}>
+        <summary><span><b>Conta de teste (testbooru)</b><small>opcional, para o técnico · usada só no "Testar sem publicar"</small></span>
+          {% if tsess %}{{ ui.status('conectada' if tsess.ok else 'desconectada', 'publicado' if tsess.ok else 'falhou') }}{% endif %}</summary>
+        <p class="small home-muted">Com ela, o teste envia de verdade para o testbooru (site de testes do Danbooru, separado do real).
+          Sem ela, o teste do Danbooru só simula. <b>Nunca</b> é usada na publicação real.{% if tsess %} {{ tsess.message }}{% endif %}</p>
+        <div class="drawer-test">
+          {{ ui.field("login", "Usuário no testbooru", value=danbooru_test_login, attrs={"form": "dan-test-form", "autocomplete": "off", "id": "dan-test-login"}) }}
+          <div class="bb-field">
+            <label class="bb-field__label" for="dan-test-key">Chave de API do testbooru</label>
+            <input class="bb-input" id="dan-test-key" name="api_key" form="dan-test-form" type="password" autocomplete="new-password"
+              placeholder="{{ 'salva (' ~ danbooru_test_key_hint ~ ') · deixe vazio para manter' if danbooru_test_key_hint else 'cole a chave aqui' }}">
+          </div>
+          <div class="drawer-test__actions">
+            {{ ui.button("Salvar conta de teste", tipo="secundario", size="sm", type="submit", attrs={"form": "dan-test-form"}) }}
+            {% if danbooru_test_key_hint %}{{ ui.button("Remover", tipo="link", type="submit", attrs={"form": "dan-test-form", "name": "remove", "value": "true", "class": "is-danger"}) }}{% endif %}
+          </div>
+        </div>
+      </details>
+    </div>
+    <footer class="bb-drawer__foot">
+      {% if danbooru_key_hint %}{{ ui.button("Remover chave", tipo="link", type="submit", attrs={"formaction": "/settings/danbooru/remove", "class": "is-danger", "data-confirm": "A chave sai do painel e os posts param de ir para o Danbooru até você conectar de novo.", "data-confirm-title": "Remover a chave?", "data-confirm-danger": ""}) }}{% endif %}
+      <span class="bb-drawer__spacer"></span>
+      {{ ui.button("Testar", tipo="secundario", type="submit", attrs={"formaction": "/sites/danbooru/session"}) }}
+      {{ ui.button("Salvar e testar", type="submit") }}
+    </footer>
+  </form>
+  <form id="dan-test-form" method="post" action="/settings/danbooru-test" hidden></form>
+</dialog>
+
+{% for r in rows if r.site != 'danbooru' %}
+{% set s = r.site %}
+<dialog class="bb-drawer" id="painel-{{ s }}" aria-labelledby="painel-{{ s }}-t" {{ 'open' if painel == s }}>
+  <div class="bb-drawer__form">
+    <header class="bb-drawer__head">
+      <div>
+        <h2 class="title-1" id="painel-{{ s }}-t">{{ r.label }}</h2>
+        <p class="site-card__state site-card--{{ r.state }}"><span class="site-card__dot" aria-hidden="true"></span>{{ r.text }}</p>
+      </div>
+      <a class="na-close" href="/sites" data-dialog-cancel aria-label="Fechar">{{ ui.icon("fechar") }}</a>
+    </header>
+    <div class="bb-drawer__body">
+      <p>"Entrar" abre o site numa janela. Faça login{{ ' (o captcha é você quem resolve)' if s == 'rule34xxx' }} e feche a janela: a sessão fica salva neste PC.</p>
+      {% if r.detail %}<p class="small home-muted">Último teste: {{ r.detail }}</p>{% endif %}
+      {% if s == 'paheal' %}<p class="small home-muted">Regra do site: arte só com personagem original (OC) fica de fora.</p>{% endif %}
+      <details class="drawer-more">
+        <summary><span><b>Avançado</b><small>como o navegador aparece no envio real: {{ BROWSER_MODE_LABELS[send_modes[s]] }}</small></span></summary>
+        <form method="post" action="/settings/browser/{{ s }}" class="drawer-test">
+          <label class="bb-field__label" for="mode-{{ s }}">Navegador no envio real</label>
+          <select class="bb-input" id="mode-{{ s }}" name="mode">
             {% for m in ('headless', 'hidden', 'visible') %}
               {% if not (s == 'rule34xxx' and m == 'headless') %}
               <option value="{{ m }}" {{ 'selected' if send_modes[s] == m }}>{{ BROWSER_MODE_LABELS[m] }}{{ ' (padrão)' if default_modes[s] == m }}</option>
               {% endif %}
             {% endfor %}
           </select>
-        </label>
-        <div class="actions"><button class="ghost">Salvar</button></div>
-      </form>
-      <p class="muted small">Só troque se o envio desse site começar a falhar sem janela. O login é sempre numa janela visível.</p>
-    </details>
+          <p class="small home-muted">Só troque se o envio desse site começar a falhar sem janela. O login é sempre numa janela visível.</p>
+          <div class="drawer-test__actions">{{ ui.button("Salvar", tipo="secundario", size="sm", type="submit") }}</div>
+        </form>
+      </details>
+    </div>
+    <footer class="bb-drawer__foot">
+      <span class="bb-drawer__spacer"></span>
+      <form method="post" action="/sites/{{ s }}/session">{{ ui.button("Testar", tipo="secundario", type="submit") }}</form>
+      <form method="post" action="/sites/{{ s }}/login">{{ ui.button("Entrar", type="submit") }}</form>
+    </footer>
   </div>
-  {% endfor %}
-</div>
+</dialog>
+{% endfor %}
 
-<h2 id="inicio">Iniciar com o Windows</h2>
-<div class="card site">
-  <div>
-    {% if not startup.supported %}
-      <strong>Início automático</strong> <span class="pill">só no Windows</span>
-    {% elif startup.installed %}
-      <strong>Início automático</strong> <span class="pill s-ok">ligado</span>
-      <div class="muted small">O painel abre escondido quando o Windows inicia, sem janela na tela. Os posts saem mesmo se você esquecer de abrir.
-        <br>O PC também <b>não pode estar dormindo</b> no horário do post: <a href="/guia#pc-acordado">veja como ajustar</a>.</div>
-    {% else %}
-      <strong>Início automático</strong> <span class="pill s-failed">desligado</span>
-      <div class="muted small">Se o painel não estiver aberto no horário, o post do dia não sai. Recomendado: ligar.
-        <br>O PC também <b>não pode estar dormindo</b> no horário do post: <a href="/guia#pc-acordado">veja como ajustar</a>.</div>
-    {% endif %}
-  </div>
-  {% if startup.supported %}
-  <form method="post" action="/settings/startup" class="actions">
-    {% if startup.installed %}
-      <button class="ghost" name="action" value="remove">Desligar</button>
-    {% else %}
-      <button class="primary" name="action" value="install">Ligar</button>
-    {% endif %}
-  </form>
-  {% endif %}
-</div>
-
-<h2 id="backup">Backup diário</h2>
-<form method="post" action="/settings/backup" class="card settings">
-  <p class="muted small">Uma vez por dia, o painel copia o banco (fila, histórico, configurações) e as imagens para esta pasta.
-    Use uma pasta do <b>OneDrive</b> ou do Google Drive para ter cópia fora do PC. Os logins dos sites <b>não</b> vão para o backup
-    (por segurança); se precisar, é só entrar de novo em cada site.</p>
-  <label>Pasta de backup
-    <input name="backup_dir" value="{{ backup_dir }}" placeholder="C:\Users\voce\OneDrive\boorubot-backup">
-  </label>
-  <p class="small">
-    {% if not backup_dir %}<span class="pill">desligado</span>
-    {% elif last_backup_at %}
-      <span class="pill {{ 's-ok' if last_backup_ok == '1' else 's-failed' }}">{{ 'ok' if last_backup_ok == '1' else 'falhou' }}</span>
-      último backup: {{ last_backup_at[8:10] }}/{{ last_backup_at[5:7] }} {{ last_backup_at[11:16] }} · {{ last_backup_msg }}
-    {% elif last_backup_ok == '0' %}<span class="pill s-failed">falhou</span> {{ last_backup_msg }}
-    {% else %}<span class="pill">ainda não rodou</span>{% endif %}
-  </p>
-  <div class="actions">
-    <button class="primary" name="action" value="save">Salvar</button>
-    <button class="ghost" name="action" value="now">Salvar e fazer backup agora</button>
-    {% if backup_dir %}<button class="danger" name="action" value="off">Desligar</button>{% endif %}
-  </div>
-</form>
-
-<h2 id="ritmo">Ritmo por site</h2>
-<form method="post" action="/settings/ritmo" class="card settings rhythm-form">
-  <p class="muted small">O padrão é todos os sites no mesmo dia, 1 arte por dia. Dá para espaçar um site
-    ("dia sim, dia não"), atrasar ("1 dia depois" do dia da arte) ou desligar. Nunca sai mais de 1 por dia em cada site,
-    e PC desligado só atrasa: não sai tudo junto. Veja o resultado no <a href="/calendario">Calendário</a>.</p>
-  <table class="table">
-    <tr><th>Site</th><th>Ritmo</th><th>Quando</th></tr>
-    {% for s in ALL_SITES %}
-    <tr>
-      <td><b>{{ SITE_LABELS[s] }}</b></td>
-      <td><select name="rhythm_{{ s }}" aria-label="Ritmo do {{ SITE_LABELS[s] }}">
-        <option value="diario" {{ 'selected' if rhythms[s] == 'diario' }}>1 por dia</option>
-        <option value="dia_sim_dia_nao" {{ 'selected' if rhythms[s] == 'dia_sim_dia_nao' }}>dia sim, dia não</option>
-        <option value="desligado" {{ 'selected' if rhythms[s] == 'desligado' }}>desligado</option>
-      </select></td>
-      <td><select name="delay_{{ s }}" aria-label="Atraso do {{ SITE_LABELS[s] }}">
-        {% for n in range(0, 4) %}
-        <option value="{{ n }}" {{ 'selected' if delays[s] == n }}>{{ 'mesmo dia' if n == 0 else (n ~ (' dia depois' if n == 1 else ' dias depois')) }}</option>
-        {% endfor %}
-      </select></td>
-    </tr>
-    {% endfor %}
-  </table>
-  <div class="actions"><button class="primary">Salvar ritmo</button></div>
-</form>
-
-<h2 id="config">Configurações</h2>
-<form method="post" action="/settings" class="card settings">
-  <label class="check">
-    <input type="checkbox" name="test_mode" value="true" {{ 'checked' if test_mode }}>
-    Modo teste <small>preenche os formulários e tira print, mas não envia nada</small>
-  </label>
-  <label>Horário do post diário <input type="time" name="daily_time" value="{{ daily_time }}"></label>
-  <label>Tags padrão <small>entram automaticamente em todo post novo (ex.: seu nome de artista, <code>commission</code>)</small>
-    <input name="default_tags" value="{{ default_tags }}" placeholder="nome_da_artista commission">
-  </label>
-  <div class="sites">
-    <span>Sites marcados em posts novos</span>
-    {% for s in ALL_SITES %}
-    <label class="chip"><input type="checkbox" name="default_sites" value="{{ s }}" {{ 'checked' if s in default_sites }}> {{ SITE_LABELS[s] }}</label>
-    {% endfor %}
-  </div>
-  <div class="actions"><button class="primary">Salvar</button></div>
-</form>
+<script>
+  /* links antigos (/sites#backup, #config, #inicio, #ritmo) levam ao lugar novo */
+  (function () {
+    var go = { backup: "/ajustes#backup", config: "/ajustes", inicio: "/ajustes#inicio", ritmo: "/calendario" }[location.hash.slice(1)];
+    if (go) location.replace(go);
+  })();
+</script>
+<script src="/static/sites.js" defer></script>
 {% endblock %}

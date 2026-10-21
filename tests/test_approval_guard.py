@@ -97,7 +97,7 @@ def test_publish_now_in_production_is_an_explicit_confirmation(db):
     pid = new(db)
     db.approve(pid)
     db.set_setting("test_mode", "0")
-    c.post(f"/posts/{pid}", data={"action": "publish_now", "tags": "x", "sites": ["danbooru"]})
+    c.post(f"/posts/{pid}", data={"action": "publish_now", "tags": "x", "rating": "general", "sites": ["danbooru"]})
     assert not db.get_post(pid)["approved_in_test"] and [j.kind for j in w.jobs.queue] == ["publish"]
 
 

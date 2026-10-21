@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+{% import "_ui.html" as ui %}
+{% block title %}Artes · boorubot{% endblock %}
+{% block content %}
+{% macro url(filtro=a.filtro, q=a.q, limite=None) -%}
+/artes?filtro={{ filtro }}{% if q %}&q={{ q|urlencode }}{% endif %}{% if limite %}&limite={{ limite }}{% endif %}
+{%- endmacro %}
+<header class="page-head page-head--row">
+  <div>
+    <h1 class="display">Artes</h1>
+    <p class="body-lg">Tudo o que você já subiu, da primeira versão ao que já saiu.</p>
+  </div>
+  {{ ui.button("Nova arte", icon="nova-arte", attrs={"data-new-art": ""}) }}
+</header>
+
+<div class="arts-tools">
+  <nav class="bb-seg arts-filters" aria-label="Filtrar artes">
+    {% for key, label in a.filters.items() %}
+    <a class="bb-seg__opt" href="{{ url(key) }}"{% if key == a.filtro %} aria-current="page"{% endif %}>
+      {{ label }} <span class="arts-count{{ ' is-hot' if key in ('revisar', 'falha') and a.counts[key] }}">{{ a.counts[key] }}</span></a>
+    {% endfor %}
+  </nav>
+  <form class="arts-search" role="search" action="/artes">
+    <input type="hidden" name="filtro" value="{{ a.filtro }}">
+    <label class="sr-only" for="arts-q">Buscar por título ou tag</label>
+    {{ ui.icon("buscar") }}
+    <input id="arts-q" name="q" value="{{ a.q }}" placeholder="título ou tag…" autocomplete="off">
+  </form>
+</div>
+
+{% if a.rows %}
+<div class="bb-card arts-card">
+  <table class="arts-table">
+    <thead>
+      <tr>
+        <th scope="col" class="arts-col-art">Arte</th>
+        <th scope="col">Situação</th>
+        {% for site, short in a.columns.items() %}<th scope="col" class="arts-col-site"><abbr title="{{ SITE_LABELS[site] }}">{{ short }}</abbr></th>{% endfor %}
+        <th scope="col">Quando</th>
+        <th scope="col" class="arts-col-favs">Favoritos</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for r in a.rows %}
+      {% set p = r.post %}
+      <tr>
+        <td class="arts-col-art">
+          <a class="arts-art" href="/posts/{{ p.id }}">
+            <img src="/images/{{ p.image }}" alt="" loading="lazy">
+            <span><b>{{ p.title or ('#' ~ p.id) }}</b><span class="arts-detail{{ ' is-bad' if r.detail_tone == 'bad' }}">{{ r.detail }}</span></span>
+          </a>
+        </td>
+        <td>{{ ui.status(r.situation[0], r.situation[1]) }}</td>
+        {% for site in a.columns %}
+        {% set m = r.marks[site] %}
+        <td class="arts-col-site"><span class="arts-mark arts-mark--{{ m.mark }}" title="{{ SITE_LABELS[site] }}: {{ m.text }}{{ ' · ' ~ m.why if m.why }}">
+          {%- if m.mark == 'falhou' %}×{% endif %}<span class="sr-only">{{ SITE_LABELS[site] }}: {{ m.text }}</span></span></td>
+        {% endfor %}
+        <td class="arts-when{{ ' is-' ~ r.when_tone if r.when_tone }}">{{ r.when }}</td>
+        <td class="arts-col-favs{{ ' is-top' if r.favs and r.favs == a.top_favs }}">{{ r.favs if r.favs is not none else '–' }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+<div class="arts-foot">
+  <ul class="arts-legend" aria-label="Legenda">
+    {% for key, text in a.marks.items() %}<li><span class="arts-mark arts-mark--{{ key }}" aria-hidden="true">{{ '×' if key == 'falhou' }}</span>{{ text }}</li>{% endfor %}
+  </ul>
+  <p>mostrando {{ a.rows|length }} de {{ a.total }}{% if a.more %} · <a href="{{ url(limite=a.limit + 30) }}">ver mais</a>{% endif %}</p>
+</div>
+{% elif a.q %}
+{{ ui.empty("Nada com \"" ~ a.q ~ "\"", "Tente outra palavra do título ou uma tag, como pink_hair.", pet="mochi-pensando") }}
+{% else %}
+{{ ui.empty("Nada por aqui ainda", "Quando você subir uma arte, ela aparece aqui com a situação em cada site.", action="Nova arte") }}
+{% endif %}
+{% endblock %}

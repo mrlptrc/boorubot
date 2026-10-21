@@ -1,11 +1,12 @@
 {% extends "base.html" %}
+{% import "_ui.html" as ui %}
 {% block content %}
 {% set n = d.next %}
 
-<header class="hello">
+<header class="page-head page-head--row">
   <div>
-    <h1>{{ d.greeting }} ♡</h1>
-    <p class="muted">
+    <h1 class="display">{{ d.greeting }}! ♡</h1>
+    <p class="body-lg">
       {% if d.today_posts|length > 1 %}Hoje saem <b>{{ d.today_posts|length }} artes</b> em {{ d.today_sites }} sites.
       {% elif n and n.is_today %}Hoje sai <b>{{ n.post.title or ('#' ~ n.post.id) }}</b> às {{ n.when.strftime('%H:%M') }}
         em {{ n.sites|length }} site{{ 's' if n.sites|length != 1 }}.
@@ -13,83 +14,116 @@
       {% if d.review %}{{ d.review|length }} arte{{ 's' if d.review|length != 1 }} para revisar.{% else %}Nada pendente para você.{% endif %}
     </p>
   </div>
-  <button type="button" class="primary" data-new-art>+ Nova arte</button>
+  {{ ui.button("Nova arte", icon="nova-arte", attrs={"data-new-art": ""}) }}
+  {# plano B sem JavaScript: a janela "Novas artes" esconde este form quando carrega #}
+  <form method="post" action="/posts" enctype="multipart/form-data" class="na-fallback" id="nova-arte" data-na-fallback>
+    <label for="na-fallback-file">Subir uma arte</label>
+    <input id="na-fallback-file" type="file" name="image" accept=".png,.jpg,.jpeg,.gif,.webp" required>
+    {{ ui.button("Enviar", tipo="secundario", type="submit", size="sm") }}
+  </form>
 </header>
 
-{% set done = steps|selectattr('done')|list|length %}
-{% if done < steps|length %}
-<section class="card setup">
-  <img class="setup-pet" src="/static/pets/bunny.svg" alt="">
-  <div class="setup-head">
-    <strong>Configuração inicial</strong>
-    <span class="muted small">{{ done }} de {{ steps|length }}</span>
-    <a class="small" href="/guia">abrir o guia →</a>
-  </div>
-  <div class="bar"><span style="width: {{ (100 * done / steps|length)|round|int }}%"></span></div>
-  <ul class="checklist">
-    {% for st in steps %}
-    <li class="{{ 'ok' if st.done }}"><span class="box">{{ '✓' if st.done else '' }}</span> <a href="{{ st.href }}">{{ st.label }}</a></li>
-    {% endfor %}
-  </ul>
-</section>
+{% set a = d.alert %}
+{% if a and a.kind != 'test_mode' %}
+<div class="home-alert" role="status">
+  {% if a.kind == 'confirm' %}
+    <span><b>{{ a.others }} arte{{ 's' if a.others != 1 }}</b> aprovada{{ 's' if a.others != 1 }} no modo teste
+      esperando confirmação. Elas não vão ao ar sozinhas.</span>
+    <a href="#confirmar">Revisar</a>
+  {% elif a.kind == 'session' %}
+    <span>O <b>{{ a.label }}</b> pediu login de novo.{% if a.others %} Até lá, os posts saem só nos outros {{ a.others }} site{{ 's' if a.others != 1 }}.{% endif %}</span>
+    <a href="/sites#{{ a.site }}">Entrar</a>
+  {% elif a.kind == 'backup' %}
+    <span>O <b>backup</b> falhou na última tentativa.</span>
+    <a href="/ajustes#backup">Ver backup</a>
+  {% endif %}
+</div>
 {% endif %}
 
-<section class="summary" aria-label="Resumo">
-  <div class="card stat">
-    <img class="stat-pet" src="/static/pets/cat.svg" alt="">
-    <div class="stat-body">
-      <span class="stat-label">A fila cobre</span>
-      <span class="stat-big">{{ d.runway }} dia{{ 's' if d.runway != 1 }}</span>
-      <span class="paws" role="img" aria-label="{{ d.paws|select|list|length }} de 7 dias com post">
-        {% for full in d.paws %}{% if full %}<img src="/static/pets/paw.svg" alt="">{% else %}<span class="paw-empty"></span>{% endif %}{% endfor %}
-      </span>
-      <span class="small">
-        {% if d.runway_low %}Aprove mais artes: {% if d.missing_for_week %}faltam {{ d.missing_for_week }} para fechar a semana.{% endif %}
-        {% elif d.missing_for_week %}Aprove mais {{ d.missing_for_week }} para fechar a semana.
-        {% else %}Semana completa ♡{% endif %}
-      </span>
+<section class="home-top" aria-label="Resumo">
+  {% if n %}
+  {% set post = n.post %}
+  <article class="bb-card home-today">
+    <a class="home-today__thumb" href="/posts/{{ post.id }}"><img src="/images/{{ post.image }}" alt=""></a>
+    <div class="home-today__body">
+      <p class="eyebrow">{{ n.when_label }}</p>
+      <h2 class="title-1"><a href="/posts/{{ post.id }}">{{ post.title or ('#' ~ post.id) }}</a></h2>
+      <ul class="home-chips" aria-label="Sites">
+        {% for s in n.site_keys %}
+        <li class="home-chip{{ ' home-chip--warn' if s in d.down }}">{{ SITE_LABELS[s] }}
+          {%- if s == 'danbooru' and danbooru_mode in ('moderated', 'forced') %} · moderação{% endif %}
+          {%- if s in d.down %} · esperando login{% endif %}</li>
+        {% endfor %}
+      </ul>
+      {% if post.original_character and 'paheal' in post.sites and 'paheal' not in n.site_keys %}
+      <p class="small home-muted">paheal fica de fora: não aceita personagem original</p>
+      {% endif %}
+      <div class="home-today__actions">
+        {{ ui.button("Abrir arte", tipo="secundario", size="sm", href="/posts/" ~ post.id) }}
+        {% if not test_mode %}
+        <form method="post" action="/posts/{{ post.id }}">
+          {{ ui.button("Publicar agora", tipo="suave", size="sm", type="submit", attrs={"name": "action", "value": "publish_now",
+               "data-confirm-title": "Publicar agora?", "data-confirm": "Sai DE VERDADE agora nos sites marcados e conta como o post de hoje."}) }}
+        </form>
+        {% endif %}
+      </div>
+    </div>
+  </article>
+  {% else %}
+  <article class="bb-card home-today home-today--empty">
+    <img src="/static/pets/mochi-dormindo.svg" alt="" width="96" height="83">
+    <div class="home-today__body">
+      <p class="eyebrow">Próximo post</p>
+      <h2 class="title-1">Fila vazia</h2>
+      <p class="small home-muted">Aprove uma arte e ela entra aqui. Sairia {{ d.next_slot|quando }}.</p>
+    </div>
+  </article>
+  {% endif %}
+
+  <div class="bb-card home-stat">
+    {{ ui.pet("mochi-feliz", 56) }}
+    <div>
+      <p class="home-stat__label">A fila cobre</p>
+      <p class="number-xl">{{ d.runway }} dia{{ 's' if d.runway != 1 }}</p>
+      <p class="small home-muted">
+        {%- if d.missing_for_week %}aprove mais {{ d.missing_for_week }} para fechar a semana{% else %}semana completa{% endif -%}
+      </p>
     </div>
   </div>
 
-  <div class="card stat">
-    {% if n %}
-    <a href="/posts/{{ n.post.id }}" class="stat-thumb"><img src="/images/{{ n.post.image }}" alt="{{ n.post.title }}"></a>
-    <div class="stat-body">
-      <span class="stat-label">Próximo post · {{ n.when_label }}</span>
-      <a class="stat-title" href="/posts/{{ n.post.id }}">{{ n.post.title or ('#' ~ n.post.id) }}</a>
-      <span class="pill s-approved">{{ n.countdown }}</span>
-      <span class="small">{{ n.sites|join(' · ') }}</span>
+  {% set week_done = d.paws|select|list|length %}
+  <div class="bb-card home-stat">
+    {{ ui.pet("bunny", 56) }}
+    <div>
+      <p class="home-stat__label">Esta semana</p>
+      <p class="number-xl">{{ week_done }} de 7</p>
+      <p class="home-paws" role="img" aria-label="{{ week_done }} de 7 dias com post">
+        {% for full in d.paws %}<span class="{{ 'on' if full }}"></span>{% endfor %}
+      </p>
     </div>
-    {% else %}
-    <img class="stat-pet" src="/static/pets/cat-sleep.svg" alt="">
-    <div class="stat-body">
-      <span class="stat-label">Próximo post</span>
-      <span class="stat-title">Fila vazia</span>
-      <span class="small">Aprove uma arte e ela entra aqui. Sairia em {{ d.next_slot.strftime('%d/%m %H:%M') }}.</span>
-    </div>
-    {% endif %}
   </div>
 
-  <div class="card stat stat-col">
-    <span class="stat-label">Favoritos na semana</span>
-    {% if d.favorites.has_data %}
-    <div class="fav-row">
-      <span class="stat-big">{{ '%+d'|format(d.favorites.total) }} <span class="heart">♡</span></span>
-      <span class="minibars" role="img" aria-label="{{ d.favorites.aria }}">
-        {% for b in d.favorites.bars %}<span class="{{ 'top' if loop.last }}" style="height: {{ [b.pct, 12]|max }}%"></span>{% endfor %}
-      </span>
+  <a class="bb-card home-stat" href="/metricas">
+    {{ ui.pet("bear", 56) }}
+    <div>
+      <p class="home-stat__label">Favoritos · 30 dias</p>
+      {% if fav.has_data %}
+      <p class="number-xl">{{ '{:,}'.format(fav.favorites).replace(',', '.') }}</p>
+      {% set diff = fav.favorites - (fav.previous_favorites or 0) %}
+      <p class="small {{ 'home-up' if diff > 0 else 'home-muted' }}">
+        {%- if diff > 0 %}+{{ diff }} que o mês anterior{% elif diff < 0 %}{{ diff|abs }} a menos que o mês anterior{% else %}igual ao mês anterior{% endif -%}
+      </p>
+      {% else %}
+      <p class="small home-muted">As métricas aparecem depois do primeiro post no Danbooru.</p>
+      {% endif %}
     </div>
-    <span class="small">Danbooru · <a href="/metricas">ver métricas</a></span>
-    {% else %}
-    <span class="small">As métricas aparecem depois do primeiro post no Danbooru.</span>
-    {% endif %}
-  </div>
+  </a>
 </section>
 
 {% if d.to_confirm %}
-<section class="card confirm-box" aria-labelledby="confirmar">
-  <h2 id="confirmar">Confirme antes de postar</h2>
-  <p class="small">Estas artes foram aprovadas com o <b>modo teste</b> ligado. Por segurança elas <b>não vão ao ar</b>
+<section class="bb-card home-confirm" aria-labelledby="confirmar">
+  <h2 id="confirmar" class="title-2">Confirme antes de postar</h2>
+  <p>Estas artes foram aprovadas com o <b>modo teste</b> ligado. Por segurança elas <b>não vão ao ar</b>
     até você confirmar que valem de verdade (arte sua ou dela, tags e rating conferidos).</p>
   <div class="chips-row">
     {% for p in d.to_confirm %}
@@ -97,40 +131,19 @@
     {% endfor %}
   </div>
   <form method="post" action="/fila/teste" class="actions">
-    <button class="ghost" name="action" value="draft">Voltar todas para rascunho</button>
-    <button class="primary" name="action" value="confirm" data-confirm="Todas estas artes vão entrar na fila e sair DE VERDADE, 1 por dia. Confirmar?">Confirmar todas para valer</button>
+    {{ ui.button("Voltar todas para rascunho", tipo="secundario", type="submit", attrs={"name": "action", "value": "draft"}) }}
+    {{ ui.button("Confirmar todas para valer", type="submit", attrs={"name": "action", "value": "confirm", "data-confirm": "Todas estas artes vão entrar na fila e sair DE VERDADE, 1 por dia."}) }}
   </form>
 </section>
 {% endif %}
 
-{% set a = d.alert %}
-{% if a %}
-<div class="alert-strip" role="status">
-  <img src="/static/pets/chick.svg" alt="">
-  {% if a.kind == 'confirm' %}
-    <span><b>{{ a.others }} arte{{ 's' if a.others != 1 }}</b> aprovada{{ 's' if a.others != 1 }} no modo teste
-      esperando confirmação. Elas não vão ao ar sozinhas.</span>
-    <a href="#confirmar">Revisar</a>
-  {% elif a.kind == 'session' %}
-    <span>O <b>{{ a.label }}</b> pediu login de novo.{% if a.others %} Até lá, os posts saem só nos outros {{ a.others }} site{{ 's' if a.others != 1 }}.{% endif %}</span>
-    <a href="/sites#{{ a.site }}">Entrar agora</a>
-  {% elif a.kind == 'backup' %}
-    <span>O <b>backup</b> falhou na última tentativa.</span>
-    <a href="/sites#backup">Ver backup</a>
-  {% else %}
-    <span>Enquanto o <b>modo teste</b> estiver ligado, nada é publicado.</span>
-    <a href="/sites#config">Desligar em Sites</a>
-  {% endif %}
-</div>
-{% endif %}
-
-<section aria-labelledby="semana">
+<section class="home-sec" aria-labelledby="semana">
   <div class="section-head">
-    <h2 id="semana">Próximos 7 dias</h2>
-    <a class="small" href="/calendario">abrir calendário →</a>
+    <h2 id="semana" class="title-2">Próximos dias</h2>
+    {{ ui.button("Abrir calendário", tipo="link", href="/calendario") }}
   </div>
   <div class="week">
-    {% for w in d.week %}
+    {% for w in d.week[:5] %}
       {% if w.entries %}
       {% set first = w.entries[0] %}
       <div class="day{{ ' today' if w.today }}">
@@ -153,54 +166,62 @@
       {% else %}
       <div class="day empty-day{{ ' today' if w.today }}">
         <span class="day-label">{{ w.label }}</span>
-        <img src="/static/pets/cat-sleep.svg" alt="">
-        <span class="when">vazio</span>
+        <img src="/static/pets/mochi-dormindo.svg" alt="">
+        <span class="when">folga</span>
       </div>
       {% endif %}
     {% endfor %}
   </div>
 </section>
 
-<section aria-labelledby="revisar">
-  <h2 id="revisar">Para revisar <small>a IA sugere as tags; você confere e aprova</small></h2>
-  <div class="review">
-    <form method="post" action="/posts" enctype="multipart/form-data" id="upload-form">
-      <label class="drop" id="drop">
-        <input type="file" name="image" accept=".png,.jpg,.jpeg,.gif,.webp" required onchange="this.form.submit()">
-        <img src="/static/pets/puppy.svg" alt="">
-        <div><strong>+ Nova arte</strong>
-        <span>clique ou arraste aqui</span></div>
-      </label>
-    </form>
-    {% for p in d.review %}
-    <a class="thumb" href="/posts/{{ p.id }}">
-      <img src="/images/{{ p.image }}" alt="">
-      <div class="meta">
-        {% if p.status == 'draft' %}
-          <span class="pill s-draft">rascunho</span>
-          <span class="when">{{ p.tag_list|length ~ ' tags' if p.tag_list else 'sem tags ainda' }}</span>
-        {% elif d.to_check.get(p.id) %}
-          <span class="pill s-partial">conferir no {{ d.to_check[p.id]|join(', ') }}</span>
-        {% else %}
-          <span class="pill s-failed">falhou{{ ' no ' ~ d.failed_sites[p.id]|join(', ') if d.failed_sites.get(p.id) }}</span>
-        {% endif %}
-        <div class="t">{{ p.title or ('#' ~ p.id) }}</div>
-      </div>
-    </a>
-    {% endfor %}
-  </div>
-</section>
+{% set done = steps|selectattr('done')|list|length %}
+{% set pending = steps|rejectattr('done')|list %}
+<div class="home-bottom{{ ' home-bottom--guide' if pending }}">
+  <section class="home-sec" aria-labelledby="revisar">
+    <div class="section-head">
+      <h2 id="revisar" class="title-2">Para revisar</h2>
+      {{ ui.button("Ver todas em Artes", tipo="link", href="/artes?filtro=revisar") }}
+    </div>
+    {% if d.review %}
+    <ul class="bb-card review-list">
+      {% for p in d.review %}
+      <li class="review-row">
+        <img src="/images/{{ p.image }}" alt="">
+        <div class="review-row__text">
+          <a class="review-row__title" href="/posts/{{ p.id }}">{{ p.title or ('#' ~ p.id) }}</a>
+          {% if p.status == 'draft' %}
+            {% if p.suggest_state in ('pendente', 'analisando') %}<span class="review-row__why">a Mochi está olhando</span>
+            {% elif not p.tags %}<span class="review-row__why is-warn">faltam as tags</span>
+            {% elif not p.rating %}<span class="review-row__why is-warn">falta escolher o rating</span>
+            {% else %}<span class="review-row__why">{{ p.tags.split()|length }} tags · pronta para aprovar</span>{% endif %}
+          {% elif d.to_check.get(p.id) %}
+            <span class="review-row__why is-warn">conferir no {{ d.to_check[p.id]|join(', ') }}</span>
+          {% else %}
+            <span class="review-row__why is-bad">falhou{{ ' no ' ~ d.failed_sites[p.id]|join(', ') if d.failed_sites.get(p.id) }}</span>
+          {% endif %}
+        </div>
+        {% if p.status == 'draft' %}{{ ui.status("rascunho", "rascunho") }}
+        {% elif d.to_check.get(p.id) %}{{ ui.status("conferir", "alerta") }}
+        {% else %}{{ ui.status("falhou", "falhou") }}{% endif %}
+        {{ ui.button("Revisar", tipo="secundario", size="sm", href="/posts/" ~ p.id) }}
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    {{ ui.empty("Nada para revisar", "Quando você subir uma arte, ela aparece aqui com as tags que a Mochi sugeriu.", action="Nova arte") }}
+    {% endif %}
+  </section>
 
-<script>
-  const drop = document.getElementById("drop");
-  ["dragover", "dragenter"].forEach(e => drop.addEventListener(e, ev => { ev.preventDefault(); drop.classList.add("over"); }));
-  ["dragleave", "drop"].forEach(e => drop.addEventListener(e, () => drop.classList.remove("over")));
-  drop.addEventListener("drop", ev => {
-    ev.preventDefault();
-    const input = drop.querySelector("input");
-    input.files = ev.dataTransfer.files;
-    input.form.submit();
-  });
-  document.querySelectorAll("[data-new-art]").forEach(b => b.addEventListener("click", () => drop.querySelector("input").click()));
-</script>
+  {% if pending %}
+  <aside class="bb-card home-guide" aria-labelledby="guia-t">
+    {{ ui.pet("chick", 56) }}
+    <h2 id="guia-t" class="title-3">Configuração inicial</h2>
+    <p class="small home-muted">{{ done }} de {{ steps|length }} passos prontos</p>
+    <div class="bar" role="progressbar" aria-valuemin="0" aria-valuemax="{{ steps|length }}" aria-valuenow="{{ done }}"
+         aria-label="Passos prontos"><span style="width: {{ (100 * done / steps|length)|round|int }}%"></span></div>
+    <p class="small">Próximo: <a href="{{ pending[0].href }}">{{ pending[0].label }}</a></p>
+    {{ ui.button("Continuar o guia", tipo="secundario", size="sm", href="/guia") }}
+  </aside>
+  {% endif %}
+</div>
 {% endblock %}

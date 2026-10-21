@@ -1,0 +1,82 @@
+/* boorubot design tokens v2.0 — gerado de tokens.json */
+@import url('https://fonts.googleapis.com/css2?family=Quicksand:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap');
+
+:root {
+  /* aliases usados no Figma (code syntax das variáveis) */
+  --disabled: #FFC9DC;
+  --toast-action: #FF9EC4;
+  --paper: #FFF6FA;
+  --surface: #FFFFFF;
+  --blush: #FFE4EE;
+  --line: #F6D9E5;
+  --ink: #3B2234;
+  --ink-soft: #7A5A6E;
+  --ink-faint: #9C7D90;
+  --pink-200: #FFC9DC;
+  --pink-300: #FF9EC4;
+  --pink-400: #F56FA0;
+  --primary: #E8467F;
+  --primary-strong: #CF336B;
+  --primary-deep: #A8245A;
+  --primary-pressed: #7E1C45;
+  --on-primary: #FFFFFF;
+  --lilac-100: #EFE9FF;
+  --lilac-300: #C4B2F5;
+  --lilac-500: #7B5BD6;
+  --lilac-700: #5A3FB0;
+  --ok: #26704F;
+  --ok-bg: #DDF4E8;
+  --warn: #7A5600;
+  --warn-bg: #FFE7A3;
+  --danger: #B4233F;
+  --danger-bg: #FFE1E6;
+  --toast: #3B2234;
+  --on-toast: #FFE4EE;
+  --mochi-line: #4A3043;
+  --sparkle: #F5B83D;
+  --font-display: 'Quicksand', 'Nunito', ui-rounded, system-ui, sans-serif;
+  --font-body: 'Nunito', ui-rounded, system-ui, sans-serif;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
+  --radius-xs: 6px;
+  --radius-sm: 10px;
+  --radius-input: 12px;
+  --radius-md: 16px;
+  --radius-lg: 24px;
+  --radius-xl: 32px;
+  --radius-full: 999px;
+  --shadow-sm: 0 1px 2px rgba(59, 34, 52, 0.06), 0 1px 1px rgba(232, 70, 127, 0.04);
+  --shadow-md: 0 8px 20px -6px rgba(59, 34, 52, 0.14);
+  --shadow-lg: 0 24px 48px -12px rgba(59, 34, 52, 0.28);
+  --shadow-focus: 0 0 0 2px #FFFFFF, 0 0 0 4px #CF336B;
+  --sidebar-width: 248px;
+  --content-max: 1120px;
+  --touch-min: 44px;
+  --bottom-nav: 72px;
+  --breakpoint-mobile: 768px;
+  /* adicionados no código (DS-1): véus e hover sobre o toast escuro */
+  --scrim: rgba(59, 34, 52, 0.32);
+  --scrim-soft: rgba(59, 34, 52, 0.24);
+  --on-toast-hover: rgba(255, 255, 255, 0.12);
+}
+
+.display { font-family: var(--font-display); font-size: 44px; line-height: 52px; font-weight: 700; letter-spacing: -0.01em; }
+.title-1 { font-family: var(--font-display); font-size: 28px; line-height: 36px; font-weight: 700; }
+.title-2 { font-family: var(--font-display); font-size: 20px; line-height: 28px; font-weight: 700; }
+.title-3 { font-family: var(--font-display); font-size: 17px; line-height: 24px; font-weight: 700; }
+.body-lg { font-family: var(--font-body); font-size: 17px; line-height: 26px; font-weight: 400; }
+.body { font-family: var(--font-body); font-size: 15px; line-height: 24px; font-weight: 400; }
+.body-strong { font-family: var(--font-body); font-size: 15px; line-height: 24px; font-weight: 700; }
+.small { font-family: var(--font-body); font-size: 13px; line-height: 20px; font-weight: 400; }
+.small-strong { font-family: var(--font-body); font-size: 13px; line-height: 20px; font-weight: 700; }
+.eyebrow { font-family: var(--font-body); font-size: 12px; line-height: 16px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; }
+.number-xl { font-family: var(--font-display); font-size: 32px; line-height: 40px; font-weight: 800; }
+.code { font-family: ui-monospace, Menlo, monospace; font-size: 13px; line-height: 20px; font-weight: 400; }

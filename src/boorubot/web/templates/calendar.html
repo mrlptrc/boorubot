@@ -1,57 +1,82 @@
 {% extends "base.html" %}
+{% import "_ui.html" as ui %}
 {% block title %}Calendário · boorubot{% endblock %}
 {% block content %}
-<header class="hello">
+<header class="page-head page-head--row page-head--pet">
   <div>
-    <h1>Calendário</h1>
-    <p class="muted">Cada site tem a própria fila. <b>Arraste uma arte para outro dia</b> para fixar quando ela sai
-      naquele site (📌); clique no 📌 para desfixar. No celular, use "Dia por site" na página da arte.</p>
+    <h1 class="display">Calendário</h1>
+    <p class="body-lg">Sete dias, por site. Arraste uma arte para outro dia para mudar a ordem da fila.</p>
   </div>
-  <nav class="week-nav" aria-label="Semana">
-    {% if c.week > 0 %}<a class="pill-btn" href="/calendario?semana={{ c.week - 1 }}">← semana anterior</a>{% endif %}
-    <span class="small">{{ c.range_label }}</span>
-    {% if c.week < c.max_weeks %}<a class="pill-btn" href="/calendario?semana={{ c.week + 1 }}">próxima semana →</a>{% endif %}
+  {{ ui.pet("bunny", 72) }}
+  <nav class="cal-nav" aria-label="Semana">
+    {% if c.week > -c.max_weeks %}<a class="cal-nav__arrow" href="/calendario?semana={{ c.week - 1 }}" aria-label="Semana anterior">‹</a>{% endif %}
+    <span class="cal-nav__label">{{ c.range_label }}</span>
+    {% if c.week < c.max_weeks %}<a class="cal-nav__arrow" href="/calendario?semana={{ c.week + 1 }}" aria-label="Próxima semana">›</a>{% endif %}
+    {% if c.week != 0 %}{{ ui.button("Esta semana", tipo="secundario", size="sm", href="/calendario") }}{% endif %}
   </nav>
 </header>
-{% if error %}<div class="alert">{{ error }}</div>{% endif %}
-<div class="alert" id="cal-error" hidden></div>
+{% if error %}<div class="ed-alert" role="alert">{{ error }}</div>{% endif %}
+<div class="ed-alert" id="cal-error" role="alert" hidden></div>
 
-<div class="cal-wrap card">
+<div class="bb-card cal-card">
   <div class="cal" role="table" aria-label="Dias por site">
-    <div class="cal-row" role="row">
-      <span class="cal-head" role="columnheader"></span>
-      {% for d in c.dates %}<span class="cal-day{{ ' today' if d.today }}" role="columnheader">{{ d.label }}</span>{% endfor %}
+    <div class="cal-row cal-row--head" role="row">
+      <span role="columnheader"><span class="sr-only">Site</span></span>
+      {% for d in c.dates %}
+      <span class="cal-day{{ ' is-today' if d.today }}" role="columnheader">{% if d.today %}<span class="eyebrow">Hoje</span>{% endif %}{{ d.weekday }} {{ d.day }}</span>
+      {% endfor %}
     </div>
     {% for r in c.rows %}
     <div class="cal-row" role="row">
-      <span class="cal-site" role="rowheader">{{ r.label }}
-        <small class="{{ 'warn' if r.session_down and not r.off }}">{{ 'pedir login' if r.session_down and not r.off else r.rhythm }}</small></span>
+      <div class="cal-site" role="rowheader">
+        <details class="cal-rhythm">
+          <summary aria-label="Ritmo do {{ r.label }}: {{ r.rhythm }}"><b>{{ r.label }}</b> <span aria-hidden="true">▾</span>
+            <small class="{{ 'is-warn' if r.session_down and not r.off }}">{{ 'pediu login' if r.session_down and not r.off else r.rhythm }}</small></summary>
+          <form method="post" action="/calendario/ritmo" class="bb-card bb-card--float cal-rhythm__menu" data-rhythm-form>
+            <input type="hidden" name="site" value="{{ r.site }}"><input type="hidden" name="semana" value="{{ c.week }}">
+            <p class="title-3">Ritmo do {{ r.label }}</p>
+            <p class="eyebrow">Quanto</p>
+            {{ ui.segmented("rhythm", [("diario", "1 por dia", None), ("dia_sim_dia_nao", "dia sim, dia não", None), ("desligado", "desligado", None)], r.rhythm_key, label="Quanto sai no " ~ r.label) }}
+            <p class="eyebrow">Quando</p>
+            {{ ui.segmented("delay", [(0, "mesmo dia", None), (1, "+1 dia", None), (2, "+2", None), (3, "+3", None)], r.delay, label="Quando sai no " ~ r.label) }}
+            <p class="small home-muted">Nunca sai mais de 1 por dia em cada site. PC desligado só atrasa, não junta posts.</p>
+            <noscript>{{ ui.button("Salvar ritmo", size="sm", type="submit") }}</noscript>
+          </form>
+        </details>
+      </div>
       {% for cell in r.cells %}
         {% set p = cell.post %}
-        {% set drop = '' if r.off else ' data-drop-site="' ~ r.site ~ '" data-drop-day="' ~ cell.day ~ '"' %}
-        {% if cell.kind in ('post', 'waiting') %}
-        <div class="cal-cell {{ cell.kind }}{{ ' today' if cell.today }}{{ ' pinned' if cell.pinned }}" role="cell" draggable="true"
+        {% set day_label = c.dates[loop.index0].weekday ~ ' ' ~ c.dates[loop.index0].day %}
+        {% set drop = '' if r.off or cell.past else ' data-drop-site="' ~ r.site ~ '" data-drop-pos="' ~ cell.position ~ '"' %}
+        {% if cell.kind in ('post', 'waiting', 'blocked') %}
+        <div class="cal-cell cal-cell--{{ cell.kind }}{{ ' is-today' if cell.today }}" role="cell" draggable="true"
              data-post="{{ p.id }}" data-site="{{ r.site }}"{{ drop|safe }}
-             title="{{ p.title or ('#' ~ p.id) }}{{ ' · fixada neste dia' if cell.pinned }}{{ ' · esperando login' if cell.kind == 'waiting' }} · arraste para mudar o dia">
-          <a href="/posts/{{ p.id }}" draggable="false"><img src="/images/{{ p.image }}" alt="" draggable="false"></a>
-          <span>{{ 'esperando' if cell.kind == 'waiting' else (p.title or ('#' ~ p.id))|truncate(14, True, '…') }}</span>
+             title="{{ p.title or ('#' ~ p.id) }} · {{ c.position.get(p.id, '') }}º na fila{{ ' · fixada neste dia' if cell.pinned }}{{ ' · esperando login' if cell.kind == 'waiting' }}{{ ' · depende do login' if cell.kind == 'blocked' }} · arraste para mudar a ordem">
+          <a class="cal-cell__art" href="/posts/{{ p.id }}" draggable="false"><img src="/images/{{ p.image }}" alt="" draggable="false" loading="lazy">
+            {% if cell.kind == 'waiting' %}<span class="cal-cell__badge">◷ esperando login</span>{% elif cell.kind == 'blocked' %}<span class="cal-cell__badge">depende do login</span>{% endif %}</a>
+          <span class="cal-cell__name">{{ p.title or ('#' ~ p.id) }}</span>
           {% if cell.pinned %}
-          <form method="post" action="/calendario/desafixar" class="unpin">
+          <form method="post" action="/calendario/desafixar" class="cal-cell__pin">
             <input type="hidden" name="post_id" value="{{ p.id }}"><input type="hidden" name="site" value="{{ r.site }}">
             <input type="hidden" name="semana" value="{{ c.week }}">
-            <button class="pin-btn" aria-label="Desafixar {{ p.title }} do {{ r.label }}" title="desafixar">📌</button>
+            <button aria-label="Desafixar {{ p.title }} do {{ r.label }}" title="dia fixado · desafixar">📌</button>
           </form>
           {% endif %}
         </div>
         {% elif cell.kind == 'published' %}
-        <a class="cal-cell published" role="cell" href="/posts/{{ p.id }}" title="{{ p.title or ('#' ~ p.id) }} · já saiu hoje">
-          <img src="/images/{{ p.image }}" alt=""><span>{{ (p.title or ('#' ~ p.id))|truncate(14, True, '…') }}</span></a>
+        <a class="cal-cell cal-cell--published{{ ' is-today' if cell.today }}" role="cell" href="/posts/{{ p.id }}" title="{{ p.title or ('#' ~ p.id) }} · já saiu">
+          <span class="cal-cell__art"><img src="/images/{{ p.image }}" alt="" loading="lazy"><span class="cal-cell__badge cal-cell__badge--ok">✓ saiu</span></span>
+          <span class="cal-cell__name">{{ p.title or ('#' ~ p.id) }}</span></a>
         {% elif cell.kind == 'off' %}
-        <span class="cal-cell off" role="cell">desligado</span>
+        <span class="cal-cell cal-cell--off{{ ' is-today' if cell.today }}" role="cell"><span class="cal-cell__box">desligado</span></span>
         {% elif cell.kind == 'rest' %}
-        <span class="cal-cell rest" role="cell"{{ drop|safe }}><span class="sr-only">folga</span></span>
+        <span class="cal-cell cal-cell--rest{{ ' is-today' if cell.today }}" role="cell"{{ drop|safe }}>
+          <span class="cal-cell__box"><img src="/static/pets/mochi-dormindo.svg" alt="" width="44" height="38"></span><span class="cal-cell__name">folga</span></span>
+        {% elif cell.kind == 'past' %}
+        <span class="cal-cell cal-cell--past" role="cell"><span class="cal-cell__box"><span class="sr-only">nada saiu</span></span></span>
         {% else %}
-        <span class="cal-cell empty" role="cell"{{ drop|safe }}>vazio</span>
+        <span class="cal-cell cal-cell--empty{{ ' is-today' if cell.today }}" role="cell"{{ drop|safe }}>
+          <button type="button" class="cal-cell__box" data-new-art aria-label="Nova arte para {{ day_label }} no {{ r.label }}">+</button><span class="cal-cell__name">vazio</span></span>
         {% endif %}
       {% endfor %}
     </div>
@@ -60,59 +85,66 @@
 </div>
 
 <div class="cal-bottom">
-  <section class="card" aria-labelledby="sem-dia">
-    <h2 id="sem-dia">Na fila, sem dia ainda <small>arraste para um dia de um site</small></h2>
+  <section class="bb-card" aria-labelledby="depois">
+    <h2 id="depois" class="title-2">Na fila, depois desta semana <small class="ed-sub">aparecem quando abrir espaço</small></h2>
     {% if c.beyond %}
     <div class="chips-row">
       {% for p in c.beyond %}
-      <a class="art-chip" href="/posts/{{ p.id }}" draggable="true" data-post="{{ p.id }}" data-site="">
-        <img src="/images/{{ p.image }}" alt="" draggable="false">{{ p.title or ('#' ~ p.id) }}</a>
+      <a class="art-chip" href="/posts/{{ p.id }}"><img src="/images/{{ p.image }}" alt="">{{ p.title or ('#' ~ p.id) }}</a>
       {% endfor %}
     </div>
     {% else %}
-    <p class="muted">Tudo o que está aprovado já tem dia até o fim desta semana.</p>
+    <p class="home-muted">Tudo o que está aprovado já tem dia até o fim desta semana.</p>
     {% endif %}
   </section>
   {% if c.empty_days %}
-  <section class="card cal-tip">
-    <img src="/static/pets/bunny.svg" alt="">
-    <p>{{ c.empty_days|join(', ') }} {{ 'está vazio' if c.empty_days|length == 1 else 'estão vazios' }}.
-      {% if c.suggestion %}Aprove <a href="/posts/{{ c.suggestion.id }}"><b>{{ c.suggestion.title or ('#' ~ c.suggestion.id) }}</b></a>
-      ou suba uma arte nova.{% else %}Aprove mais artes para preencher a semana.{% endif %}</p>
-  </section>
+  <aside class="cal-tip">
+    {% set empty_text = c.empty_days|join(', ') ~ (' está vazio. ' if c.empty_days|length == 1 else ' estão vazios. ') %}
+    {% call ui.mochi_note("", empty_text) %}{% if c.suggestion %}Aprove <a href="/posts/{{ c.suggestion.id }}"><b>{{ c.suggestion.title or ('#' ~ c.suggestion.id) }}</b></a> ou suba uma arte nova.{% else %}Aprove mais artes para preencher a semana.{% endif %}{% endcall %}
+  </aside>
   {% endif %}
 </div>
 
 <script>
-  // arrastar = fixar o dia daquela arte naquele site (POST /calendario/fixar)
+  /* arrastar uma arte para outro dia da mesma linha = mudar a posição dela na fila (POST /calendario/mover);
+     o ritmo salva na hora ao trocar a opção do menu do site */
   (function () {
     const errorBox = document.getElementById("cal-error");
     let drag = null;
-    document.querySelectorAll("[draggable=true][data-post]").forEach((el) => {
+    document.querySelectorAll(".cal-cell[draggable=true]").forEach((el) => {
       el.addEventListener("dragstart", (ev) => {
         drag = { post: el.dataset.post, site: el.dataset.site };
         ev.dataTransfer.effectAllowed = "move";
         ev.dataTransfer.setData("text/plain", el.dataset.post);
-        el.classList.add("dragging");
+        el.classList.add("is-dragging");
       });
-      el.addEventListener("dragend", () => { el.classList.remove("dragging"); drag = null; });
+      el.addEventListener("dragend", () => { el.classList.remove("is-dragging"); drag = null; });
     });
     document.querySelectorAll("[data-drop-site]").forEach((cell) => {
-      const ok = () => drag && (!drag.site || drag.site === cell.dataset.dropSite);  // na mesma linha
-      cell.addEventListener("dragover", (ev) => { if (ok()) { ev.preventDefault(); cell.classList.add("drop-over"); } });
-      cell.addEventListener("dragleave", () => cell.classList.remove("drop-over"));
+      const ok = () => drag && drag.site === cell.dataset.dropSite && drag.post !== cell.dataset.post;
+      cell.addEventListener("dragover", (ev) => { if (ok()) { ev.preventDefault(); cell.classList.add("is-over"); } });
+      cell.addEventListener("dragleave", () => cell.classList.remove("is-over"));
       cell.addEventListener("drop", async (ev) => {
-        cell.classList.remove("drop-over");
+        cell.classList.remove("is-over");
         if (!ok()) return;
         ev.preventDefault();
-        const body = new URLSearchParams({ post_id: drag.post, site: cell.dataset.dropSite, day: cell.dataset.dropDay,
-                                           add_site: drag.site ? "false" : "true" });
-        const r = await fetch("/calendario/fixar", { method: "POST", body });
+        const body = new URLSearchParams({ post_id: drag.post, posicao: cell.dataset.dropPos });
+        const r = await fetch("/calendario/mover", { method: "POST", body, headers: { Accept: "application/json" } });
         if (r.ok) { location.reload(); return; }
         const data = await r.json().catch(() => ({}));
-        errorBox.textContent = "Não deu para mudar o dia: " + (data.error || "erro desconhecido");
+        errorBox.textContent = "Não deu para mudar a ordem: " + (data.error || "erro desconhecido");
         errorBox.hidden = false;
       });
+    });
+    document.querySelectorAll("[data-rhythm-form]").forEach((form) => {
+      form.addEventListener("change", () => form.requestSubmit ? form.requestSubmit() : form.submit());
+    });
+    // menu de ritmo: um aberto por vez; fecha com Esc e ao clicar fora
+    const menus = [...document.querySelectorAll(".cal-rhythm")];
+    menus.forEach((m) => m.addEventListener("toggle", () => { if (m.open) menus.forEach((o) => { if (o !== m) o.open = false; }); }));
+    document.addEventListener("click", (ev) => menus.forEach((m) => { if (m.open && !m.contains(ev.target)) m.open = false; }));
+    document.addEventListener("keydown", (ev) => {
+      if (ev.key === "Escape") menus.forEach((m) => { if (m.open) { m.open = false; m.querySelector("summary").focus(); } });
     });
   })();
 </script>

@@ -119,16 +119,17 @@ def test_scheduler_runs_metrics_once_a_day(db):
     assert w.jobs.empty()  # já rodou hoje
 
 
-def test_history_shows_metrics_and_refresh_button(db):
+def test_arts_and_editor_show_metrics_and_refresh_button(db):
     w = Worker(db)
     c = TestClient(app_mod.create_app(db, w, start_worker=False))
     post_id = db.create_post("a.png", title="arte")
     db.add_publication(post_id, "danbooru", "ok", "https://danbooru.donmai.us/posts/7")
     pub_id = db.publications(post_id)[0]["id"]
     db.add_metric_snapshot(pub_id, "2026-10-14T10:00:00", 42, 43, -1, 17)
-    page = c.get("/historico").text
-    assert "<b>42</b> · ♥ 17" in page
-    assert "<b>42</b> · ♥ 17" in c.get(f"/posts/{post_id}").text
+    db.update_post(post_id, status="done", published_at="2026-10-14T09:00:00")
+    page = c.get("/historico", follow_redirects=True).text          # o Histórico virou Artes › Publicadas
+    assert '<td class="arts-col-favs is-top">17</td>' in page
+    assert "<b>42</b> · 17 favoritos" in c.get(f"/posts/{post_id}").text
     c.post("/metricas/atualizar")
     assert [j.kind for j in w.jobs.queue] == ["metrics"]
 

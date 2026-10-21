@@ -1,0 +1,130 @@
+{% extends "base.html" %}
+{% import "_ui.html" as ui %}
+{% block title %}Ajustes · boorubot{% endblock %}
+{% block content %}
+<header class="page-head page-head--row">
+  <div>
+    <h1 class="display">Ajustes</h1>
+    <p class="body-lg">Tudo aqui salva sozinho.</p>
+  </div>
+  <p class="save-status settings-saved" data-save-status role="status" aria-live="polite"></p>
+</header>
+{% if error %}<div class="ed-alert" role="alert">{{ error }}</div>{% endif %}
+
+<div class="settings-grid">
+  <section aria-labelledby="postagem-t">
+    <h2 id="postagem-t" class="title-2">Postagem</h2>
+    {# sem JavaScript: este form manda tudo para /settings com o botão Salvar #}
+    <form method="post" action="/settings" class="bb-card settings-card" data-settings-form>
+      <input type="hidden" name="test_mode" value="{{ 'true' if s.test_mode else '' }}" data-mirror-test-mode>
+      <div class="settings-row">
+        <div>
+          <label class="settings-label" for="daily_time">Horário do post diário</label>
+          <p class="settings-hint">Escolha um horário em que o PC costuma estar ligado.</p>
+        </div>
+        <input class="bb-input settings-time" type="time" id="daily_time" name="daily_time" value="{{ s.daily_time }}" data-setting="daily_time">
+      </div>
+      <div class="settings-row settings-row--stack">
+        <div>
+          <label class="settings-label" for="default_tags">Tags padrão</label>
+          <p class="settings-hint" id="default_tags-hint">Entram sozinhas em toda arte nova.</p>
+        </div>
+        <div class="tag-field" data-tag-field='{{ {"scores": {}, "weak": [], "defaults": s.default_tags}|tojson|forceescape }}'>
+          <textarea name="default_tags" id="default_tags" rows="2" aria-describedby="default_tags-hint" data-setting="default_tags">{{ s.default_tags|join(' ') }}</textarea>
+        </div>
+      </div>
+      <fieldset class="settings-row settings-row--stack">
+        <legend class="settings-label">Sites marcados em artes novas</legend>
+        <p class="settings-hint">Dá para mudar em cada arte, no editor.</p>
+        <div class="settings-pills">
+          {% for site in ALL_SITES %}
+          <label class="settings-pill"><input type="checkbox" name="default_sites" value="{{ site }}" data-setting="default_sites" {{ 'checked' if site in s.default_sites }}><span>{{ SITE_LABELS[site] }}</span></label>
+          {% endfor %}
+        </div>
+      </fieldset>
+      <div class="settings-row">
+        <div class="settings-row__pet">
+          {{ ui.pet("bunny", 40) }}
+          <div><p class="settings-label">Ritmo por site</p><p class="settings-hint">Agora fica no Calendário, ao lado de cada site.</p></div>
+        </div>
+        {{ ui.button("Abrir calendário", tipo="link", href="/calendario") }}
+      </div>
+      <noscript><div class="settings-row">{{ ui.button("Salvar", type="submit") }}</div></noscript>
+    </form>
+  </section>
+
+  <div>
+    <section aria-labelledby="testes-t">
+      <h2 id="testes-t" class="title-2">Testes</h2>
+      <div class="bb-card settings-card">
+        <div class="settings-row">
+          <div>
+            <p class="settings-label" id="test-mode-l">Modo teste</p>
+            <p class="settings-hint" id="test-mode-h">Preenche os formulários dos sites e tira print, mas não envia nada. A fila fica pausada enquanto estiver ligado.</p>
+          </div>
+          {{ ui.toggle("test_mode", s.test_mode, "Modo teste", value="true", hide_label=True, attrs={"data-setting": "test_mode", "form": "test-mode-form", "aria-describedby": "test-mode-h"}) }}
+        </div>
+        <form id="test-mode-form" method="post" action="/settings" hidden>
+          <input type="hidden" name="daily_time" value="{{ s.daily_time }}">
+          <input type="hidden" name="default_tags" value="{{ s.default_tags|join(' ') }}">
+          {% for site in s.default_sites %}<input type="hidden" name="default_sites" value="{{ site }}">{% endfor %}
+        </form>
+        <noscript><div class="settings-row">{{ ui.button("Salvar modo teste", tipo="secundario", size="sm", type="submit", attrs={"form": "test-mode-form"}) }}</div></noscript>
+      </div>
+    </section>
+
+    <section aria-labelledby="pc-t" class="settings-sec">
+      <h2 id="pc-t" class="title-2">Este computador</h2>
+      <div class="bb-card settings-card">
+        <div class="settings-row" id="inicio">
+          <div>
+            <p class="settings-label">Abrir junto com o Windows</p>
+            {% if s.startup.supported %}
+            <p class="settings-hint">O painel abre escondido quando o PC liga, então o post sai mesmo se você esquecer de abrir.</p>
+            {% else %}
+            <p class="settings-hint">Só funciona no Windows. Neste computador, abra o painel antes do horário do post.</p>
+            {% endif %}
+          </div>
+          {% if s.startup.supported %}
+          <form method="post" action="/settings/startup">
+            <input type="hidden" name="action" value="{{ 'remove' if s.startup.installed else 'install' }}">
+            {{ ui.toggle("startup", s.startup.installed, "Abrir junto com o Windows", value="true", hide_label=True, attrs={"data-setting": "startup"}) }}
+            <noscript>{{ ui.button("Desligar" if s.startup.installed else "Ligar", tipo="secundario", size="sm", type="submit") }}</noscript>
+          </form>
+          {% endif %}
+        </div>
+        <div class="settings-warn">
+          <span aria-hidden="true">⚠</span>
+          <p>O PC também não pode estar dormindo às {{ s.daily_time }}. O <a href="/guia#pc-acordado">Guia mostra como evitar</a> isso no Windows.</p>
+        </div>
+
+        <form method="post" action="/settings/backup" class="settings-row settings-row--stack settings-backup" id="backup">
+          <div class="settings-row settings-row--flat">
+            <div>
+              <p class="settings-label">Backup diário</p>
+              <p class="settings-hint">Fila, histórico e imagens, numa pasta do OneDrive ou do Google Drive. Os logins dos sites não vão para o backup.</p>
+            </div>
+            {{ ui.toggle("backup_on", s.backup_on, "Backup diário", value="true", hide_label=True, attrs={"data-setting": "backup_on"}) }}
+          </div>
+          <div class="settings-folder">
+            {{ ui.icon("artes") }}
+            <label class="sr-only" for="backup_dir">Pasta do backup</label>
+            <input id="backup_dir" name="backup_dir" value="{{ s.backup_dir }}" placeholder="C:\Users\voce\OneDrive\boorubot-backup" data-setting="backup_dir">
+          </div>
+          <div class="settings-row settings-row--flat">
+            <p class="settings-last" data-backup-last>
+              {%- if not s.backup_on %}backup desligado
+              {%- elif s.last_backup %}<span class="dot-{{ 'ok' if s.last_backup_ok == '1' else 'bad' }}" aria-hidden="true"></span>último backup {{ s.last_backup }} · {{ 'deu tudo certo' if s.last_backup_ok == '1' else 'falhou: ' ~ s.last_backup_msg }}
+              {%- else %}ainda não rodou{% endif -%}
+            </p>
+            {% if s.backup_on %}{{ ui.button("Fazer agora", tipo="link", type="submit", attrs={"formaction": "/ajustes/backup-agora"}) }}{% endif %}
+          </div>
+          <noscript><div class="settings-row settings-row--flat">{{ ui.button("Salvar pasta", tipo="secundario", size="sm", type="submit", attrs={"name": "action", "value": "save"}) }}</div></noscript>
+        </form>
+      </div>
+    </section>
+  </div>
+</div>
+<script src="/static/editor.js"></script>
+<script src="/static/settings.js"></script>
+{% endblock %}

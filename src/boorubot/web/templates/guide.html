@@ -1,215 +1,253 @@
 {% extends "base.html" %}
+{% import "_ui.html" as ui %}
 {% block title %}Guia · boorubot{% endblock %}
 {% block content %}
-{% macro status(site) %}
-  {% set sess = sessions.get(site) %}
-  {% if sess and sess.ok %}<span class="pill s-ok">conectado</span>
-  {% elif sess %}<span class="pill s-failed">desconectado</span>
-  {% else %}<span class="pill">não conectado</span>{% endif %}
-{% endmacro %}
+{% set all_ids = steps|map(attribute='id')|list + topics|map(attribute=0)|list %}
+{% set labels = {} %}{% for x in steps %}{% set _ = labels.update({x.id: x.label}) %}{% endfor %}{% for t in topics %}{% set _ = labels.update({t[0]: t[1]}) %}{% endfor %}
+{% set states = {} %}{% for x in steps %}{% set _ = states.update({x.id: x.state}) %}{% endfor %}
 
-<article class="guide">
-  <h1>Como usar o boorubot</h1>
-  <p class="lead">Você sobe a arte, a IA sugere as tags, você revisa e aprova. O robô posta <b>1 arte por dia</b>
-  no horário escolhido, em todos os sites marcados, usando as <b>suas</b> contas.</p>
+{# quadro com o estado real no topo de cada passo #}
+{% macro state_box(id, ok_text, warn_text='', todo_text='') -%}
+  {% set st = states.get(id, 'todo') %}
+  {% if st == 'ok' %}<div class="guide-state is-ok" role="status"><img src="/static/pets/mochi-comemorando.svg" alt="" width="40" height="35"><p><b>Feito!</b> {{ ok_text }}</p></div>
+  {% elif st == 'warn' %}<div class="guide-state is-warn" role="status"><img src="/static/pets/mochi-ops.svg" alt="" width="40" height="35"><p>{{ warn_text }}</p></div>
+  {% elif todo_text %}<div class="guide-state" role="status"><p>{{ todo_text }}</p></div>{% endif %}
+{%- endmacro %}
 
-  <sl-tab-group class="guide-tabs" placement="start">
-    <sl-tab slot="nav" panel="antes"><img src="/static/pets/chick.svg" alt=""><span class="tab-n">1</span>Antes de começar</sl-tab>
-    <sl-tab slot="nav" panel="pc-acordado"><img src="/static/pets/cat-sleep.svg" alt=""><span class="tab-n">2</span>PC acordado</sl-tab>
-    <sl-tab slot="nav" panel="danbooru"><img src="/static/pets/cat.svg" alt=""><span class="tab-n">3</span>Danbooru</sl-tab>
-    <sl-tab slot="nav" panel="gelbooru"><img src="/static/pets/bunny.svg" alt=""><span class="tab-n">4</span>Gelbooru, paheal, rule34.us</sl-tab>
-    <sl-tab slot="nav" panel="rule34xxx"><img src="/static/pets/bear.svg" alt=""><span class="tab-n">5</span>rule34.xxx</sl-tab>
-    <sl-tab slot="nav" panel="teste"><img src="/static/pets/puppy.svg" alt=""><span class="tab-n">6</span>Testar um post</sl-tab>
-    <sl-tab slot="nav" panel="valendo"><img src="/static/pets/cat.svg" alt=""><span class="tab-n">7</span>Postar de verdade</sl-tab>
-    <sl-tab slot="nav" panel="dia-a-dia"><img src="/static/pets/bunny.svg" alt=""><span class="tab-n">8</span>Dia a dia</sl-tab>
-    <sl-tab slot="nav" panel="regras"><img src="/static/pets/bear.svg" alt=""><span class="tab-n">9</span>Regras dos sites</sl-tab>
-    <sl-tab slot="nav" panel="seguranca"><img src="/static/pets/puppy.svg" alt=""><span class="tab-n">10</span>Segurança</sl-tab>
-    <sl-tab slot="nav" panel="problemas"><img src="/static/pets/chick.svg" alt=""><span class="tab-n">11</span>Algo deu errado?</sl-tab>
+{# rodapé de cada passo: anterior, atalho para a tela certa, próximo #}
+{% macro pager(id, link_text='', link_href='') -%}
+  {% set i = all_ids.index(id) %}
+  <footer class="guide-pager">
+    {% if i > 0 %}<a class="guide-pager__prev" href="/guia?passo={{ all_ids[i - 1] }}#{{ all_ids[i - 1] }}">‹ {{ labels[all_ids[i - 1]] }}</a>{% else %}<span></span>{% endif %}
+    <span class="guide-pager__spacer"></span>
+    {% if link_text %}{{ ui.button(link_text, tipo="secundario", href=link_href) }}{% endif %}
+    {% if i + 1 < all_ids|length %}{{ ui.button("Próximo passo ›" if i + 1 < steps|length else labels[all_ids[i + 1]] ~ " ›", href="/guia?passo=" ~ all_ids[i + 1] ~ "#" ~ all_ids[i + 1], attrs={"class": "guide-next"}) }}
+    {% else %}{{ ui.button("Ir para o Início", href="/", attrs={"class": "guide-next"}) }}{% endif %}
+  </footer>
+{%- endmacro %}
 
-  <sl-tab-panel name="antes" id="antes">
-    <h2>1. Antes de começar</h2>
-    <ul>
-      <li>Este painel roda <b>neste computador</b>. Para os posts saírem no horário, o PC precisa estar <b>ligado, acordado</b>
-        e com o painel aberto. Ligue o <a href="/sites#inicio">início automático</a> e veja abaixo como evitar que o PC durma.</li>
-      <li>Tenha em mãos o <b>usuário e a senha</b> de cada site. A senha você digita no próprio site e ela <b>não fica salva aqui</b>.</li>
-      <li>Enquanto o <b>modo teste</b> estiver ligado (faixa amarela no topo), nada é publicado e a fila fica <b>pausada</b>.
-        Pode testar à vontade com "🧪 Testar este post", porque os testes não mexem na sua fila.</li>
-    </ul>
-    <nav class="pager"><span></span><span class="pager-dots">1 de 11</span><a class="pager-next" href="#pc-acordado">PC acordado →</a></nav>
-  </sl-tab-panel>
+{% macro head(id, minutes='') -%}
+  {% set i = all_ids.index(id) %}
+  <p class="eyebrow guide-eyebrow">{% if i < steps|length %}Passo {{ i + 1 }} de {{ steps|length }}{% else %}Para consultar{% endif %}{% if minutes %} · uns {{ minutes }} minutos{% endif %}</p>
+  <h2 class="title-1">{{ labels[id] }}</h2>
+{%- endmacro %}
 
-  <sl-tab-panel name="pc-acordado" id="pc-acordado">
-    <h2>O PC precisa estar acordado no horário do post</h2>
-    <p>O robô roda <b>dentro do seu computador</b>. Quando o PC <b>entra em suspensão</b> (a tela apaga e ele "dorme"),
-      o robô dorme junto. A maioria dos PCs, e principalmente os notebooks, dorme sozinha depois de 15 a 30 minutos sem uso.</p>
-    <p>Se o PC estiver dormindo no horário do post, <b>o post atrasa</b> e só sai quando você mexer no computador.
-      Nada se perde e não sai tudo de uma vez: quando o PC acorda, sai 1 post e a fila continua no ritmo de 1 por dia.</p>
+<div class="guide">
+  <aside class="guide-nav">
+    <header class="guide-nav__head">
+      {{ ui.pet("chick", 56) }}
+      <div>
+        <h1 class="display">Guia</h1>
+        <p class="body-lg">{{ done }} de {{ steps|length }} passos prontos</p>
+      </div>
+    </header>
+    <div class="bar" role="progressbar" aria-valuemin="0" aria-valuemax="{{ steps|length }}" aria-valuenow="{{ done }}" aria-label="Passos prontos">
+      <span style="width: {{ (100 * done / steps|length)|round|int }}%"></span></div>
+    <nav aria-label="Passos do guia">
+      <p class="eyebrow">Para começar</p>
+      <ol class="guide-list">
+        {% for x in steps %}
+        <li><a class="guide-link{{ ' is-active' if x.id == active }}" href="{{ x.href }}" data-step="{{ x.id }}"{% if x.id == active %} aria-current="step"{% endif %}>
+          <span class="guide-mark guide-mark--{{ x.state }}" aria-hidden="true">{{ '✓' if x.state == 'ok' else '!' if x.state == 'warn' else loop.index }}</span>
+          <span>{{ x.label }}</span>
+          {% if x.state == 'warn' %}<small>pediu login</small>{% endif %}
+          <span class="sr-only">{{ ', pronto' if x.state == 'ok' else ', pediu login de novo' if x.state == 'warn' else ', falta fazer' }}</span></a></li>
+        {% endfor %}
+      </ol>
+      <p class="eyebrow">Para consultar</p>
+      <ul class="guide-list">
+        {% for id, label, pet in topics %}
+        <li><a class="guide-link{{ ' is-active' if id == active }}" href="/guia?passo={{ id }}#{{ id }}" data-step="{{ id }}"{% if id == active %} aria-current="step"{% endif %}>
+          {{ ui.pet(pet, 20, "guide-mark guide-mark--pet") }}<span>{{ label }}</span></a></li>
+        {% endfor %}
+      </ul>
+    </nav>
+  </aside>
 
-    <h3>Soluções, da mais simples para a mais completa</h3>
-    <ol class="steps">
-      <li><b>Escolher um horário em que você costuma estar no PC</b> (em <a href="/sites">Sites → Configurações</a>).
-        Não precisa mudar nada no Windows.</li>
-      <li><b>Não deixar o PC dormir quando estiver na tomada.</b> No Windows 11: <i>Configurações → Sistema → Energia</i>
-        (ou <i>Energia e bateria</i>) → <i>Tela, suspensão e hibernação</i> → em <i>"Conectado à energia, colocar meu dispositivo
-        em suspensão após"</i>, escolha <b>Nunca</b>. A <b>tela pode continuar apagando</b>: o que importa é o PC não dormir.</li>
-      <li><b>Notebook com a tampa fechada:</b> por padrão, fechar a tampa faz o notebook dormir. Para mudar:
-        <i>Painel de Controle → Opções de Energia → Escolher a função do fechamento da tampa</i> → em <i>"Conectado"</i>,
-        escolha <b>Nada a fazer</b>. Deixe na tomada e num lugar ventilado.</li>
-      <li><b>Evoluir para um servidor na nuvem (VPS).</b> O robô passa a rodar num computador alugado que fica ligado 24 horas,
-        sem depender do seu PC. É o caminho para quem quer "aprovar e esquecer" de verdade.</li>
-    </ol>
+  <div class="bb-card guide-content">
+    <section class="guide-step{{ ' is-active' if active == 'antes' }}" id="antes">
+      {{ head('antes', 2) }}
+      {{ state_box('antes', 'Você já começou a conectar os sites.') }}
+      <p class="guide-lead">Você sobe a arte, a Mochi sugere as tags, você revisa e aprova. O robô posta <b>1 arte por dia</b>
+        no horário escolhido, em todos os sites marcados, usando as <b>suas</b> contas.</p>
+      <ol class="guide-steps">
+        <li>Este painel roda <b>neste computador</b>. Para os posts saírem no horário, o PC precisa estar <b>ligado, acordado</b>
+          e com o painel aberto.</li>
+        <li>Tenha em mãos o <b>usuário e a senha</b> de cada site. A senha você digita no próprio site e ela <b>não fica salva aqui</b>.</li>
+        <li>Enquanto o <b>modo teste</b> estiver ligado (faixa lilás no topo), nada é publicado e a fila fica <b>pausada</b>.
+          Use "Testar sem publicar" à vontade: os testes não mexem na sua fila.</li>
+      </ol>
+      {{ pager('antes', 'Abrir Ajustes', '/ajustes') }}
+    </section>
 
-    <h3>Sobre o servidor na nuvem (próxima fase)</h3>
-    <ul>
-      <li><b>Vantagem:</b> os posts saem no horário mesmo com seu PC desligado, em viagem ou sem internet.</li>
-      <li><b>Custo:</b> em torno de R$ 30 a 60 por mês, dependendo do provedor.</li>
-      <li><b>O que muda para você:</b> o painel passa a abrir por um endereço na internet, com senha. Os logins e captchas
-        dos sites continuam sendo feitos por você, por uma janela de navegador remoto dentro do próprio painel.</li>
-      <li><b>Quando vale:</b> se os atrasos começarem a incomodar, ou se o PC fica desligado com frequência.
-        Fale com o técnico: a migração aproveita tudo o que já está configurado aqui.</li>
-    </ul>
-    <nav class="pager"><a class="pager-prev" href="#antes">← Antes de começar</a><span class="pager-dots">2 de 11</span><a class="pager-next" href="#danbooru">Danbooru →</a></nav>
-  </sl-tab-panel>
+    <section class="guide-step{{ ' is-active' if active == 'pc-acordado' }}" id="pc-acordado">
+      {{ head('pc-acordado', 5) }}
+      {% if startup.supported %}{{ state_box('pc-acordado', 'O painel abre sozinho quando o Windows liga.') }}{% endif %}
+      <p class="guide-lead">O robô roda <b>dentro do seu computador</b>. Quando o PC <b>entra em suspensão</b> (a tela apaga e ele "dorme"),
+        o robô dorme junto. A maioria dos PCs, e principalmente os notebooks, dorme sozinha depois de 15 a 30 minutos sem uso.</p>
+      <p>Se o PC estiver dormindo às {{ daily_time }}, <b>o post atrasa</b> e só sai quando você mexer no computador.
+        Nada se perde e não sai tudo de uma vez: quando o PC acorda, sai 1 post e a fila continua no ritmo de 1 por dia.</p>
+      <ol class="guide-steps">
+        <li>Ligue <b>Abrir junto com o Windows</b> em <a href="/ajustes#inicio">Ajustes</a>, e escolha lá um horário em que você costuma estar no PC.</li>
+        <li><b>Não deixe o PC dormir na tomada.</b> No Windows 11: <i>Configurações → Sistema → Energia</i> → <i>Tela, suspensão e hibernação</i>
+          → em <i>"Conectado à energia, colocar meu dispositivo em suspensão após"</i>, escolha <b>Nunca</b>. A tela pode continuar apagando.</li>
+        <li><b>Notebook com a tampa fechada:</b> <i>Painel de Controle → Opções de Energia → Escolher a função do fechamento da tampa</i>
+          → em <i>"Conectado"</i>, escolha <b>Nada a fazer</b>. Deixe na tomada e num lugar ventilado.</li>
+      </ol>
+      <div class="guide-tip"><p class="title-3">E um servidor na nuvem (VPS)?</p>
+        <p>O robô passa a rodar num computador alugado que fica ligado 24 horas, sem depender do seu PC (em torno de R$ 30 a 60 por mês).
+          O painel abre por um endereço na internet, com senha, e os logins e captchas continuam sendo feitos por você.
+          Vale se os atrasos começarem a incomodar: fale com o técnico, a migração aproveita tudo o que já está configurado aqui.</p></div>
+      {{ pager('pc-acordado', 'Abrir Ajustes', '/ajustes#inicio') }}
+    </section>
 
-  <sl-tab-panel name="danbooru" id="danbooru">
-    <h2>2. Conectar o Danbooru {{ status('danbooru') }}</h2>
-    <p>O Danbooru conecta por uma <b>chave de API</b>, uma senha especial só para o robô que você pode cancelar quando quiser.</p>
-    <ol class="steps">
-      <li>Entre na sua conta em <a href="https://danbooru.donmai.us/login" target="_blank">danbooru.donmai.us</a>.</li>
-      <li>Abra <a href="https://danbooru.donmai.us/api_keys/new" target="_blank">danbooru.donmai.us/api_keys/new</a>
-        (ou: seu perfil → <i>API Key</i> → <i>New</i>).</li>
-      <li>Em <i>Name</i> escreva <code>boorubot</code>. Deixe <i>IP Addresses</i> e <i>Permissions</i> <b>em branco</b> e clique em <i>Create</i>.</li>
-      <li>Copie a chave que aparece na lista (um texto longo de letras e números).</li>
-      <li>Aqui no painel, vá em <a href="/sites#danbooru">Sites → Danbooru</a>, preencha seu <b>usuário</b>, cole a <b>chave</b>
-        e clique em <b>Salvar e testar</b>.</li>
-      <li>Em alguns segundos deve aparecer <span class="pill s-ok">conectado</span> com o <b>nível da sua conta</b>,
-        lido direto do Danbooru.</li>
-    </ol>
-    <h3>O nível da conta muda como o post entra</h3>
-    <ul>
-      <li><b>Contributor ou acima</b>: aprovação automática. O post vai ao ar <b>na hora</b>, sem ninguém conferir.
-        Por isso, confira sempre rating e tags antes de aprovar. Se preferir mais segurança no começo, em Sites → Danbooru
-        marque <i>"Mandar meus posts para a fila de moderação mesmo assim"</i>.</li>
-      <li><b>Abaixo de Contributor</b> (Member, Gold...): os posts vão para a <b>fila de moderação</b>, que tem até 3 dias para aprovar,
-        e existe um limite de posts pendentes ao mesmo tempo. Posts recusados diminuem esse limite.</li>
-    </ul>
-    <p class="tip">
-      {% if danbooru_mode == 'unknown' %}Sua conta ainda não foi conectada, então o painel ainda não sabe o seu nível.
-      {% elif danbooru_mode == 'moderated' %}Sua conta: <b>{{ danbooru_level }}</b>. Seus posts passam pela moderação.
-      {% elif danbooru_mode == 'forced' %}Sua conta: <b>{{ danbooru_level }}</b>, com moderação ligada por escolha sua.
-      {% else %}Sua conta: <b>{{ danbooru_level }}</b>. Seus posts vão ao ar na hora.{% endif %}
-    </p>
-    <p class="tip">Para cancelar o acesso do robô: no Danbooru, abra <a href="https://danbooru.donmai.us/api_keys" target="_blank">API Keys</a> e apague a chave <code>boorubot</code>.</p>
-    <nav class="pager"><a class="pager-prev" href="#pc-acordado">← PC acordado</a><span class="pager-dots">3 de 11</span><a class="pager-next" href="#gelbooru">Gelbooru, paheal, rule34.us →</a></nav>
-  </sl-tab-panel>
+    <section class="guide-step{{ ' is-active' if active == 'danbooru' }}" id="danbooru">
+      {{ head('danbooru', 3) }}
+      {{ state_box('danbooru', 'Sua conta está conectada como ' ~ (danbooru_level or 'Member') ~ (', então os posts passam pela moderação.' if danbooru_mode in ('moderated', 'forced') else ', então os posts vão ao ar na hora.'),
+           'O Danbooru recusou a chave. Confira o usuário e a chave em Sites.') }}
+      <p class="guide-lead">O Danbooru conecta por uma <b>chave de API</b>, uma senha só para o robô que você pode cancelar quando quiser.</p>
+      <ol class="guide-steps">
+        <li>Entre na sua conta em <a href="https://danbooru.donmai.us/login" target="_blank" rel="noopener">danbooru.donmai.us</a>.</li>
+        <li>Abra seu perfil → <i>API Key</i> → <i>New</i> (ou direto em <a href="https://danbooru.donmai.us/api_keys/new" target="_blank" rel="noopener">api_keys/new</a>).
+          Em <i>Name</i> escreva <code>boorubot</code>, deixe o resto em branco e clique em <i>Create</i>.</li>
+        <li>Copie a chave que aparece (um texto longo de letras e números).</li>
+        <li>Volte aqui, abra o <b>Danbooru em Sites</b>, cole a chave e clique em <b>Salvar e testar</b>.</li>
+      </ol>
+      <div class="guide-tip"><p class="title-3">Por que o nível da conta importa</p>
+        <p>Contributor ou acima: o post vai ao ar na hora, sem ninguém conferir (dá para mandar para moderação mesmo assim, no painel do Danbooru em Sites).
+          Abaixo disso (Member, Gold): passa pela moderação, que leva até 3 dias e tem limite de envios pendentes.</p></div>
+      <p class="small home-muted">Para cancelar o acesso do robô: no Danbooru, abra <a href="https://danbooru.donmai.us/api_keys" target="_blank" rel="noopener">API Keys</a> e apague a chave <code>boorubot</code>.</p>
+      {{ pager('danbooru', 'Abrir o Danbooru em Sites', '/sites?painel=danbooru#painel-danbooru') }}
+    </section>
 
-  <sl-tab-panel name="gelbooru" id="gelbooru">
-    <h2>3. Conectar Gelbooru, paheal e rule34.us</h2>
-    <p>Esses sites conectam pelo navegador, do mesmo jeito que você entra normalmente.</p>
-    <ol class="steps">
-      <li>Vá em <a href="/sites">Sites</a> e clique em <b>Entrar</b> no site desejado.</li>
-      <li>Uma <b>janela do navegador abre</b> na página de login do site. Entre com seu usuário e senha.</li>
-      <li>Depois de logada, <b>feche essa janela</b>. O painel testa sozinho e mostra <span class="pill s-ok">conectado</span>.</li>
-      <li>Repita para cada site. Se aparecer <span class="pill s-failed">desconectado</span>, clique em <b>Entrar</b> de novo.</li>
-    </ol>
-    <p id="paheal" class="tip"><b>rule34.paheal:</b> o site não aceita artes só com personagem original (OC). Quando a arte for de OC,
-      marque a caixa <i>"Só personagem original"</i> no post e o robô pula o paheal automaticamente.</p>
-    <p id="rule34us" class="tip"><b>rule34.us:</b> se aparecer um "não sou um robô" na hora de entrar, resolva na própria janela.</p>
-    <nav class="pager"><a class="pager-prev" href="#danbooru">← Danbooru</a><span class="pager-dots">4 de 11</span><a class="pager-next" href="#rule34xxx">rule34.xxx →</a></nav>
-  </sl-tab-panel>
+    <section class="guide-step{{ ' is-active' if active == 'gelbooru' }}" id="gelbooru">
+      {{ head('gelbooru', 5) }}
+      {{ state_box('gelbooru', 'Gelbooru, paheal e rule34.us estão conectados.', 'Um desses sites pediu login de novo. Em Sites, clique em Entrar nele.') }}
+      <p class="guide-lead">Esses sites conectam pelo navegador, do mesmo jeito que você entra normalmente.</p>
+      <ol class="guide-steps">
+        <li>Em <a href="/sites">Sites</a>, clique em <b>Entrar</b> no site.</li>
+        <li>Uma <b>janela do navegador abre</b> na página de login. Entre com seu usuário e senha.</li>
+        <li>Depois de entrar, <b>feche a janela</b>. O painel testa sozinho e mostra "conectado".</li>
+        <li>Repita para cada site.</li>
+      </ol>
+      <div class="guide-tip" id="paheal"><p class="title-3">rule34.paheal não aceita OC</p>
+        <p>Quando a Mochi não acha nenhum personagem conhecido, ela marca a arte como personagem original e o paheal fica de fora sozinho.
+          Você pode desmarcar no editor se ela errou.</p></div>
+      <p class="small home-muted" id="rule34us">rule34.us: se aparecer um "não sou um robô" na hora de entrar, resolva na própria janela.</p>
+      {{ pager('gelbooru', 'Abrir Sites', '/sites') }}
+    </section>
 
-  <sl-tab-panel name="rule34xxx" id="rule34xxx">
-    <h2>4. Conectar o rule34.xxx {{ status('rule34xxx') }}</h2>
-    <p>Igual aos anteriores, com dois detalhes:</p>
-    <ul>
-      <li>Ao abrir, pode aparecer uma tela de <b>"verificando se você é humano"</b>. Espere alguns segundos, ela passa sozinha.</li>
-      <li>O login tem <b>captcha</b>: resolva antes de clicar em <i>Log in</i>.</li>
-    </ul>
-    <p class="tip">Nesse site, a janela do navegador também abre <b>na hora de postar</b>, porque o site bloqueia o modo invisível. É normal: não feche, ela fecha sozinha.</p>
-    <nav class="pager"><a class="pager-prev" href="#gelbooru">← Gelbooru, paheal, rule34.us</a><span class="pager-dots">5 de 11</span><a class="pager-next" href="#teste">Testar um post →</a></nav>
-  </sl-tab-panel>
+    <section class="guide-step{{ ' is-active' if active == 'rule34xxx' }}" id="rule34xxx">
+      {{ head('rule34xxx', 3) }}
+      {{ state_box('rule34xxx', 'O rule34.xxx está conectado.', 'O rule34.xxx pediu login de novo. Em Sites, clique em Entrar.') }}
+      <p class="guide-lead">Igual aos anteriores, com dois detalhes:</p>
+      <ol class="guide-steps">
+        <li>Ao abrir, pode aparecer uma tela de <b>"verificando se você é humano"</b>. Espere alguns segundos.</li>
+        <li>O login tem <b>captcha</b>: é você quem resolve, antes de clicar em <i>Log in</i>. A Mochi nunca mexe no captcha.</li>
+      </ol>
+      <div class="guide-tip"><p class="title-3">A janela também abre na hora de postar</p>
+        <p>Esse site bloqueia o modo invisível, então a janela abre fora da tela no envio. É normal: não feche, ela fecha sozinha.</p></div>
+      {{ pager('rule34xxx', 'Abrir Sites', '/sites') }}
+    </section>
 
-  <sl-tab-panel name="teste" id="teste">
-    <h2>5. Testar um post</h2>
-    <p><b>Teste e publicação real nunca se misturam.</b> Testar um post não muda nada nele: ele continua na mesma posição
-      da fila, não conta como post do dia e não aparece no Histórico.</p>
-    <ol class="steps">
-      <li>Na <a href="/">Fila</a>, arraste uma arte para <b>+ Nova arte</b>.</li>
-      <li>Clique em <b>✨ Sugerir com IA</b>. Na primeira vez demora alguns minutos (baixa o modelo), depois leva um segundo.</li>
-      <li>Revise as tags, o rating e o link original, marque os sites e clique em <b>🧪 Testar este post</b>.</li>
-      <li>Embaixo do post, na seção <b>Testes</b>, cada site aparece como <span class="pill s-dry_run">simulado</span> (deu certo)
-        ou <span class="pill s-failed">falhou</span>, com o motivo.</li>
-    </ol>
-    <p class="tip">Nos testes, os sites só <b>preenchem</b> o formulário, sem enviar. O Danbooru só envia de verdade se o técnico
-      cadastrar uma conta de teste no <b>testbooru</b>, o site de testes deles, separado do Danbooru real.</p>
-    <nav class="pager"><a class="pager-prev" href="#rule34xxx">← rule34.xxx</a><span class="pager-dots">6 de 11</span><a class="pager-next" href="#valendo">Postar de verdade →</a></nav>
-  </sl-tab-panel>
+    <section class="guide-step{{ ' is-active' if active == 'teste' }}" id="teste">
+      {{ head('teste', 5) }}
+      {{ state_box('teste', 'Você já testou um post. Os resultados aparecem na linha de cada site, no editor.') }}
+      <p class="guide-lead"><b>Teste e publicação real nunca se misturam.</b> Testar não muda nada na arte: ela continua na mesma posição
+        da fila, não conta como post do dia e não aparece em Artes › Publicadas.</p>
+      <ol class="guide-steps">
+        <li>Clique em <b>+ Nova arte</b> e escolha uma imagem. A Mochi olha sozinha e sugere tags e rating (na primeira vez leva alguns minutos).</li>
+        <li>Revise as tags, <b>escolha o rating</b> e marque os sites.</li>
+        <li>Clique em <b>Testar sem publicar</b>, na barra de baixo do editor.</li>
+        <li>Na linha de cada site, em "Publicar em", aparece "teste ok" ou o motivo da falha.</li>
+      </ol>
+      <div class="guide-tip"><p class="title-3">O que o teste faz em cada site</p>
+        <p>Os sites só <b>preenchem</b> o formulário, sem enviar. O Danbooru só envia de verdade se o técnico cadastrar uma conta de teste no
+          testbooru, o site de testes deles, separado do Danbooru real.</p></div>
+      {{ pager('teste', 'Abrir Artes', '/artes') }}
+    </section>
 
-  <sl-tab-panel name="valendo" id="valendo">
-    <h2>6. Começar a postar de verdade</h2>
-    <p>Quando todos os sites estiverem <span class="pill s-ok">conectado</span> e o teste tiver dado certo:</p>
-    <ol class="steps">
-      <li>Em <a href="/sites">Sites → Configurações</a>, <b>desmarque "Modo teste"</b>, escolha o <b>horário</b> do post diário e salve.</li>
-      <li>A faixa amarela some e a fila volta a andar: os posts aprovados saem de verdade, 1 por dia, sempre pelas suas contas reais.</li>
-    </ol>
-    <nav class="pager"><a class="pager-prev" href="#teste">← Testar um post</a><span class="pager-dots">7 de 11</span><a class="pager-next" href="#dia-a-dia">Dia a dia →</a></nav>
-  </sl-tab-panel>
+    <section class="guide-step{{ ' is-active' if active == 'valendo' }}" id="valendo">
+      {{ head('valendo', 1) }}
+      {{ state_box('valendo', 'O modo teste está desligado: as artes aprovadas saem de verdade, 1 por dia.') }}
+      <p class="guide-lead">Quando os sites estiverem conectados e o teste tiver dado certo:</p>
+      <ol class="guide-steps">
+        <li>Em <a href="/ajustes">Ajustes</a>, desligue o <b>Modo teste</b> (ou clique em <b>Desligar</b> na faixa lilás do topo).</li>
+        <li>A faixa some e a fila volta a andar: as artes aprovadas saem de verdade, 1 por dia, às {{ daily_time }}, pelas suas contas.</li>
+      </ol>
+      {{ pager('valendo', 'Abrir Ajustes', '/ajustes') }}
+    </section>
 
-  <sl-tab-panel name="dia-a-dia" id="dia-a-dia">
-    <h2>7. Dia a dia</h2>
-    <ul>
-      <li><b>Aprovar e agendar</b>: o post entra no <b>fim da fila</b>. Sai 1 por dia, na ordem, no horário configurado.
-        As datas mostradas são <b>previsões</b>.</li>
-      <li><b>PC desligado?</b> A fila só atrasa: quando o painel voltar, sai <b>1</b> post e o resto continua 1 por dia.
-        Nunca sai tudo junto.</li>
-      <li><b>Passar para o início / Mandar para o fim</b>: muda a ordem da fila.</li>
-      <li><b>Publicar agora</b>: posta na hora e <b>conta como o post do dia</b> (o próximo da fila vai para amanhã).</li>
-      <li><b>Voltar para rascunho</b>: tira o post da fila.</li>
-      <li><b>Tentar de novo</b>: se um site falhou, reenvia <b>só para os sites que falharam</b>.</li>
-      <li><b>Tags padrão</b> (em Sites → Configurações): seu nome de artista, <code>commission</code> etc. já entram em todo post novo.</li>
-      <li><b>Histórico</b>: todos os envios, com o link do post em cada site.</li>
-    </ul>
-    <nav class="pager"><a class="pager-prev" href="#valendo">← Postar de verdade</a><span class="pager-dots">8 de 11</span><a class="pager-next" href="#regras">Regras dos sites →</a></nav>
-  </sl-tab-panel>
+    <section class="guide-step{{ ' is-active' if active == 'dia-a-dia' }}" id="dia-a-dia">
+      {{ head('dia-a-dia') }}
+      <ol class="guide-steps">
+        <li><b>Aprovar e agendar</b>: a arte entra no fim da fila e sai 1 por dia, na ordem, às {{ daily_time }}. Com Ctrl+Enter, já abre a próxima para revisar.</li>
+        <li><b>Mudar a ordem</b>: arraste a arte para outro dia no <a href="/calendario">Calendário</a>, ou use Início/Fim da fila no editor.</li>
+        <li><b>PC desligado?</b> A fila só atrasa: quando o painel voltar, sai 1 post e o resto continua 1 por dia. Nunca sai tudo junto.</li>
+        <li><b>Publicar agora</b> (em Mais ações, no editor): posta na hora e conta como o post do dia.</li>
+        <li><b>Tentar de novo</b>: se um site falhou, reenvia só para os sites que falharam.</li>
+        <li><b>Apagar arte</b>: dá para desfazer por alguns segundos. Ela some de vez depois de 24 h.</li>
+        <li><a href="/artes">Artes</a> mostra tudo: o que falta revisar, a fila, o que saiu em cada site e os favoritos.</li>
+      </ol>
+      {{ pager('dia-a-dia', 'Abrir o Calendário', '/calendario') }}
+    </section>
 
-  <sl-tab-panel name="regras" id="regras">
-    <h2>8. Regras dos sites (para não perder a conta)</h2>
-    <ul>
-      <li><b>Uma conta por site.</b> Danbooru e paheal proíbem contas extras. Use só a sua.</li>
-      <li><b>Personagens sempre adultos</b> e nada de pessoas reais. Vale para todos os sites e é lei.</li>
-      <li><b>Danbooru</b>: estilo anime, boa qualidade, de 10 a 20 tags ou mais, e o crédito da artista (a tag com seu nome de artista). Nada de conteúdo pago ou bloqueado por paywall.</li>
-      <li><b>Gelbooru</b>: estilo japonês, sem marca d'água, boa qualidade.</li>
-      <li><b>rule34.paheal</b>: não aceita OC (veja acima) e não deixa criar tags novas sem falar com a moderação.</li>
-      <li><b>Ritmo</b>: 1 post por dia é tranquilo. Postar em rajada parece spam.</li>
-    </ul>
-    <nav class="pager"><a class="pager-prev" href="#dia-a-dia">← Dia a dia</a><span class="pager-dots">9 de 11</span><a class="pager-next" href="#seguranca">Segurança →</a></nav>
-  </sl-tab-panel>
+    <section class="guide-step{{ ' is-active' if active == 'regras' }}" id="regras">
+      {{ head('regras') }}
+      <ol class="guide-steps">
+        <li><b>Uma conta por site.</b> Danbooru e paheal proíbem contas extras.</li>
+        <li><b>Personagens sempre adultos</b> e nada de pessoas reais. Vale para todos os sites e é lei.</li>
+        <li><b>Danbooru</b>: estilo anime, boa qualidade, de 10 a 20 tags ou mais e o crédito da artista. Nada de conteúdo pago ou bloqueado.</li>
+        <li><b>Gelbooru</b>: estilo japonês, sem marca d'água, boa qualidade. Conta nova precisa ganhar reputação participando do site.</li>
+        <li><b>rule34.paheal</b>: não aceita OC e não deixa criar tags novas sem falar com a moderação.</li>
+        <li><b>Ritmo</b>: 1 post por dia é tranquilo. Postar em rajada parece spam.</li>
+      </ol>
+      {{ pager('regras') }}
+    </section>
 
-  <sl-tab-panel name="seguranca" id="seguranca">
-    <h2>9. Segurança das suas contas</h2>
-    <ul>
-      <li>Sua <b>senha nunca é salva</b> no painel. Fica só a sessão ("lembrar de mim") no navegador do robô, neste PC.</li>
-      <li>A <b>chave do Danbooru</b> fica salva só neste PC e pode ser cancelada no Danbooru a qualquer momento.</li>
-      <li>O painel só abre <b>neste computador</b>. Ninguém de fora acessa.</li>
-    </ul>
-    <nav class="pager"><a class="pager-prev" href="#regras">← Regras dos sites</a><span class="pager-dots">10 de 11</span><a class="pager-next" href="#problemas">Algo deu errado? →</a></nav>
-  </sl-tab-panel>
+    <section class="guide-step{{ ' is-active' if active == 'seguranca' }}" id="seguranca">
+      {{ head('seguranca') }}
+      <ol class="guide-steps">
+        <li>Sua <b>senha nunca é salva</b> no painel. Fica só a sessão ("lembrar de mim") no navegador do robô, neste PC.</li>
+        <li>A <b>chave do Danbooru</b> fica só neste PC e pode ser cancelada no Danbooru a qualquer momento.</li>
+        <li>O painel só abre <b>neste computador</b>. Ninguém de fora acessa.</li>
+        <li>Captcha é sempre resolvido por você. O robô não usa nenhum truque para passar por eles.</li>
+      </ol>
+      {{ pager('seguranca') }}
+    </section>
 
-  <sl-tab-panel name="problemas" id="problemas">
-    <h2>10. Algo deu errado?</h2>
-    <dl>
-      <dt>O post não saiu no horário.</dt>
-      <dd>O PC estava ligado <b>e acordado</b> (veja <a href="#pc-acordado">o PC precisa estar acordado</a>)?
-        O modo teste está desligado? Os sites estão "conectado"? Se o PC estava dormindo, o post sai sozinho quando ele acordar.</dd>
-      <dt>Apareceu "sem sessão no site".</dt>
-      <dd>O site te deslogou. Vá em <a href="/sites">Sites</a>, clique em <b>Entrar</b> naquele site e faça login de novo. Depois, use <b>Tentar de novo</b> no post.</dd>
-      <dt>Danbooru "desconectado".</dt>
-      <dd>Confira o usuário (exatamente como no site) e se a chave não foi apagada. Gere outra se precisar.</dd>
-      <dt>A sugestão de tags errou.</dt>
-      <dd>É só uma sugestão: apague as tags erradas e adicione as que faltam. Confira sempre o <b>rating</b>.</dd>
-    </dl>
-    <nav class="pager"><a class="pager-prev" href="#seguranca">← Segurança</a><span class="pager-dots">11 de 11</span><a class="pager-next" href="/">Ir para a fila ♡</a></nav>
-  </sl-tab-panel>
-  </sl-tab-group>
-</article>
+    <section class="guide-step{{ ' is-active' if active == 'problemas' }}" id="problemas">
+      {{ head('problemas') }}
+      <dl class="guide-faq">
+        <dt>O post não saiu no horário.</dt>
+        <dd>O PC estava ligado <b>e acordado</b> (veja <a href="/guia?passo=pc-acordado#pc-acordado">PC acordado</a>)? O modo teste está desligado?
+          Os sites estão conectados? Se o PC estava dormindo, o post sai sozinho quando ele acordar.</dd>
+        <dt>Apareceu "pediu login de novo".</dt>
+        <dd>O site te deslogou. Em <a href="/sites">Sites</a>, clique em <b>Entrar</b> naquele site. Os posts dele esperam por você.</dd>
+        <dt>Danbooru desconectado.</dt>
+        <dd>Confira o usuário (exatamente como no site) e se a chave não foi apagada. Gere outra se precisar.</dd>
+        <dt>A Mochi errou as tags.</dt>
+        <dd>É só uma sugestão: tire as erradas e adicione as que faltam. As amarelas valem uma conferida. E confira sempre o <b>rating</b>.</dd>
+      </dl>
+      {{ pager('problemas') }}
+    </section>
+  </div>
+</div>
+<script>
+  /* links antigos com âncora (/guia#danbooru) abrem o passo certo também com JavaScript ligado */
+  (function () {
+    const show = (id) => {
+      const step = id && document.getElementById(id);
+      if (!step || !step.classList.contains("guide-step")) return;
+      document.querySelectorAll(".guide-step").forEach((s) => s.classList.toggle("is-active", s === step));
+      document.querySelectorAll(".guide-link").forEach((a) => {
+        const on = a.dataset.step === id;
+        a.classList.toggle("is-active", on);
+        if (on) a.setAttribute("aria-current", "step"); else a.removeAttribute("aria-current");
+      });
+    };
+    show(decodeURIComponent(location.hash.slice(1)));
+    window.addEventListener("hashchange", () => show(decodeURIComponent(location.hash.slice(1))));
+  })();
+</script>
 {% endblock %}

@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="pt-br" class="sl-loading">
+<html lang="pt-br">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -7,68 +7,123 @@
   <link rel="icon" type="image/svg+xml" href="/static/pets/favicon.svg">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600&family=Nunito:wght@400;600;700&display=swap">
-  {# Shoelace (componentes) e ninja-keys (busca Ctrl+K) por CDN, versão fixa. Se não carregarem, o painel
-     continua funcionando: gaveta, diálogos e abas têm plano B em static/app.js. #}
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.20.1/cdn/themes/light.css">
-  <script type="module" src="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.20.1/cdn/shoelace-autoloader.js" onerror="document.documentElement.classList.remove('sl-loading')"></script>
-  <script type="module" src="https://unpkg.com/ninja-keys@1.2.2?module"></script>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Quicksand:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap">
+  <link rel="stylesheet" href="/static/tokens.css">
+  <link rel="stylesheet" href="/static/components.css">
   <link rel="stylesheet" href="/static/style.css">
 </head>
+{% import "_ui.html" as ui %}
 {% set path = request.url.path %}
 {% macro nav_links() %}
-  <a href="/" class="{{ 'on' if path == '/' or path.startswith('/posts') }}"><img src="/static/pets/cat.svg" alt=""><span>Início</span></a>
-  <a href="/calendario" class="{{ 'on' if path == '/calendario' }}"><img src="/static/pets/bunny.svg" alt=""><span>Calendário</span></a>
-  <a href="/metricas" class="{{ 'on' if path == '/metricas' }}"><img src="/static/pets/bear.svg" alt=""><span>Métricas</span></a>
-  <a href="/sites" class="{{ 'on' if path == '/sites' }}"><img src="/static/pets/puppy.svg" alt=""><span>Sites</span></a>
-  <a href="/historico" class="{{ 'on' if path == '/historico' }}"><img src="/static/pets/paw.svg" alt=""><span>Histórico</span></a>
-  <a href="/guia" class="{{ 'on' if path == '/guia' }}"><img src="/static/pets/chick.svg" alt=""><span>Guia</span></a>
+  {{ ui.nav_item("Início", "/", "inicio", path == "/") }}
+  {{ ui.nav_item("Artes", "/artes", "artes", path in ("/artes", "/historico") or path.startswith("/posts"), count=shell.review) }}
+  {{ ui.nav_item("Calendário", "/calendario", "calendario", path == "/calendario") }}
+  {{ ui.nav_item("Métricas", "/metricas", "metricas", path == "/metricas") }}
+  {{ ui.nav_item("Sites", "/sites", "sites", path == "/sites", dot=shell.login_down) }}
+  {{ ui.nav_item("Ajustes", "/ajustes", "ajustes", path == "/ajustes") }}
+  {{ ui.nav_item("Guia", "/guia", "guia", path == "/guia") }}
 {% endmacro %}
 <body>
   <div class="app">
     <aside class="side" aria-label="Menu">
-      <a class="brand" href="/"><img src="/static/pets/cat.svg" alt="">boorubot</a>
-      <button type="button" class="search-btn" data-open-search>
-        <svg class="mag" viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5" fill="none" stroke="currentColor" stroke-width="2.6"/><path d="M15.5 15.5 L20.5 20.5" stroke="currentColor" stroke-width="2.8" stroke-linecap="round"/></svg><span>Buscar…</span><kbd>Ctrl</kbd><kbd>K</kbd>
-      </button>
-      <nav class="side-nav">{{ nav_links() }}</nav>
+      <a class="brand" href="/">{{ ui.pet("mochi-feliz", 36) }}<span>boorubot</span></a>
+      <a class="side-search" href="/artes" data-open-search>{{ ui.icon("buscar") }}<span>Buscar</span>{{ ui.kbd("Ctrl K") }}</a>
+      <nav class="side-nav" aria-label="Páginas">{{ nav_links() }}</nav>
       <div class="side-bottom">
         <div id="jobs" class="jobs" data-count="{{ jobs|length }}">
           {%- if jobs %}<span class="spin"></span> {{ jobs[0] }}{% if jobs|length > 1 %} (+{{ jobs|length - 1 }}){% endif %}{% endif -%}
         </div>
-        {% if test_mode %}<a class="side-test" href="/sites"><img src="/static/pets/chick.svg" alt="">modo teste ligado</a>{% endif %}
-        <div class="side-pets" aria-hidden="true">
-          <img src="/static/pets/bunny.svg" alt=""><img src="/static/pets/puppy.svg" alt=""><img src="/static/pets/bear.svg" alt="">
-        </div>
+        <a class="side-robot side-robot--{{ shell.robot.tone }}" href="{{ shell.robot.href }}">
+          <span class="side-robot__dot" aria-hidden="true"></span>
+          <span><b>{{ shell.robot.title }}</b><span>{{ shell.robot.text }}</span></span>
+        </a>
       </div>
     </aside>
 
     <header class="mobile-top">
-      <button type="button" class="icon-btn" data-open-menu aria-label="Abrir menu">☰</button>
-      <a class="brand" href="/"><img src="/static/pets/cat.svg" alt="">boorubot</a>
-      <button type="button" class="icon-btn" data-open-search aria-label="Buscar"><svg class="mag" viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5" fill="none" stroke="currentColor" stroke-width="2.6"/><path d="M15.5 15.5 L20.5 20.5" stroke="currentColor" stroke-width="2.8" stroke-linecap="round"/></svg></button>
+      <a class="brand" href="/">{{ ui.pet("mochi-feliz", 28) }}<span>boorubot</span></a>
+      <a class="icon-btn" href="/artes" data-open-search aria-label="Buscar">{{ ui.icon("buscar") }}</a>
     </header>
 
     <div class="page">
       {% if test_mode %}
-      <div class="banner"><img src="/static/pets/chick.svg" alt=""><span>Modo teste ligado: a fila está <b>pausada</b> e nada é publicado. Use "Testar este post" à vontade. Desligue em <a href="/sites">Sites</a>.</span></div>
+      <form class="banner" method="post" action="/ajustes/desligar-teste">
+        {{ ui.pet("chick", 24) }}<span>Modo teste ligado: nada é publicado e a fila está pausada.</span>
+        <input type="hidden" name="volta" value="{{ request.url.path }}">
+        {{ ui.button("Desligar", tipo="secundario", size="sm", type="submit", attrs={"data-confirm-title": "Desligar o modo teste?", "data-confirm": "A fila volta a andar e as artes aprovadas saem de verdade, 1 por dia.", "data-confirm-ok": "Desligar"}) }}
+      </form>
       {% endif %}
       <main>{% block content %}{% endblock %}</main>
-      <footer class="foot"><span>boorubot · feito com ♡</span></footer>
     </div>
   </div>
 
-  <sl-drawer id="menu-drawer" placement="start" label="boorubot" class="menu-drawer">
-    <nav class="side-nav">{{ nav_links() }}</nav>
-  </sl-drawer>
+  {# celular: barra fixa embaixo; "Mais" abre a folha com as outras páginas (sem JavaScript, abre por #more-sheet) #}
+  {% set more_current = path in ("/metricas", "/sites", "/ajustes", "/guia") %}
+  <nav class="bottom-nav" aria-label="Páginas">
+    {{ ui.nav_item("Início", "/", "inicio", path == "/") }}
+    {{ ui.nav_item("Artes", "/artes", "artes", path in ("/artes", "/historico") or path.startswith("/posts"), count=shell.review) }}
+    <a class="bottom-nav__add" href="/#nova-arte" data-new-art aria-label="Nova arte">{{ ui.icon("nova-arte") }}</a>
+    {{ ui.nav_item("Calendário", "/calendario", "calendario", path == "/calendario") }}
+    <a class="bb-nav__item" href="#more-sheet" data-dialog-open="more-sheet" aria-haspopup="dialog"{% if more_current %} aria-current="page"{% endif %}>
+      {{ ui.icon("mais") }}<span>Mais</span>{% if shell.login_down %}<span class="bb-nav__dot" role="img" aria-label="algum site pediu login"></span>{% endif %}</a>
+  </nav>
+  <dialog id="more-sheet" class="bb-sheet" aria-labelledby="more-sheet-t">
+    <div class="bb-sheet__grip" aria-hidden="true"></div>
+    <div class="bb-sheet__head"><h2 id="more-sheet-t" class="title-2">Mais</h2>
+      <a class="bb-sheet__close" href="#" data-dialog-cancel aria-label="Fechar">{{ ui.icon("fechar") }}</a></div>
+    <nav class="side-nav" aria-label="Mais páginas">
+      {{ ui.nav_item("Métricas", "/metricas", "metricas", path == "/metricas") }}
+      {{ ui.nav_item("Sites", "/sites", "sites", path == "/sites", dot=shell.login_down) }}
+      {{ ui.nav_item("Ajustes", "/ajustes", "ajustes", path == "/ajustes") }}
+      {{ ui.nav_item("Guia", "/guia", "guia", path == "/guia") }}
+    </nav>
+  </dialog>
 
-  <sl-dialog id="confirm-dialog" label="Tem certeza?" class="cute-dialog">
-    <div class="confirm-body"><img src="/static/pets/bunny.svg" alt=""><p data-confirm-text></p></div>
-    <button slot="footer" type="button" class="ghost" data-confirm-no>Cancelar</button>
-    <button slot="footer" type="button" class="primary" data-confirm-yes>Sim, pode</button>
-  </sl-dialog>
+  {{ ui.confirm_dialog("confirm-dialog", "Tem certeza?", "", "Confirmar", perigo=False, thumb="", cancelar="Cancelar") }}
 
-  <ninja-keys noAutoLoadMdIcons hideBreadcrumbs placeholder="Buscar artes, páginas, tópicos do guia, ações…"></ninja-keys>
+  <dialog id="search" class="bb-search" aria-label="Buscar">
+    <div class="bb-search__head">
+      {{ ui.icon("buscar") }}
+      <input type="search" role="combobox" aria-expanded="true" aria-controls="search-results" aria-autocomplete="list"
+             aria-label="Buscar artes, páginas e ações" placeholder="Buscar artes, páginas, ações…" autocomplete="off">
+      {{ ui.kbd("Esc") }}
+    </div>
+    <div class="bb-search__results" id="search-results" role="listbox" aria-label="Resultados" data-search-results></div>
+    <footer class="bb-search__foot"><span>↑ ↓ navegar</span><span>Enter abrir</span><span>Esc fechar</span><span class="bb-search__hint">busca títulos, tags e páginas</span></footer>
+  </dialog>
+
+  <dialog id="new-art" class="na-dialog" aria-labelledby="na-title" aria-describedby="na-desc">
+    <div class="na-head">
+      <div><h2 id="na-title" class="title-1">Novas artes</h2><p id="na-desc">Elas entram como rascunho. A Mochi sugere as tags enquanto isso.</p></div>
+      <button type="button" class="na-close" data-na-close aria-label="Fechar">{{ ui.icon("fechar") }}</button>
+    </div>
+    <div class="na-drop" data-na-drop>
+      <img src="/static/pets/paw.svg" alt="" width="48" height="48">
+      <div><strong>Arraste as artes aqui</strong><span>PNG, JPG, GIF ou WEBP · várias de uma vez</span></div>
+      <input type="file" accept=".png,.jpg,.jpeg,.gif,.webp" multiple hidden>
+      <button type="button" class="bb-btn bb-btn--link" data-na-pick>escolher arquivos</button>
+    </div>
+    <ul class="na-list" data-na-list hidden aria-live="polite"></ul>
+    <div class="na-first" data-na-first hidden>
+      <img src="/static/pets/mochi-pensando.svg" alt="" width="40" height="35">
+      <p>Na primeira vez a Mochi baixa o modelo de tags (380 MB) e pode levar alguns minutos. Pode fechar esta janela, as artes continuam sendo analisadas.</p>
+    </div>
+    <div class="na-foot">
+      <p class="na-summary" data-na-summary aria-live="polite"></p>
+      {{ ui.button("Fechar", tipo="secundario", attrs={"data-na-close": ""}) }}
+      <a class="bb-btn bb-btn--primary" data-na-review href="/" hidden>Revisar a primeira</a>
+    </div>
+  </dialog>
+
+  {# aviso de uma ação ("Aprovada! Faltam 2", "Arte apagada · desfazer"): ?aviso=…&desfazer=<id>&tipo=sucesso|erro #}
+  {% set aviso = request.query_params.get('aviso', '') %}
+  {% set undo = request.query_params.get('desfazer', '') %}
+  <div id="toasts" class="bb-toasts" aria-live="polite">
+    {%- if aviso %}{{ ui.toast(aviso, request.query_params.get('tipo', 'neutro'), action="desfazer" if undo.isdigit() else None, action_form="/posts/" ~ undo ~ "/desfazer" if undo.isdigit() else None) }}{% endif -%}
+  </div>
+
   <script src="/static/app.js" defer></script>
+  <script src="/static/search.js" defer></script>
+  <script src="/static/new-art.js" defer></script>
 </body>
 </html>

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import sqlite3
 import threading
@@ -29,7 +30,9 @@ MIN_GAP = timedelta(hours=12)
 # partir do 1º site em que a arte saiu.
 RHYTHMS = ("diario", "dia_sim_dia_nao", "desligado")
 MAX_DELAY_DAYS = 7
-POST_STATUSES = ("draft", "approved", "publishing", "done", "partial", "failed")
+POST_STATUSES = ("draft", "approved", "publishing", "done", "partial", "failed", "deleted")
+# apagada: some de todas as listas, pode ser desfeita; o worker remove de vez depois deste prazo
+PURGE_AFTER = timedelta(hours=24)
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS posts (
@@ -104,6 +107,26 @@ CREATE TABLE IF NOT EXISTS settings (
 );
 """
 
+# colunas que vieram depois da primeira versão (o DB.__init__ adiciona em bancos antigos)
+NEW_POST_COLUMNS = (
+    ("queue_pos", "REAL"),
+    ("published_at", "TEXT"),
+    # sugestão da IA: '' (nunca pedida) | pendente | analisando | pronta | falhou
+    ("suggest_state", "TEXT NOT NULL DEFAULT ''"),
+    ("suggest_error", "TEXT NOT NULL DEFAULT ''"),
+    ("tag_scores", "TEXT NOT NULL DEFAULT '{}'"),  # {tag: confiança} das tags que a IA sugeriu
+    ("weak_tags", "TEXT NOT NULL DEFAULT '[]'"),   # [[tag, confiança]] entre 0,25 e 0,35: só sugestão
+    ("oc_touched", "INTEGER NOT NULL DEFAULT 0"),  # ela mexeu no OC: a IA não marca nem desmarca mais
+    ("oc_auto", "INTEGER NOT NULL DEFAULT 0"),     # OC marcado pela IA (nenhum personagem conhecido)
+    # rating '' = ninguém escolheu ainda (posts novos); a IA só SUGERE, em colunas próprias
+    ("rating_suggestion", "TEXT NOT NULL DEFAULT ''"),
+    ("rating_confidence", "REAL"),
+    ("deleted_at", "TEXT"),                                  # quando foi apagada (status 'deleted')
+    ("status_before_delete", "TEXT NOT NULL DEFAULT ''"),    # para o "desfazer"
+    ("image_md5", "TEXT NOT NULL DEFAULT ''"),             # identifica upload repetido sem bloquear repost
+)
+SUGGEST_STATES = ("pendente", "analisando", "pronta", "falhou")
+
 DEFAULT_SETTINGS = {
     "test_mode": "1",       # 1 = nada é enviado de verdade (dry-run)
     "daily_time": "18:00",  # horário do post diário
@@ -142,9 +165,21 @@ class DB:
         with _lock, self.conn:
             self.conn.executescript(SCHEMA)
             cols = {r[1] for r in self.conn.execute("PRAGMA table_info(posts)")}
-            for col, kind in (("queue_pos", "REAL"), ("published_at", "TEXT")):
+            for col, kind in NEW_POST_COLUMNS:
                 if col not in cols:  # banco criado por versão anterior
                     self.conn.execute(f"ALTER TABLE posts ADD COLUMN {col} {kind}")
+            # Backfill preguiçoso e idempotente: hash só das imagens antigas que ainda existem.
+            rows = self.conn.execute("SELECT id, image FROM posts WHERE image_md5 = '' AND image != ''").fetchall()
+            image_root = IMAGES_DIR.resolve()
+            for row in rows:
+                path = (IMAGES_DIR / row["image"]).resolve()
+                if path.parent != image_root:
+                    continue
+                try:
+                    digest = hashlib.md5(path.read_bytes(), usedforsecurity=False).hexdigest()
+                except OSError:
+                    continue
+                self.conn.execute("UPDATE posts SET image_md5 = ? WHERE id = ?", (digest, row["id"]))
             if "approved_in_test" not in cols:
                 self.conn.execute("ALTER TABLE posts ADD COLUMN approved_in_test INTEGER NOT NULL DEFAULT 0")
                 # banco de antes da trava: com o modo teste ligado, o que está na fila foi aprovado
@@ -201,18 +236,60 @@ class DB:
     def update_post(self, post_id: int, **fields) -> None:
         if "sites" in fields:
             fields["sites"] = json.dumps(list(fields["sites"]))
-        if "site_tags" in fields:
-            fields["site_tags"] = json.dumps(fields["site_tags"])
+        for key in ("site_tags", "tag_scores", "weak_tags"):
+            if key in fields:
+                fields[key] = json.dumps(fields[key])
         if "original_character" in fields:
             fields["original_character"] = int(bool(fields["original_character"]))
         cols = ", ".join(f"{k} = ?" for k in fields)
         self._exec(f"UPDATE posts SET {cols} WHERE id = ?", (*fields.values(), post_id))
 
+    def set_suggest_state(self, post_id: int, state: str, error: str = "") -> None:
+        self._exec("UPDATE posts SET suggest_state = ?, suggest_error = ? WHERE id = ?", (state, error, post_id))
+
+    def posts_suggesting(self) -> list[int]:
+        """Sugestões que não terminaram (o painel fechou no meio): o worker retoma ao iniciar."""
+        return [r["id"] for r in self._all(
+            "SELECT id FROM posts WHERE suggest_state IN ('pendente', 'analisando') ORDER BY id")]
+
     def delete_post(self, post_id: int) -> None:
-        self._exec("DELETE FROM posts WHERE id = ?", (post_id,))
+        """Apagar = esconder (dá para desfazer). A remoção de verdade é purge_deleted()."""
+        self._exec("UPDATE posts SET status_before_delete = status, status = 'deleted', deleted_at = ? "
+                   "WHERE id = ? AND status != 'deleted'", (now(), post_id))
+
+    def restore_post(self, post_id: int) -> bool:
+        row = self.get_post(post_id)
+        if not row or row["status"] != "deleted":
+            return False
+        self._exec("UPDATE posts SET status = ?, deleted_at = NULL, status_before_delete = '' WHERE id = ?",
+                   (row["status_before_delete"] or "draft", post_id))
+        return True
+
+    def purge_deleted(self, when: datetime | None = None) -> list[str]:
+        """Remove de vez o que foi apagado há mais de PURGE_AFTER. Devolve as imagens a apagar do disco.
+        Arte que já saiu em algum site fica com a linha (escondida): o ritmo de cada site e a proteção
+        contra post duplicado contam com esse histórico. Só a imagem vai embora."""
+        cutoff = ((when or datetime.now()) - PURGE_AFTER).isoformat(timespec="seconds")
+        rows = self._all("SELECT id, image FROM posts WHERE status = 'deleted' AND deleted_at <= ? AND image != ''",
+                         (cutoff,))
+        images = []
+        for r in rows:
+            if self._all("SELECT 1 FROM publications WHERE post_id = ? AND status = 'ok' LIMIT 1", (r["id"],)):
+                self._exec("UPDATE posts SET image = '' WHERE id = ?", (r["id"],))
+            else:
+                self._exec("DELETE FROM posts WHERE id = ?", (r["id"],))
+            images.append(r["image"])
+        return images
 
     def get_post(self, post_id: int) -> dict | None:
         rows = self._all("SELECT * FROM posts WHERE id = ?", (post_id,))
+        return _decode(rows[0]) if rows else None
+
+    def find_image_duplicate(self, image_md5: str) -> dict | None:
+        """Encontra uma arte igual ainda ativa ou que já foi publicada, sem impedir novo upload."""
+        rows = self._all(
+            "SELECT * FROM posts WHERE image_md5 = ? AND (status != 'deleted' OR published_at IS NOT NULL) "
+            "ORDER BY published_at IS NULL, created_at DESC, id DESC LIMIT 1", (image_md5,))
         return _decode(rows[0]) if rows else None
 
     def list_posts(self, statuses: tuple[str, ...] | None = None) -> list[dict]:
@@ -220,8 +297,8 @@ class DB:
             marks = ",".join("?" * len(statuses))
             rows = self._all(f"SELECT * FROM posts WHERE status IN ({marks}) "
                              "ORDER BY queue_pos IS NULL, queue_pos, created_at DESC", statuses)
-        else:
-            rows = self._all("SELECT * FROM posts ORDER BY created_at DESC")
+        else:  # sem filtro: tudo menos as apagadas
+            rows = self._all("SELECT * FROM posts WHERE status != 'deleted' ORDER BY created_at DESC")
         return [_decode(r) for r in rows]
 
     # --- fila + limitador de ritmo -----------------------------------------------
@@ -251,6 +328,17 @@ class DB:
         agg = "MIN" if where == "first" else "MAX"
         edge = self._all(f"SELECT {agg}(queue_pos) AS v FROM posts WHERE status = 'approved'")[0]["v"] or 0
         self.update_post(post_id, queue_pos=edge - 1 if where == "first" else edge + 1)
+
+    def move_to_position(self, post_id: int, position: int) -> None:
+        """Põe a arte na posição `position` (1 = a próxima) e renumera a fila 1..N, sem buracos nem repetição.
+        O pacer não muda: ele só lê a ordem."""
+        ids = [r["id"] for r in self._all("SELECT id FROM posts WHERE status = 'approved' ORDER BY queue_pos, id")]
+        if post_id not in ids:
+            return
+        ids.remove(post_id)
+        ids.insert(max(0, min(position - 1, len(ids))), post_id)
+        for pos, pid in enumerate(ids, start=1):
+            self._exec("UPDATE posts SET queue_pos = ? WHERE id = ?", (float(pos), pid))
 
     def mark_post_published_at(self, post_id: int, when: datetime | None = None) -> None:
         """Primeira vez que a arte saiu em algum site (referência do atraso por site)."""
@@ -330,8 +418,12 @@ class DB:
     def publications(self, post_id: int | None = None, limit: int = 100) -> list[dict]:
         if post_id is not None:
             return self._all("SELECT * FROM publications WHERE post_id = ? ORDER BY id DESC", (post_id,))
-        return self._all("SELECT p.*, posts.title, posts.image FROM publications p "
+        return self._all("SELECT p.*, posts.title, posts.image, posts.status AS post_status FROM publications p "
                          "JOIN posts ON posts.id = p.post_id ORDER BY p.id DESC LIMIT ?", (limit,))
+
+    def all_publications(self) -> list[dict]:
+        """Todas as publicações, da mais antiga para a mais nova (tela Artes: uma consulta só)."""
+        return self._all("SELECT * FROM publications ORDER BY id")
 
     def published_sites(self, post_id: int) -> set[str]:
         """Sites que NÃO recebem mais esta arte automaticamente: já saiu, foi pulada pela regra,
@@ -369,16 +461,20 @@ class DB:
                    "fav_count) VALUES (?, ?, ?, ?, ?, ?)",
                    (publication_id, captured_at, score, up_score, down_score, fav_count))
 
+    _VISIBLE_SNAPSHOTS = ("SELECT m.* FROM metric_snapshots m JOIN publications p ON p.id = m.publication_id "
+                          "JOIN posts ON posts.id = p.post_id WHERE posts.status != 'deleted'")
+
     def metric_snapshots_since(self, since: datetime) -> list[dict]:
-        return self._all("SELECT * FROM metric_snapshots WHERE captured_at >= ? ORDER BY captured_at, id",
+        return self._all(self._VISIBLE_SNAPSHOTS + " AND m.captured_at >= ? ORDER BY m.captured_at, m.id",
                          (since.isoformat(timespec="seconds"),))
 
     def all_metric_snapshots(self) -> list[dict]:
-        return self._all("SELECT * FROM metric_snapshots ORDER BY captured_at, id")
+        return self._all(self._VISIBLE_SNAPSHOTS + " ORDER BY m.captured_at, m.id")
 
     def publications_with_posts(self) -> list[dict]:
+        """Para as métricas: arte apagada não conta."""
         return self._all("SELECT p.*, posts.title, posts.image FROM publications p "
-                         "JOIN posts ON posts.id = p.post_id ORDER BY p.id")
+                         "JOIN posts ON posts.id = p.post_id WHERE posts.status != 'deleted' ORDER BY p.id")
 
     def has_metrics(self) -> bool:
         return bool(self._all("SELECT 1 FROM metric_snapshots LIMIT 1"))
@@ -412,8 +508,12 @@ def _decode(row: dict) -> dict:
     row = dict(row)
     row["sites"] = json.loads(row["sites"])
     row["site_tags"] = json.loads(row["site_tags"])
+    row["tag_scores"] = json.loads(row.get("tag_scores") or "{}")
+    row["weak_tags"] = json.loads(row.get("weak_tags") or "[]")
     row["original_character"] = bool(row["original_character"])
     row["approved_in_test"] = bool(row.get("approved_in_test"))
+    row["oc_touched"] = bool(row.get("oc_touched"))
+    row["oc_auto"] = bool(row.get("oc_auto"))
     row["tag_list"] = row["tags"].split()
     return row
 

@@ -116,10 +116,10 @@ def test_calendar_page_renders_draggable_cells(db):
     approve(db, 2)
     db.set_session("rule34xxx", False, "sem sessão")
     page = client(db).get("/calendario").text
-    assert "Calendário" in page and "Na fila, sem dia ainda" in page and "pedir login" in page
+    assert "Calendário" in page and "Na fila, depois desta semana" in page and "pediu login" in page
     assert 'draggable="true"' in page and 'data-drop-site="danbooru"' in page
-    assert page.count('class="cal-row"') == 6               # cabeçalho + 5 sites
-    assert "próxima semana" in client(db).get("/calendario?semana=1").text
+    assert page.count('class="cal-row') == 6                # cabeçalho + 5 sites
+    assert "Próxima semana" in page and "Esta semana" in client(db).get("/calendario?semana=1").text
 
 
 def test_calendar_page_empty(db):
@@ -173,8 +173,57 @@ def test_post_page_day_per_site(db):
 
 def test_rhythm_settings_form(db):
     c = client(db)
-    assert 'id="ritmo"' in c.get("/sites").text
+    assert 'id="ritmo"' not in c.get("/sites").text          # o ritmo saiu de Sites e foi para o Calendário
     c.post("/settings/ritmo", data={"rhythm_rule34us": "dia_sim_dia_nao", "delay_gelbooru": "1",
                                     "rhythm_paheal": "hackeado", "delay_danbooru": "99"})
     assert db.site_rhythm("rule34us") == "dia_sim_dia_nao" and db.site_delay("gelbooru") == 1
     assert db.site_rhythm("paheal") == "diario" and db.site_delay("danbooru") == 0
+
+
+# --- etapa 15: ordem da fila pelo calendário, ritmo no menu, semanas passadas ----------------------
+
+def test_move_to_position_reorders_without_gaps_or_repeats(db):
+    a, b, c = approve(db, 3)
+    db.move_to_position(c, 1)
+    assert [p["id"] for p in db.queue()] == [c, a, b]
+    db.move_to_position(c, 99)                              # além do fim: vai para o fim
+    assert [p["id"] for p in db.queue()] == [a, b, c]
+    positions = [p["queue_pos"] for p in db.queue()]
+    assert positions == [1.0, 2.0, 3.0]
+
+
+def test_drag_to_another_day_moves_in_the_queue(db):
+    a, b, c = approve(db, 3)
+    r = client(db).post("/calendario/mover", data={"post_id": c, "posicao": 1}, headers={"accept": "application/json"})
+    assert r.json() == {"ok": True} and db.queue()[0]["id"] == c
+    draft = db.create_post("d.png", title="rascunho", tags="x", sites=["danbooru"])
+    r = client(db).post("/calendario/mover", data={"post_id": draft, "posicao": 1}, headers={"accept": "application/json"})
+    assert r.status_code == 400 and db.get_post(draft)["queue_pos"] is None
+
+
+def test_rhythm_saved_from_the_calendar_shows_in_the_grid(db):
+    approve(db, 2)
+    client(db).post("/calendario/ritmo", data={"site": "paheal", "rhythm": "dia_sim_dia_nao", "delay": 2})
+    assert db.site_rhythm("paheal") == "dia_sim_dia_nao" and db.site_delay("paheal") == 2
+    page = client(db).get("/calendario").text
+    assert "dia sim, dia não · 2 dias depois" in page
+    client(db).post("/calendario/ritmo", data={"site": "paheal", "rhythm": "hackeado", "delay": 99})
+    assert db.site_rhythm("paheal") == "diario" and db.site_delay("paheal") == 0
+
+
+def test_days_after_a_login_wait_depend_on_it(db):
+    approve(db, 3)
+    db.set_session("gelbooru", False, "sem sessão")
+    row = next(r for r in calendar_view.build(db, NOW)["rows"] if r["site"] == "gelbooru")
+    kinds = [c["kind"] for c in row["cells"] if c["kind"] in ("waiting", "blocked")]
+    assert kinds[0] == "waiting" and set(kinds[1:]) == {"blocked"}
+
+
+def test_past_week_shows_what_went_out(db):
+    (pid,) = approve(db, 1)
+    db.add_publication(pid, "danbooru", "ok", "https://x/1")
+    when = NOW - timedelta(days=3)
+    db._exec("UPDATE publications SET created_at = ?", (when.isoformat(),))
+    view = calendar_view.build(db, NOW, week=-1)
+    dan = next(r for r in view["rows"] if r["site"] == "danbooru")
+    assert [c["kind"] for c in dan["cells"]].count("published") == 1
