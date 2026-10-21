@@ -29,6 +29,9 @@
       <div class="site-card__actions">
         {% if r.state == 'login' %}
           <form method="post" action="/sites/{{ s }}/cancelar">{{ ui.button("Cancelar", tipo="secundario", size="sm", type="submit") }}</form>
+        {% elif r.state == 'manual' %}
+          <form method="post" action="/sites/{{ s }}/assistido"><input type="hidden" name="ligar" value="0">
+            {{ ui.button("Voltar a enviar pelo robô", tipo="link", type="submit", attrs={"data-confirm": "O robô volta a abrir o " ~ r.label ~ " sozinho no horário. Se a Cloudflare barrar de novo, o envio falha."}) }}</form>
         {% else %}
           {% if s != 'danbooru' and r.state in ('down', 'none') %}
           <form method="post" action="/sites/{{ s }}/login" data-login-form>{{ ui.button("Entrar", size="sm", type="submit") }}</form>
