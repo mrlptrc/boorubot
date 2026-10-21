@@ -139,7 +139,7 @@
             {{ ui.button("Pronto", tipo="suave", size="sm", attrs={"data-dialog-cancel": ""}) }}</div>
           <ul class="bb-sites">
             {% for r in site_rows %}
-            {% set down = r.site != 'danbooru' and r.session_ok == False and not r.done %}
+            {% set down = r.site != 'danbooru' and r.session_ok == False and not r.done and not r.assisted %}
             <li class="bb-site{{ ' bb-site--off' if r.off or r.done }}{{ ' bb-site--warn' if down }}" data-site="{{ r.site }}">
               <span class="bb-site__name" id="site-{{ r.site }}">{{ r.label }}</span>
               <span class="bb-site__note">
@@ -148,7 +148,9 @@
                   {%- elif r.off %}site desligado no <a href="/calendario">Calendário</a>
                   {%- else %}
                     {%- if r.site == 'paheal' %}<span data-oc-only {{ 'hidden' if not post.original_character }}>fica de fora: não aceita personagem original</span>{% endif %}
-                    {%- if down %}
+                    {%- if r.assisted %}
+                      envio à mão: o painel prepara, você envia pelo seu navegador{% if post.status in ('approved', 'partial') %} · <a href="#manual">ver</a>{% endif %}
+                    {%- elif down %}
                       pediu login de novo · <button type="submit" class="bb-btn bb-btn--link" formaction="/sites/{{ r.site }}/login" formnovalidate>entrar</button>
                     {%- elif r.site != 'danbooru' and r.session_ok is none %}
                       ainda não conectado · <a href="/guia#{{ 'rule34xxx' if r.site == 'rule34xxx' else 'gelbooru' }}">como entrar</a>
@@ -250,6 +252,54 @@
     </ul>
     {% if spam %}<p class="publish-warn"><span aria-hidden="true">⚠</span> Já saiu um post hoje. Dois no mesmo dia podem parecer spam para os sites.</p>{% endif %}
   {% endcall %}
+
+  {% if manual %}
+  {% set ext = post.image[post.image.rfind('.'):] %}
+  <section class="ed-section" id="manual" aria-labelledby="manual-t">
+    <h2 id="manual-t">Enviar à mão</h2>
+    <p class="ed-manual__intro">A Cloudflare não deixa o robô entrar {{ 'nestes sites' if manual|length > 1 else 'neste site' }}. O painel deixou tudo pronto:
+      abra a página de envio no <b>seu navegador</b>, copie e cole, e depois marque aqui.</p>
+    {% for m in manual %}
+    <div class="bb-card ed-manual">
+      <h3 class="title-3">{{ m.label }}</h3>
+      <ol class="ed-manual__steps">
+        <li><span>Baixe a arte e abra a página de envio. A verificação da Cloudflare e o captcha você resolve lá.</span>
+          <span class="ed-manual__actions">
+            <a class="bb-btn bb-btn--secondary bb-btn--sm" href="/images/{{ post.image }}" download="{{ (post.title or 'arte')|replace(' ', '_') ~ ext }}">Baixar a arte</a>
+            <a class="bb-btn bb-btn--primary bb-btn--sm" href="{{ m.upload_url }}" target="_blank" rel="noopener noreferrer">Abrir o envio do {{ m.label }} ↗</a>
+          </span></li>
+        <li><span>Copie e cole cada campo.</span>
+          <div class="ed-manual__fields">
+            <div class="ed-field">
+              <div class="ed-label-row"><label class="ed-label" for="manual-tags-{{ m.site }}">Tags</label>
+                <span class="ed-sub">{{ m.tag_count }} tags</span>
+                <button type="button" class="bb-btn bb-btn--link" data-copy="#manual-tags-{{ m.site }}">copiar</button></div>
+              <textarea id="manual-tags-{{ m.site }}" class="bb-input" rows="4" readonly>{{ m.tags }}</textarea>
+              {% if m.site == 'rule34xxx' and m.tag_count < 5 %}<p class="ed-hint is-warn">O rule34.xxx pede pelo menos 5 tags.</p>{% endif %}
+            </div>
+            <p class="ed-manual__rating">Rating: <b>{{ m.rating }}</b>
+              {%- if m.site == 'rule34xxx' and m.rating not in ('Explicit', 'Questionable') %} · o rule34.xxx só tem Explicit e Questionable{% endif %}</p>
+            {% for key, label, value in [('source', 'Source', m.source), ('title', 'Title', m.title)] if value %}
+            <div class="ed-field">
+              <div class="ed-label-row"><label class="ed-label" for="manual-{{ key }}-{{ m.site }}">{{ label }}</label>
+                <button type="button" class="bb-btn bb-btn--link" data-copy="#manual-{{ key }}-{{ m.site }}">copiar</button></div>
+              <input id="manual-{{ key }}-{{ m.site }}" class="bb-input" value="{{ value }}" readonly>
+            </div>
+            {% endfor %}
+          </div></li>
+        <li><span>Enviou? Cole o link do post (opcional) e marque.</span>
+          <form method="post" action="/posts/{{ post.id }}/manual" class="ed-manual__done">
+            <input type="hidden" name="site" value="{{ m.site }}">
+            <label class="sr-only" for="manual-url-{{ m.site }}">Link do post no {{ m.label }}</label>
+            <input id="manual-url-{{ m.site }}" name="url" class="bb-input" placeholder="https://… (link do post)">
+            {{ ui.button("Saiu", type="submit", size="sm", attrs={"name": "action", "value": "saiu"}) }}
+            {{ ui.button("Não vou enviar", tipo="secundario", type="submit", size="sm", attrs={"name": "action", "value": "pular", "data-confirm": "Esta arte não vai para o " ~ m.label ~ ". Ela sai da fila desse site."}) }}
+          </form></li>
+      </ol>
+    </div>
+    {% endfor %}
+  </section>
+  {% endif %}
 
   {% if refused %}
   <section class="ed-section" id="recusado" aria-labelledby="recusado-t">
