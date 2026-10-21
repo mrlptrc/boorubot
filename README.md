@@ -1,5 +1,18 @@
 # boorubot
 
+![Python 3.13](https://img.shields.io/badge/Python-3.13-3776AB?logo=python&logoColor=white)
+![FastAPI](https://img.shields.io/badge/FastAPI-009688?logo=fastapi&logoColor=white)
+![SQLite](https://img.shields.io/badge/SQLite-003B57?logo=sqlite&logoColor=white)
+![Playwright](https://img.shields.io/badge/Playwright-2EAD33?logo=playwright&logoColor=white)
+![ONNX Runtime](https://img.shields.io/badge/ONNX_Runtime-005CED?logo=onnx&logoColor=white)
+![uv](https://img.shields.io/badge/uv-DE5FE9?logo=uv&logoColor=white)
+![Licença MIT](https://img.shields.io/badge/licen%C3%A7a-MIT-informational)
+
+> **In English:** boorubot is a local web panel that helps an artist post her artwork to imageboards
+> (Danbooru, rule34.paheal, rule34.xxx) at a steady pace of one per day. A local AI tagger suggests
+> Danbooru-style tags and rating, she reviews and approves, and a queue publishes through the Danbooru API,
+> a headless browser, or an assisted manual flow where a site blocks automation. The UI is in Portuguese.
+
 Painel local para artistas publicarem as próprias artes em imageboards (Danbooru, rule34.paheal e rule34.xxx),
 **uma por dia**, sem copiar e colar a mesma arte em vários sites.
 
@@ -96,6 +109,53 @@ A primeira sugestão de tags baixa ~380 MB (modelo [`SmilingWolf/wd-vit-tagger-v
 Os prints e o GIF usam um banco de demonstração com artes geradas por código. Para refazer depois de mudar
 alguma tela: `scripts/demo/gerar.sh` (precisa de ffmpeg e ImageMagick).
 
+## Como funciona
+
+Um processo só, no PC de quem usa: o painel web e três threads de fundo dividem o mesmo banco SQLite.
+
+```mermaid
+flowchart LR
+    user(["Artista<br/>(navegador)"]) --> panel["Painel<br/>FastAPI + Jinja2"]
+    panel <--> db[("SQLite<br/>artes, fila, envios,<br/>métricas, ajustes")]
+
+    subgraph worker["Worker (threads no mesmo processo)"]
+        direction TB
+        sched["Agendador<br/>1 fila por site, no horário"]
+        jobs["Fila de envios<br/>um de cada vez"]
+        ai["Fila da IA<br/>separada dos envios"]
+        sched --> jobs
+    end
+
+    panel -- "nova arte" --> ai
+    panel -- "publicar agora / testar" --> jobs
+    ai --> tagger["WD Tagger v3<br/>ONNX Runtime, local"]
+    tagger -. "tags + rating" .-> db
+    sched -. "lê a fila" .-> db
+
+    jobs --> dan["Danbooru<br/>API oficial"]
+    jobs --> pah["rule34.paheal<br/>Playwright, sem janela"]
+    panel --> r34["rule34.xxx<br/>envio assistido:<br/>a pessoa envia"]
+    dan -. "score e favoritos" .-> db
+```
+
+Decisões que moldam o código:
+
+- **Uma simulação para o robô e para as telas.** `scheduler.simulate_site` percorre a fila de cada site dia a
+  dia. O worker pergunta a ela o que sai agora (`site_due`), e o Início e o Calendário usam a mesma função para
+  mostrar o que vai sair (`plan`). A previsão na tela é sempre o que o robô vai fazer.
+- **Fila com posição, não com data.** Arte aprovada tem `queue_pos`. O dia de cada arte é calculado na hora,
+  então reordenar, pular um dia ou o PC ficar desligado não deixa datas velhas no banco nem acumula posts.
+- **A IA nunca atrasa um envio.** A sugestão de tags roda numa fila e numa thread próprias. O primeiro uso
+  baixa ~380 MB e cada análise leva segundos; o envio das 19:30 não espera por isso.
+- **Envios um de cada vez.** Os sites de formulário usam perfis persistentes do Playwright (`.profiles/`), e
+  dois envios ao mesmo tempo brigariam pelo mesmo perfil.
+- **Teste e produção em tabelas diferentes.** `test_runs` e `publications` nunca se misturam, então um teste
+  não conta como publicação, não mexe na fila e não estraga métricas.
+- **Quando o site barra o robô, a pessoa assume.** A Cloudflare do rule34.xxx recusa navegador automatizado.
+  Em vez de disfarçar o robô, o painel prepara tudo e a pessoa envia; o resto da fila segue normal.
+- **Banco que se atualiza sozinho.** As migrações rodam em `DB.__init__` e são idempotentes: abrir uma versão
+  nova do painel sobre um banco antigo só adiciona o que falta.
+
 ## Comandos
 
 ```bash
@@ -121,8 +181,8 @@ nos sites e desligue o painel do computador antigo.
 
 ## Desenvolvimento
 
-- FastAPI + Jinja2, SQLite com migrações idempotentes em `DB.__init__`, worker em thread com fila separada
-  para a sugestão da IA, Playwright com perfis persistentes por site.
+- `uv run pytest` roda os testes (unidade, rotas com `TestClient` e telas com Playwright num uvicorn real).
+  Nenhum teste acessa a rede: `tests/conftest.py` bloqueia o Danbooru.
 - Design system em [`docs/design-system/`](docs/design-system/BRAND-BOOK.md): tokens em `tokens.css`,
   componentes `bb-*`; a tela `/_ui` mostra o catálogo. Cores sempre por token.
 - Sites novos: `src/boorubot/sites/` (`FormSite` para formulários; `Gelbooru02` cobre o motor Gelbooru 0.2).
